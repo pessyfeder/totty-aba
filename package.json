@@ -1,0 +1,16 @@
+{
+  "name": "totty-aba",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "db:migrate": "node scripts/migrate.js",
+    "db:seed": "node scripts/migrate.js --seed",
+    "test": "node --test \"test/*.test.js\""
+  },
+  "dependencies": {
+    "pg": "^8.13.0"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "^0.2.17"
+  }
+}
