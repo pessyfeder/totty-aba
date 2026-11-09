@@ -226,3 +226,19 @@ test("another clinician's goal series and annotations are 404", async () => {
   assert.equal((await call(`/api/goals/${g.id}/series`, { cookie })).status, 404);
   assert.equal((await call(`/api/goals/${g.id}/annotations`, { method: 'POST', cookie, body: { date: '2026-10-01', text: 'x' } })).status, 404);
 });
+
+test('editing a client can change and clear optional fields; invalid edits are refused; audit is written', async () => {
+  const { cookie } = await login();
+  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Edit', last_name: 'Me', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9, notes: 'old', dob: '2020-01-01' } });
+  const id = c.json.id;
+  const ok = await call(`/api/clients/${id}`, { method: 'PATCH', cookie, body: { first_name: 'Edited', notes: null, dob: null, candle_lighting_minutes: 25, in_israel: true } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.first_name, 'Edited');
+  assert.equal(ok.json.notes, null);
+  assert.equal(ok.json.dob, null);
+  assert.equal(ok.json.candle_lighting_minutes, 25);
+  assert.equal((await call(`/api/clients/${id}`, { method: 'PATCH', cookie, body: { latitude: 120 } })).status, 400);
+  assert.equal((await call(`/api/clients/${id}`, { method: 'PATCH', cookie, body: { timezone: 'Mars/Base' } })).status, 400);
+  const { rows } = await db.query(`SELECT detail FROM audit_log WHERE entity = 'client' AND entity_id = $1 AND action = 'update'`, [id]);
+  assert.equal(rows.length, 1);
+});

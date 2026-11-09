@@ -102,7 +102,7 @@ export async function renderClient(ctx, id) {
 
   app.replaceChildren(
     h('p', {}, h('a', { href: '#/' }, '← Dashboard')),
-    h('h2', {}, `${c.first_name} ${c.last_name}`),
+    h('h2', {}, `${c.first_name} ${c.last_name}`, ' ', h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
     h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
     h('h2', {}, 'Preferred incentives'),
     c.incentives.length ? h('ul', { class: 'chips' }, c.incentives.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),

@@ -121,20 +121,27 @@ async function renderDashboard() {
 
 const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);
 
-function renderAddClient() {
+/** Add (c == null) or edit (c = existing client) form. Editing sends every field, so a cleared optional field is cleared. */
+function renderClientForm(c = null) {
   logoutBtn.hidden = false;
   const msg = h('p', { class: 'error', role: 'alert' });
-  const field = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, ...attrs }));
+  const v = (k) => (c?.[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
+  const field = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, value: v(name), ...attrs }));
+  const OPTIONAL = ['gender', 'dob', 'location_name', 'candle_lighting_minutes', 'notes'];
   const form = h('form', { class: 'login', onsubmit: async (e) => {
     e.preventDefault();
     msg.textContent = '';
     const f = new FormData(form);
     const body = {};
-    for (const [k, v] of f.entries()) if (String(v).trim() !== '') body[k] = String(v).trim();
+    for (const [k, val] of f.entries()) {
+      const t = String(val).trim();
+      if (t !== '') body[k] = t;
+      else if (c && OPTIONAL.includes(k)) body[k] = null;
+    }
     body.in_israel = f.get('in_israel') === 'on';
     try {
-      const c = await api('/clients', { method: 'POST', body });
-      location.hash = `#/client/${c.id}`;
+      const saved = c ? await api(`/clients/${c.id}`, { method: 'PATCH', body }) : await api('/clients', { method: 'POST', body });
+      location.hash = `#/client/${saved.id}`;
     } catch (ex) { msg.textContent = ex.message; }
   } },
     field('First name', 'first_name', { required: true }),
@@ -145,13 +152,21 @@ function renderAddClient() {
     field('Location name', 'location_name', { placeholder: 'e.g. Brooklyn, NY' }),
     field('Latitude', 'latitude', { type: 'number', step: 'any', min: -90, max: 90, required: true }),
     field('Longitude', 'longitude', { type: 'number', step: 'any', min: -180, max: 180, required: true }),
-    field('Timezone', 'timezone', { value: Intl.DateTimeFormat().resolvedOptions().timeZone, required: true }),
-    h('label', {}, h('input', { name: 'in_israel', type: 'checkbox' }), ' Lives in Israel (Yom Tov observance)'),
+    field('Timezone', 'timezone', { required: true, ...(c ? {} : { value: Intl.DateTimeFormat().resolvedOptions().timeZone }) }),
+    h('label', {}, h('input', { name: 'in_israel', type: 'checkbox', checked: Boolean(c?.in_israel) }), ' Lives in Israel (Yom Tov observance)'),
     field('Candle lighting (minutes before sunset)', 'candle_lighting_minutes', { type: 'number', min: 0, placeholder: 'default 18' }),
-    h('label', {}, 'Notes', h('textarea', { name: 'notes', rows: 3 })),
-    h('button', { type: 'submit' }, 'Add client'), msg);
-  app.replaceChildren(h('p', {}, h('a', { href: '#/' }, '← Dashboard')), h('h2', {}, 'Add client'), form);
+    h('label', {}, 'Notes', h('textarea', { name: 'notes', rows: 3 }, c?.notes ?? '')),
+    h('button', { type: 'submit' }, c ? 'Save changes' : 'Add client'), msg);
+  const archive = c && h('p', {}, h('button', { type: 'button', class: 'link', onclick: async () => {
+    const restoring = c.status === 'archived';
+    if (!restoring && !confirm(`Archive ${c.first_name}? Prompts stop and the client leaves the dashboard. History is kept and you can restore later.`)) return;
+    try { await api(`/clients/${c.id}/archive`, { method: 'POST', body: { restore: restoring } }); location.hash = '#/'; } catch (ex) { msg.textContent = ex.message; }
+  } }, c.status === 'archived' ? 'Restore client' : 'Archive client'));
+  app.replaceChildren(h('p', {}, h('a', { href: c ? `#/client/${c.id}` : '#/' }, c ? '← Back to client' : '← Dashboard')), h('h2', {}, c ? `Edit ${c.first_name} ${c.last_name}` : 'Add client'), form, archive || '');
 }
+
+const renderAddClient = () => renderClientForm();
+const renderEditClient = async (id) => renderClientForm(await api(`/clients/${id}`));
 
 function handle(err) {
   if (err instanceof Locked) return renderLocked(err.body);
@@ -161,7 +176,8 @@ function handle(err) {
 
 async function route() {
   const m = /^#\/client\/([0-9a-f-]{36})$/i.exec(location.hash);
-  try { await (location.hash === '#/client/new' ? renderAddClient() : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
+  try { await (location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {
