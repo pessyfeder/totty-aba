@@ -9,6 +9,7 @@ const db = await makeDb();
 const w = await seedWorld(db);
 const spoon = await w.addGoal('Uses a spoon', { question: 'Did Dovid use a spoon at dinner today?' });
 const bedtime = await w.addGoal('Bedtime routine', { type: 'rating', time: '20:00' });
+await db.query('UPDATE contact SET consent_given_at = now()');
 await db.query(`INSERT INTO reinforcement (client_id, name, note) VALUES ($1, 'bubbles', NULL), ($1, 'iPad time', '5 minute max')`, [w.client.id]);
 
 const prompt = (goal, hoursAgo, status) =>

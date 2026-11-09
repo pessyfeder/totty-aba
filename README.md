@@ -22,7 +22,7 @@ CLINICIAN_PASSWORD='at least 12 chars' node scripts/create-clinician.js \
 npm start
 ```
 
-Without Twilio variables set, outgoing SMS goes to the console. In production (`NODE_ENV=production`) Twilio credentials are required, and the Twilio inbound webhook (`POST /webhooks/twilio/sms`) must be pointed at `PUBLIC_URL`.
+Without Twilio variables set, outgoing SMS goes to the console. In production (`NODE_ENV=production`) Twilio credentials are required, and `PUBLIC_URL` is also the base of the report links texted to parents. The Twilio inbound webhook (`POST /webhooks/twilio/sms`) must be pointed at `PUBLIC_URL`.
 
 ## Layout
 
@@ -34,6 +34,7 @@ Without Twilio variables set, outgoing SMS goes to the console. In production (`
 | `src/scheduler.js` | Per-minute tick: create, defer, send, remind, mark no-response |
 | `src/inbound.js`, `src/parse.js` | Parent replies |
 | `src/app.js`, `src/dashboard.js` | REST API and dashboard queries (locked on Shabbos) |
+| `src/reports.js`, `src/report-routes.js` | Progress reports: content, PDF, secure link |
 | `public/` | Dashboard UI (no build step) |
 
 `npm test` runs everything against PGlite (real Postgres engine, in process).

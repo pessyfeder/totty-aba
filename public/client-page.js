@@ -1,5 +1,6 @@
 // Client page: contacts, goals, per-goal charts, notes (SPEC 5.1, 5.2, 5.5, 5.6a).
 import { chartFor } from './charts.js';
+import { reportsSection } from './reports-page.js';
 
 const RANGES = [['week', '1 week'], ['month', '1 month'], ['3months', '3 months'], ['all', 'All']];
 const TREND = { improving: 'Improving', flat: 'Flat', declining: 'Declining', not_enough_data: 'Not enough data yet' };
@@ -96,6 +97,8 @@ export async function renderClient(ctx, id) {
   const reinforcementForm = inlineForm(h, [lbl('Preferred reinforcement', h('input', { name: 'name', required: true, placeholder: 'e.g. bubbles' }))],
     'Add', (f) => post('/reinforcements', trimmed(f)));
 
+  const reports = await reportsSection(ctx, id);
+
   app.replaceChildren(
     h('p', {}, h('a', { href: '#/' }, '← Dashboard')),
     h('h2', {}, `${c.first_name} ${c.last_name}`, ' ', h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
@@ -109,5 +112,6 @@ export async function renderClient(ctx, id) {
     h('h2', {}, 'Goals'),
     ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload)) : [h('p', { class: 'muted' }, 'No goals yet.')]),
     c.contacts.length ? h('details', {}, h('summary', {}, 'Add a goal'), goalForm) : h('p', { class: 'muted' }, 'Add a contact (Edit contacts, above) before adding a goal.'),
+    reports,
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload))) : '');
 }

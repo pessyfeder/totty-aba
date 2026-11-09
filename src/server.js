@@ -37,6 +37,8 @@ const app = createApp({
     production,
     sessionSecret: env.SESSION_SECRET,
     publicUrl: env.PUBLIC_URL ?? '',
+    reportsDir: env.REPORTS_DIR || undefined,
+    reportLinkDays: Number(env.REPORT_LINK_DAYS) || 14,
     twilio: twilioConfigured ? { authToken: env.TWILIO_AUTH_TOKEN } : null,
   },
 });

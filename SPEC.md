@@ -102,7 +102,16 @@ Each goal has:
 - Contents: client name, date range, per-goal summary (responses received, % met or average rating, change vs. prior period, small chart), parent comments, Totty's optional note, and next-period focus.
 - Totty previews and edits the report, then chooses **Send** or **Download PDF**. Sending is always a manual action.
 - Delivery: the PDF is stored in the app and sent to the parent as an **SMS containing a secure link** (no email delivery). The link is unguessable and expires after a set period (default 14 days), and the text itself contains no progress details, only the child's first name. Reports can only be created or sent outside the Shabbos window; the app is locked for Totty during it (see 5.3).
-- Report history is viewable per client.
+- Report history is viewable per client (period, type, status, date sent).
+- **How it works in v1:**
+  - Period choices snap to whole periods: weekly is always Sunday to Saturday, monthly is a whole calendar month, custom allows up to one year. Create report builds a **draft** and opens the preview.
+  - The report includes **every active goal**, even with no replies, plus any paused or archived goal that was asked something in the period. "Change vs. prior period" compares with the immediately preceding period of the same length.
+  - Only answered prompts count: a day with no reply is shown as a missing mark and is never counted as No (5.5).
+  - In the preview Totty can edit his note, the next-period focus, a remark under each goal, and untick any parent comment he does not want included. Everything else is generated from the data and cannot be edited.
+  - **Download PDF** produces the current draft without changing anything. **Send to parent** asks Totty to pick a contact (active, with a mobile number and recorded consent), confirms, then freezes the report, stores the PDF, and texts the link right away. A report that has been sent cannot be edited or sent again; to send updated figures Totty creates a new report.
+  - The text reads: "A progress report for <first name> is ready: <link>". If the text cannot go out (including a Shabbos refusal), nothing is stored as sent and the report stays a draft.
+  - The link opens the PDF with no login, until it expires (default 14 days, `REPORT_LINK_DAYS`). Only a hash of the token is stored. After expiry it shows a short "ask Totty for a new one" message. Opening the link is read-only, so it works during Shabbos; only Totty's actions are locked.
+  - PDFs use standard Latin fonts: characters outside them (for example Hebrew in a parent comment) print as "?" in the PDF in v1.
 
 ### 5.6a Preferred reinforcements
 - Each client has a simple list of **preferred reinforcements** (also called reinforcers), e.g., "bubbles", "iPad time", "gummy bears". It is a record only: no data collection, no scoring, and no chart.
@@ -128,7 +137,7 @@ Each goal has:
 - `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason)`
 - `response(id, prompt_id, received_at, value_bool, value_int, comment, raw_text, source, parse_status)`
 - `annotation(id, goal_id, date, text)`
-- `report(id, client_id, period_type, period_start, period_end, status, pdf_path, sent_at, note)`
+- `report(id, client_id, period_type, period_start, period_end, status, content_json, pdf_path, sent_at, note, link_token_hash, link_expires_at)`
 - `message_log(id, direction, to_from, body, provider_id, status, created_at)`
 
 ## 7. Architecture (recommended)

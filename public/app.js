@@ -1,6 +1,7 @@
 // Dashboard UI (SPEC 5.7). DOM is built with textContent only: parent replies are untrusted text.
 import { renderClient as renderClientPage } from './client-page.js';
 import { renderContacts } from './contacts-page.js';
+import { renderReport } from './reports-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -99,9 +100,7 @@ async function renderDashboard() {
   const reload = () => renderDashboard().catch(handle);
   const sh = d.shabbos;
   app.replaceChildren(
-    sh && h('div', { class: 'banner' }, sh.active
-      ? `Shabbos window in effect until ${fmtDateTime(sh.end)}.`
-      : `Next ${sh.kind === 'yom_tov' ? 'Yom Tov' : 'Shabbos'} window: ${fmtDateTime(sh.start)} to ${fmtDateTime(sh.end)}. Prompts resume at nightfall.`),
+    sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     d.attention.length > 0 && h('section', {}, h('h2', {}, 'Needs attention'),
       h('ul', {}, d.attention.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}` }, c.first_name), ` — ${c.attention.join('; ')}`)))),
     h('section', {}, h('h2', {}, 'Clients'),
@@ -187,8 +186,9 @@ function handle(err) {
 async function route() {
   const m = /^#\/client\/([0-9a-f-]{36})$/i.exec(location.hash);
   const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
+  const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
-  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {

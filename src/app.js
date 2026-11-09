@@ -6,6 +6,7 @@ import { COOKIE, createSession, readSession, parseCookies, verifyPassword } from
 import { locationFrom, windowAt } from './shabbos.js';
 import { loadDashboard } from './dashboard.js';
 import { handleInbound } from './inbound.js';
+import { reportRoutes } from './report-routes.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
@@ -337,6 +338,9 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     await audit(req, 'review_response', 'response', req.params.id);
     res.json(out[0]);
   });
+
+  // ---- Progress reports (SPEC 5.6); the parent's /r/:token link is outside /api, so it is not locked ----
+  reportRoutes({ app, db, messenger, config, now, HttpError, bad, audit, ownedClient, insertRow })();
 
   // ---- Static dashboard + errors ----
   app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));

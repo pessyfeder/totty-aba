@@ -62,3 +62,5 @@ form.login textarea { width: 100%; font: inherit; }
 .goal-card { margin-bottom: 14px; }
 .inline-form { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; align-items: end; }
 .trend-improving { color: var(--ok); } .trend-declining { color: var(--bad); }
+label.check { display: flex; gap: 6px; align-items: baseline; font-size: .9rem; }
+.card textarea, label textarea { width: 100%; font: inherit; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--text); }
