@@ -229,8 +229,10 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     res.status(201).json(row);
   });
   app.patch('/api/contacts/:id', async (req, res) => {
-    const row = await updateRow(req, 'contact', req.params.id, pick(req.body, CONTACT_FIELDS), viaClient);
-    await audit(req, 'update', 'contact', row.id, { fields: Object.keys(pick(req.body, CONTACT_FIELDS)) });
+    const f = pick(req.body, CONTACT_FIELDS);
+    if ('name' in f && !String(f.name ?? '').trim()) throw bad('name is required');
+    const row = await updateRow(req, 'contact', req.params.id, f, viaClient);
+    await audit(req, 'update', 'contact', row.id, { fields: Object.keys(f) });
     res.json(row);
   });
 
@@ -245,11 +247,14 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     await audit(req, 'create', 'goal', row.id);
     res.status(201).json(row);
   });
+  // Goals are not editable once added (SPEC 5.2): the only change allowed is its status, so a goal's
+  // question, schedule and history cannot silently change. To change a goal, archive it and add a new one.
   app.patch('/api/goals/:id', async (req, res) => {
-    const f = pick(req.body, GOAL_FIELDS);
-    checkGoal(f, { partial: true });
-    const row = await updateRow(req, 'goal', req.params.id, f, viaClient);
-    await audit(req, 'update', 'goal', row.id, { fields: Object.keys(f) });
+    const status = req.body?.status;
+    if (!['active', 'paused', 'archived'].includes(status)) throw bad('status must be active, paused or archived');
+    if (Object.keys(req.body).some((k) => k !== 'status')) throw bad('Goals cannot be edited; archive it and add a new goal');
+    const row = await updateRow(req, 'goal', req.params.id, { status }, viaClient);
+    await audit(req, status === 'archived' ? 'archive' : 'status', 'goal', row.id, { status });
     res.json(row);
   });
 

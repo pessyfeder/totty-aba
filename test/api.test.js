@@ -252,3 +252,29 @@ test('archived clients are listed separately and can be restored', async () => {
   await call(`/api/clients/${c.json.id}/archive`, { method: 'POST', cookie, body: { restore: true } });
   assert.ok((await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
 });
+
+test('goals cannot be edited, only paused/resumed or archived; archived goals stop prompting but keep history', async () => {
+  const { cookie } = await login();
+  const g = await world.addGoal('Locked goal');
+  const edit = await call(`/api/goals/${g.id}`, { method: 'PATCH', cookie, body: { title: 'changed' } });
+  assert.equal(edit.status, 400);
+  assert.equal((await call(`/api/goals/${g.id}`, { method: 'PATCH', cookie, body: { status: 'active', title: 'sneaky' } })).status, 400);
+  assert.equal((await call(`/api/goals/${g.id}`, { method: 'PATCH', cookie, body: { status: 'achieved' } })).status, 400);
+  const { rows } = await db.query('SELECT title FROM goal WHERE id = $1', [g.id]);
+  assert.equal(rows[0].title, 'Locked goal');
+  assert.equal((await call(`/api/goals/${g.id}`, { method: 'PATCH', cookie, body: { status: 'paused' } })).json.status, 'paused');
+  const arch = await call(`/api/goals/${g.id}`, { method: 'PATCH', cookie, body: { status: 'archived' } });
+  assert.equal(arch.json.status, 'archived');
+  assert.equal((await call(`/api/goals/${g.id}/series`, { cookie })).status, 200); // history still readable
+});
+
+test('contact details can be edited and cleared; name cannot be blanked', async () => {
+  const { cookie } = await login();
+  const r = await call(`/api/contacts/${world.contact.id}`, { method: 'PATCH', cookie, body: { name: 'Mrs. C', email: 'c@example.test', relationship: 'mother' } });
+  assert.equal(r.status, 200);
+  assert.equal(r.json.name, 'Mrs. C');
+  const cleared = await call(`/api/contacts/${world.contact.id}`, { method: 'PATCH', cookie, body: { email: null, consent_given_at: null } });
+  assert.equal(cleared.json.email, null);
+  assert.equal((await call(`/api/contacts/${world.contact.id}`, { method: 'PATCH', cookie, body: { name: '  ' } })).status, 400);
+  assert.equal((await call(`/api/contacts/${world.contact.id}`, { method: 'PATCH', cookie, body: { phone: '555-1234' } })).status, 400);
+});

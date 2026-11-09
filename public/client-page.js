@@ -50,11 +50,16 @@ function goalCard({ h, api, handle }, g, contacts, reload) {
   const card = h('article', { class: 'card goal-card' },
     h('h3', {}, g.title),
     h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : '0–5 rating'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`),
-    summary, rangeBar, body, note,
-    h('button', { type: 'button', class: 'link', onclick: () => {
-      const next = g.status === 'paused' ? 'active' : 'paused';
-      api(`/goals/${g.id}`, { method: 'PATCH', body: { status: next } }).then(reload, handle);
-    } }, g.status === 'paused' ? 'Resume prompts' : 'Pause prompts'));
+    summary, rangeBar, body, g.status === 'archived' ? '' : note,
+    g.status === 'archived' ? h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.') : h('div', {},
+      h('button', { type: 'button', class: 'link', onclick: () => {
+        const next = g.status === 'paused' ? 'active' : 'paused';
+        api(`/goals/${g.id}`, { method: 'PATCH', body: { status: next } }).then(reload, handle);
+      } }, g.status === 'paused' ? 'Resume prompts' : 'Pause prompts'),
+      h('button', { type: 'button', class: 'link', onclick: () => {
+        if (!confirm(`Archive "${g.title}"? Prompts stop for good and the goal can't be edited or restored. Its history is kept.`)) return;
+        api(`/goals/${g.id}`, { method: 'PATCH', body: { status: 'archived' } }).then(reload, handle);
+      } }, 'Archive goal')));
   draw().catch(handle);
   return card;
 }
@@ -66,18 +71,6 @@ export async function renderClient(ctx, id) {
   const lbl = (text, input) => h('label', {}, text, input);
   const reload = () => renderClient(ctx, id).catch(handle);
   const post = (path, body) => api(`/clients/${id}${path}`, { method: 'POST', body }).then(reload);
-
-  const contactForm = inlineForm(h, [
-    lbl('Name', h('input', { name: 'name', required: true })),
-    lbl('Relationship', h('input', { name: 'relationship', placeholder: 'Mother' })),
-    lbl('Mobile (+15551234567)', h('input', { name: 'phone', type: 'tel', pattern: '\\+[1-9][0-9]{6,14}', title: 'International format, e.g. +15551234567' })),
-    h('label', {}, h('input', { name: 'consent', type: 'checkbox' }), ' Parent consented to texts'),
-  ], 'Add contact', async (f) => {
-    const body = trimmed(f);
-    delete body.consent;
-    if (f.get('consent')) body.consent_given_at = new Date().toISOString();
-    await post('/contacts', body);
-  });
 
   const goalForm = inlineForm(h, [
     lbl('Goal', h('input', { name: 'title', required: true, placeholder: 'e.g. Used words to ask for help' })),
@@ -97,6 +90,9 @@ export async function renderClient(ctx, id) {
     await post('/goals', { ...body, channel: 'sms', schedule_json: { days, time: f.get('time') } });
   });
 
+  const liveGoals = c.goals.filter((g) => g.status !== 'archived');
+  const archivedGoals = c.goals.filter((g) => g.status === 'archived');
+
   const reinforcementForm = inlineForm(h, [lbl('Preferred reinforcement', h('input', { name: 'name', required: true, placeholder: 'e.g. bubbles' }))],
     'Add', (f) => post('/reinforcements', trimmed(f)));
 
@@ -109,8 +105,9 @@ export async function renderClient(ctx, id) {
     reinforcementForm,
     h('h2', {}, 'Contacts'),
     h('ul', {}, c.contacts.map((p) => h('li', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${p.phone ?? 'no phone'}, ${p.consent_given_at ? 'consent recorded' : 'no consent recorded'}, ${p.status}`))),
-    contactForm,
+    h('p', {}, h('a', { href: `#/client/${id}/contacts`, class: 'button' }, 'Edit contacts')),
     h('h2', {}, 'Goals'),
-    ...(c.goals.length ? c.goals.map((g) => goalCard(ctx, g, c.contacts, reload)) : [h('p', { class: 'muted' }, 'No goals yet.')]),
-    c.contacts.length ? h('details', {}, h('summary', {}, 'Add a goal'), goalForm) : h('p', { class: 'muted' }, 'Add a contact before adding a goal.'));
+    ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload)) : [h('p', { class: 'muted' }, 'No goals yet.')]),
+    c.contacts.length ? h('details', {}, h('summary', {}, 'Add a goal'), goalForm) : h('p', { class: 'muted' }, 'Add a contact (Edit contacts, above) before adding a goal.'),
+    archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload))) : '');
 }

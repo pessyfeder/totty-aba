@@ -1,5 +1,6 @@
 // Dashboard UI (SPEC 5.7). DOM is built with textContent only: parent replies are untrusted text.
 import { renderClient as renderClientPage } from './client-page.js';
+import { renderContacts } from './contacts-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -185,8 +186,9 @@ function handle(err) {
 
 async function route() {
   const m = /^#\/client\/([0-9a-f-]{36})$/i.exec(location.hash);
+  const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
-  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {

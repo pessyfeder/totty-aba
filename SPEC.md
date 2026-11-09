@@ -32,6 +32,7 @@ Single-clinician in v1. Design the data model with a `clinician_id` so multi-use
 
 ### 5.1 Client management
 - Create, edit, and archive clients.
+- **Contacts pane**: parent/guardian contact details are added and edited on a separate **Contacts** page (client page > Edit contacts), not inline with goals. Editable: name, relationship, mobile (international format), email, preferred channel, language, status (active, paused, ended), consent to texts/calls, and a consent note. The consent date is recorded when consent is first ticked and kept while it stays ticked. Pausing or ending a contact stops all prompts to that person. Contacts are not deleted.
 - **Editing**: the client page has an **Edit** button that opens the same form used to create a client, pre-filled. Every client field is editable, including name, gender, DOB, admission date, location, timezone, Israel/Yom Tov setting, candle-lighting offset, and notes. Optional fields can be cleared. Required fields (name, admission date, location, timezone) cannot be left blank. Each edit is recorded in the audit log (which fields changed).
 - A location or timezone change takes effect for the Shabbos window immediately: every send is checked against the client's current location when it is due, including prompts already scheduled. Send times of prompts already created keep their original instant; newly created prompts use the new timezone.
 - **Archiving**: **Archive client** (on the edit page, after confirmation) stops all prompts for the client and removes them from the dashboard and client list. History and charts are kept. The dashboard links to an **Archived clients** list; opening a client there leads to its edit page, where **Restore client** is offered. An archived client can be restored, which resumes prompts from the next scheduled slot (missed slots are not backfilled).
@@ -47,8 +48,9 @@ Each goal has:
   - `rating`: parent replies 0-5, with an optional free-text comment.
 - **Schedule**: days of week and a time of day (client's local timezone). Can be daily, specific days, or weekly.
 - **Contact** to prompt, and **channel** (SMS or voice call). Default to the contact's preference.
-- **Date added**: the date the goal was added to the client's plan. Set automatically to today on creation, editable by Totty, and shown on the goal and its chart.
-- Start date (first prompt date, may differ from date added), optional end date, status (active, paused, achieved, discontinued).
+- **Date added**: the date the goal was added to the client's plan. Defaults to today on creation (Totty may set it when adding the goal) and is shown on the goal and its chart.
+- Start date (first prompt date, may differ from date added), optional end date, status (active, paused, archived).
+- **Goals are add-and-archive only.** Once added, a goal's title, question, schedule, contact, type, dates and target cannot be edited, so its chart and history always mean what they said when the data was collected. To change a goal, Totty archives it and adds a new one. The only changes allowed on an existing goal are **Pause/Resume** (prompts stop while paused) and **Archive**. Archiving asks for confirmation, stops all prompts, cannot be undone, and keeps the goal's history and chart, which appear under "Archived goals" on the client page. Chart notes (5.5) can still be added to active goals.
 - Optional target criterion (e.g., "80% Y over 2 weeks", or "average at least 4") used for the chart target line and an "achieved" suggestion.
 
 ### 5.3 Shabbos / no-send rule
