@@ -97,16 +97,16 @@ export async function renderClient(ctx, id) {
     await post('/goals', { ...body, channel: 'sms', schedule_json: { days, time: f.get('time') } });
   });
 
-  const incentiveForm = inlineForm(h, [lbl('Preferred incentive', h('input', { name: 'name', required: true, placeholder: 'e.g. bubbles' }))],
-    'Add', (f) => post('/incentives', trimmed(f)));
+  const reinforcementForm = inlineForm(h, [lbl('Preferred reinforcement', h('input', { name: 'name', required: true, placeholder: 'e.g. bubbles' }))],
+    'Add', (f) => post('/reinforcements', trimmed(f)));
 
   app.replaceChildren(
     h('p', {}, h('a', { href: '#/' }, '← Dashboard')),
     h('h2', {}, `${c.first_name} ${c.last_name}`, ' ', h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
     h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
-    h('h2', {}, 'Preferred incentives'),
-    c.incentives.length ? h('ul', { class: 'chips' }, c.incentives.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
-    incentiveForm,
+    h('h2', {}, 'Preferred reinforcements'),
+    c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
+    reinforcementForm,
     h('h2', {}, 'Contacts'),
     h('ul', {}, c.contacts.map((p) => h('li', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${p.phone ?? 'no phone'}, ${p.consent_given_at ? 'consent recorded' : 'no consent recorded'}, ${p.status}`))),
     contactForm,

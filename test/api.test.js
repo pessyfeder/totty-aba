@@ -66,7 +66,7 @@ test('creating a client requires an admission date and a location', async () => 
   assert.equal(bad.status, 400);
 });
 
-test('client, contact, goal and incentive round trip; dashboard shows incentives on the card', async () => {
+test('client, contact, goal and reinforcement round trip; dashboard shows reinforcements on the card', async () => {
   const { cookie } = await login();
   const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Miri', last_name: 'Adler', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
   assert.equal(c.status, 201);
@@ -77,11 +77,11 @@ test('client, contact, goal and incentive round trip; dashboard shows incentives
   assert.equal(goal.status, 201);
   const badGoal = await call(`/api/clients/${id}/goals`, { method: 'POST', cookie, body: { contact_id: contact.json.id, title: 'x', response_type: 'both', channel: 'sms', schedule_json: { days: [9], time: '25:00' }, start_date: '2026-10-05' } });
   assert.equal(badGoal.status, 400);
-  assert.equal((await call(`/api/clients/${id}/incentives`, { method: 'POST', cookie, body: { name: 'bubbles' } })).status, 201);
+  assert.equal((await call(`/api/clients/${id}/reinforcements`, { method: 'POST', cookie, body: { name: 'bubbles' } })).status, 201);
 
   const dash = await call('/api/dashboard', { cookie });
   const card = dash.json.clients.find((x) => x.id === id);
-  assert.deepEqual(card.incentives.map((i) => i.name), ['bubbles']);
+  assert.deepEqual(card.reinforcements.map((i) => i.name), ['bubbles']);
 
   const detail = await call(`/api/clients/${id}`, { cookie });
   assert.equal(detail.json.goals.length, 1);
@@ -101,7 +101,7 @@ test("one clinician cannot read or change another's data", async () => {
   const { cookie } = await login();
   assert.equal((await call(`/api/clients/${other.client.id}`, { cookie })).status, 404);
   assert.equal((await call(`/api/clients/${other.client.id}`, { method: 'PATCH', cookie, body: { notes: 'x' } })).status, 404);
-  assert.equal((await call(`/api/clients/${other.client.id}/incentives`, { method: 'POST', cookie, body: { name: 'x' } })).status, 404);
+  assert.equal((await call(`/api/clients/${other.client.id}/reinforcements`, { method: 'POST', cookie, body: { name: 'x' } })).status, 404);
   assert.equal((await call('/api/clients/not-a-uuid', { cookie })).status, 404);
 });
 
@@ -241,4 +241,14 @@ test('editing a client can change and clear optional fields; invalid edits are r
   assert.equal((await call(`/api/clients/${id}`, { method: 'PATCH', cookie, body: { timezone: 'Mars/Base' } })).status, 400);
   const { rows } = await db.query(`SELECT detail FROM audit_log WHERE entity = 'client' AND entity_id = $1 AND action = 'update'`, [id]);
   assert.equal(rows.length, 1);
+});
+
+test('archived clients are listed separately and can be restored', async () => {
+  const { cookie } = await login();
+  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Arch', last_name: 'Ived', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  await call(`/api/clients/${c.json.id}/archive`, { method: 'POST', cookie, body: {} });
+  assert.ok((await call('/api/clients?status=archived', { cookie })).json.some((x) => x.id === c.json.id));
+  assert.ok(!(await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
+  await call(`/api/clients/${c.json.id}/archive`, { method: 'POST', cookie, body: { restore: true } });
+  assert.ok((await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
 });

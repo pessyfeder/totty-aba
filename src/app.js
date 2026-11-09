@@ -11,7 +11,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
 const CONTACT_FIELDS = ['name', 'relationship', 'phone', 'email', 'preferred_channel', 'language', 'status', 'consent_given_at', 'consent_note'];
 const GOAL_FIELDS = ['contact_id', 'title', 'description', 'question_text', 'response_type', 'channel', 'schedule_json', 'date_added', 'start_date', 'end_date', 'status', 'target_json'];
-const INCENTIVE_FIELDS = ['name', 'note'];
+const REINFORCEMENT_FIELDS = ['name', 'note'];
 
 class HttpError extends Error {
   constructor(status, message, extra = {}) {
@@ -182,11 +182,11 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
   app.get('/api/clients/:id', async (req, res) => {
     const { rows } = await db.query('SELECT * FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
-    const [contacts, goals, incentives] = await Promise.all(
-      ['contact', 'goal', 'incentive'].map((t) => db.query(`SELECT * FROM ${t} WHERE client_id = $1 ORDER BY 1`, [req.params.id]).then((r) => r.rows)),
+    const [contacts, goals, reinforcements] = await Promise.all(
+      ['contact', 'goal', 'reinforcement'].map((t) => db.query(`SELECT * FROM ${t} WHERE client_id = $1 ORDER BY 1`, [req.params.id]).then((r) => r.rows)),
     );
     await audit(req, 'view', 'client', req.params.id);
-    res.json({ ...rows[0], contacts, goals, incentives });
+    res.json({ ...rows[0], contacts, goals, reinforcements });
   });
 
   app.patch('/api/clients/:id', async (req, res) => {
@@ -204,17 +204,17 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     res.json(row);
   });
 
-  // ---- Incentives (record only, SPEC 5.6a) ----
-  app.post('/api/clients/:id/incentives', async (req, res) => {
+  // ---- Reinforcements (record only, SPEC 5.6a) ----
+  app.post('/api/clients/:id/reinforcements', async (req, res) => {
     await ownedClient(req, req.params.id);
-    const f = pick(req.body, INCENTIVE_FIELDS);
+    const f = pick(req.body, REINFORCEMENT_FIELDS);
     if (!f.name) throw bad('name is required');
-    res.status(201).json(await insertRow('incentive', { ...f, client_id: req.params.id }));
+    res.status(201).json(await insertRow('reinforcement', { ...f, client_id: req.params.id }));
   });
-  app.patch('/api/incentives/:id', async (req, res) =>
-    res.json(await updateRow(req, 'incentive', req.params.id, pick(req.body, INCENTIVE_FIELDS), viaClient)));
-  app.delete('/api/incentives/:id', async (req, res) => {
-    const { rows } = await db.query(`DELETE FROM incentive WHERE id = $1 AND ${viaClient} RETURNING id`, [req.params.id, req.clinician.id]);
+  app.patch('/api/reinforcements/:id', async (req, res) =>
+    res.json(await updateRow(req, 'reinforcement', req.params.id, pick(req.body, REINFORCEMENT_FIELDS), viaClient)));
+  app.delete('/api/reinforcements/:id', async (req, res) => {
+    const { rows } = await db.query(`DELETE FROM reinforcement WHERE id = $1 AND ${viaClient} RETURNING id`, [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
     res.status(204).end();
   });

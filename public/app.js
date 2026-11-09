@@ -67,9 +67,9 @@ function clientCard(c) {
   return h('article', { class: `card${c.attention.length ? ' attn' : ''}` },
     h('h3', {}, h('a', { href: `#/client/${c.id}` }, `${c.first_name} ${c.last_name}`)),
     c.attention.map((a) => h('div', { class: 'muted' }, `⚠ ${a}`)),
-    h('div', { class: 'muted' }, 'Preferred incentives'),
-    c.incentives.length
-      ? h('ul', { class: 'chips' }, c.incentives.map((i) => h('li', { title: i.note ?? '' }, i.name)))
+    h('div', { class: 'muted' }, 'Preferred reinforcements'),
+    c.reinforcements.length
+      ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', { title: i.note ?? '' }, i.name)))
       : h('div', { class: 'muted' }, 'None recorded'));
 }
 
@@ -104,7 +104,7 @@ async function renderDashboard() {
     d.attention.length > 0 && h('section', {}, h('h2', {}, 'Needs attention'),
       h('ul', {}, d.attention.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}` }, c.first_name), ` — ${c.attention.join('; ')}`)))),
     h('section', {}, h('h2', {}, 'Clients'),
-      h('p', {}, h('a', { href: '#/client/new', class: 'button' }, '+ Add client')),
+      h('p', {}, h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), ' ', h('a', { href: '#/archived' }, 'Archived clients')),
       d.clients.length ? h('div', { class: 'grid' }, d.clients.map(clientCard)) : h('p', { class: 'muted' }, 'No clients yet.')),
     h('section', {}, h('h2', {}, "Today's prompts"),
       d.today.length
@@ -165,6 +165,15 @@ function renderClientForm(c = null) {
   app.replaceChildren(h('p', {}, h('a', { href: c ? `#/client/${c.id}` : '#/' }, c ? '← Back to client' : '← Dashboard')), h('h2', {}, c ? `Edit ${c.first_name} ${c.last_name}` : 'Add client'), form, archive || '');
 }
 
+async function renderArchived() {
+  logoutBtn.hidden = false;
+  const list = await api('/clients?status=archived');
+  app.replaceChildren(h('p', {}, h('a', { href: '#/' }, '← Dashboard')), h('h2', {}, 'Archived clients'),
+    list.length
+      ? h('ul', {}, list.map((c) => h('li', {}, `${c.first_name} ${c.last_name} — `, h('a', { href: `#/client/${c.id}/edit` }, 'Open to restore'))))
+      : h('p', { class: 'muted' }, 'No archived clients.'));
+}
+
 const renderAddClient = () => renderClientForm();
 const renderEditClient = async (id) => renderClientForm(await api(`/clients/${id}`));
 
@@ -177,7 +186,7 @@ function handle(err) {
 async function route() {
   const m = /^#\/client\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
-  try { await (location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {

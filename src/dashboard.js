@@ -7,7 +7,7 @@ export async function loadDashboard(db, clinician, at) {
   const { rows: clients } = await db.query(
     `SELECT c.id, c.first_name, c.last_name,
             (SELECT COALESCE(json_agg(json_build_object('id', i.id, 'name', i.name, 'note', i.note) ORDER BY i.name), '[]'::json)
-               FROM incentive i WHERE i.client_id = c.id) AS incentives,
+               FROM reinforcement i WHERE i.client_id = c.id) AS reinforcements,
             (SELECT count(*)::int FROM prompt p JOIN goal g ON g.id = p.goal_id
               WHERE g.client_id = c.id AND p.status = 'no_response'
                 AND p.scheduled_for > $2::timestamptz - interval '7 days') AS missed_7d,

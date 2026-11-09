@@ -9,7 +9,7 @@ VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000
         'Dovid', 'Cohen', 'male', '2020-03-14', '2026-09-01',
         'Lakewood, NJ', 40.0979, -74.2176, 'America/New_York');
 
-INSERT INTO incentive (client_id, name, note)
+INSERT INTO reinforcement (client_id, name, note)
 VALUES ('00000000-0000-0000-0000-0000000000c1', 'bubbles', NULL),
        ('00000000-0000-0000-0000-0000000000c1', 'iPad time', '5 minute max');
 

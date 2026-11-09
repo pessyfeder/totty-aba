@@ -34,7 +34,7 @@ Single-clinician in v1. Design the data model with a `clinician_id` so multi-use
 - Create, edit, and archive clients.
 - **Editing**: the client page has an **Edit** button that opens the same form used to create a client, pre-filled. Every client field is editable, including name, gender, DOB, admission date, location, timezone, Israel/Yom Tov setting, candle-lighting offset, and notes. Optional fields can be cleared. Required fields (name, admission date, location, timezone) cannot be left blank. Each edit is recorded in the audit log (which fields changed).
 - A location or timezone change takes effect for the Shabbos window immediately: every send is checked against the client's current location when it is due, including prompts already scheduled. Send times of prompts already created keep their original instant; newly created prompts use the new timezone.
-- **Archiving**: **Archive client** (on the edit page, after confirmation) stops all prompts for the client and removes them from the dashboard and client list. History and charts are kept. An archived client can be restored, which resumes prompts from the next scheduled slot (missed slots are not backfilled).
+- **Archiving**: **Archive client** (on the edit page, after confirmation) stops all prompts for the client and removes them from the dashboard and client list. History and charts are kept. The dashboard links to an **Archived clients** list; opening a client there leads to its edit page, where **Restore client** is offered. An archived client can be restored, which resumes prompts from the next scheduled slot (missed slots are not backfilled).
 - Each client has an **admission date** (date admitted to Totty's services), required when creating the client.
 - Client page shows: first and last name, gender, age, DOB, admission date, parent/guardian names, phone(s), email, preferred channel, language, notes, and the list of goals with a chart each.
 - Client list with search and an "attention needed" flag (e.g., missed responses or declining trend).
@@ -102,13 +102,13 @@ Each goal has:
 - Delivery: the PDF is stored in the app and sent to the parent as an **SMS containing a secure link** (no email delivery). The link is unguessable and expires after a set period (default 14 days), and the text itself contains no progress details, only the child's first name. Reports can only be created or sent outside the Shabbos window; the app is locked for Totty during it (see 5.3).
 - Report history is viewable per client.
 
-### 5.6a Preferred incentives
-- Each client has a simple list of **preferred incentives** (reinforcers), e.g., "bubbles", "iPad time", "gummy bears". It is a record only: no data collection, no scoring, and no chart.
+### 5.6a Preferred reinforcements
+- Each client has a simple list of **preferred reinforcements** (also called reinforcers), e.g., "bubbles", "iPad time", "gummy bears". It is a record only: no data collection, no scoring, and no chart.
 - Each entry is a name and an optional note. Totty adds, edits, and removes entries.
 - The list is shown on the client page and on that client's dashboard card.
 
 ### 5.7 Dashboard
-- A card per client listing their preferred incentives (see 5.6a), with a link to the client page.
+- A card per client listing their preferred reinforcements (see 5.6a), with a link to the client page.
 - Today's prompts and their status (scheduled, sent, answered, no response).
 - Unparsed replies queue.
 - Upcoming Shabbos window with next send-resume time.
@@ -120,7 +120,7 @@ Each goal has:
 ## 6. Data model (draft)
 - `clinician(id, name, email, password_hash, timezone, location, settings_json)`
 - `client(id, clinician_id, first_name, last_name, gender, age, dob, admission_date, notes, location, timezone, status)`
-- `incentive(id, client_id, name, note)`
+- `reinforcement(id, client_id, name, note)`
 - `contact(id, client_id, name, relationship, phone, email, preferred_channel, language)`
 - `goal(id, client_id, contact_id, title, description, response_type, channel, schedule_json, date_added, start_date, end_date, status, target_json)`
 - `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason)`
