@@ -122,7 +122,7 @@ Each goal has:
 - A card per client listing their preferred reinforcements (see 5.6a), with a link to the client page.
 - Today's prompts and their status (scheduled, sent, answered, no response).
 - Unparsed replies queue.
-- Upcoming Shabbos window with next send-resume time.
+- A notice with the reopen time while a Shabbos / Yom Tov window is in effect. No notice about upcoming windows.
 - Clients needing attention.
 
 ### 5.8 Settings
