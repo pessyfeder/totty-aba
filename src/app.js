@@ -253,6 +253,47 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     res.json(row);
   });
 
+  // ---- Chart data and annotations (SPEC 5.5) ----
+  const RANGE_DAYS = { week: 7, month: 30, '3months': 91 };
+
+  /** improving / flat / declining from the first vs second half of answered values. Missing replies are ignored. */
+  const trendOf = (points, type) => {
+    const vals = points.filter((p) => p.answered).map((p) => (type === 'yes_no' ? (p.value_bool ? 100 : 0) : p.value_int));
+    if (vals.length < 4) return 'not_enough_data';
+    const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    const mid = Math.floor(vals.length / 2);
+    const d = avg(vals.slice(mid)) - avg(vals.slice(0, mid));
+    const eps = type === 'yes_no' ? 10 : 0.5;
+    return d > eps ? 'improving' : d < -eps ? 'declining' : 'flat';
+  };
+
+  app.get('/api/goals/:id/series', async (req, res) => {
+    const { rows: g } = await db.query(`SELECT * FROM goal WHERE id = $1 AND ${viaClient}`, [req.params.id, req.clinician.id]);
+    if (!g.length) throw new HttpError(404, 'Not found');
+    const days = RANGE_DAYS[req.query.range];
+    const since = days ? new Date(now().getTime() - days * 864e5) : new Date(0);
+    const { rows: points } = await db.query(
+      `SELECT p.id AS prompt_id, p.prompt_date::text AS date, p.status, r.id AS response_id, r.value_bool, r.value_int, r.comment, r.source,
+              (r.id IS NOT NULL) AS answered
+         FROM prompt p
+         LEFT JOIN LATERAL (SELECT * FROM response WHERE prompt_id = p.id AND parse_status <> 'unparsed' ORDER BY received_at DESC LIMIT 1) r ON true
+        WHERE p.goal_id = $1 AND p.prompt_date >= $2::date ORDER BY p.prompt_date, p.scheduled_for`,
+      [req.params.id, since.toISOString().slice(0, 10)],
+    );
+    const { rows: annotations } = await db.query('SELECT id, date::text AS date, text FROM annotation WHERE goal_id = $1 ORDER BY date', [req.params.id]);
+    res.json({ goal: g[0], points, annotations, trend: trendOf(points, g[0].response_type) });
+  });
+
+  app.post('/api/goals/:id/annotations', async (req, res) => {
+    const { rows } = await db.query(`SELECT 1 FROM goal WHERE id = $1 AND ${viaClient}`, [req.params.id, req.clinician.id]);
+    if (!rows.length) throw new HttpError(404, 'Not found');
+    const text = String(req.body?.text ?? '').trim();
+    if (!text || !/^\d{4}-\d{2}-\d{2}$/.test(req.body?.date ?? '')) throw bad('date (YYYY-MM-DD) and text are required');
+    const row = await insertRow('annotation', { goal_id: req.params.id, date: req.body.date, text });
+    await audit(req, 'create', 'annotation', row.id);
+    res.status(201).json(row);
+  });
+
   // ---- Manual data entry / resolving unparsed replies (SPEC 5.5, 5.7); always with an audit note ----
   const valueFrom = (body, responseType) => {
     if (!body?.audit_note) throw bad('audit_note is required');

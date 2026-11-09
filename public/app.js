@@ -1,4 +1,5 @@
 // Dashboard UI (SPEC 5.7). DOM is built with textContent only: parent replies are untrusted text.
+import { renderClient as renderClientPage } from './client-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -103,6 +104,7 @@ async function renderDashboard() {
     d.attention.length > 0 && h('section', {}, h('h2', {}, 'Needs attention'),
       h('ul', {}, d.attention.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}` }, c.first_name), ` — ${c.attention.join('; ')}`)))),
     h('section', {}, h('h2', {}, 'Clients'),
+      h('p', {}, h('a', { href: '#/client/new', class: 'button' }, '+ Add client')),
       d.clients.length ? h('div', { class: 'grid' }, d.clients.map(clientCard)) : h('p', { class: 'muted' }, 'No clients yet.')),
     h('section', {}, h('h2', {}, "Today's prompts"),
       d.today.length
@@ -117,19 +119,38 @@ async function renderDashboard() {
   );
 }
 
-async function renderClient(id) {
-  const c = await api(`/clients/${id}`);
+const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);
+
+function renderAddClient() {
   logoutBtn.hidden = false;
-  app.replaceChildren(
-    h('p', {}, h('a', { href: '#/' }, '← Dashboard')),
-    h('h2', {}, `${c.first_name} ${c.last_name}`),
-    h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
-    h('h2', {}, 'Preferred incentives'),
-    c.incentives.length ? h('ul', { class: 'chips' }, c.incentives.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
-    h('h2', {}, 'Contacts'),
-    h('ul', {}, c.contacts.map((p) => h('li', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${p.preferred_channel}, ${p.status}`))),
-    h('h2', {}, 'Goals'),
-    h('ul', {}, c.goals.map((g) => h('li', {}, `${g.title} — ${g.response_type === 'yes_no' ? 'Y/N' : '0-5'}, ${g.status}`))));
+  const msg = h('p', { class: 'error', role: 'alert' });
+  const field = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, ...attrs }));
+  const form = h('form', { class: 'login', onsubmit: async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    const f = new FormData(form);
+    const body = {};
+    for (const [k, v] of f.entries()) if (String(v).trim() !== '') body[k] = String(v).trim();
+    body.in_israel = f.get('in_israel') === 'on';
+    try {
+      const c = await api('/clients', { method: 'POST', body });
+      location.hash = `#/client/${c.id}`;
+    } catch (ex) { msg.textContent = ex.message; }
+  } },
+    field('First name', 'first_name', { required: true }),
+    field('Last name', 'last_name', { required: true }),
+    field('Gender', 'gender'),
+    field('Date of birth', 'dob', { type: 'date' }),
+    field('Admission date', 'admission_date', { type: 'date', required: true }),
+    field('Location name', 'location_name', { placeholder: 'e.g. Brooklyn, NY' }),
+    field('Latitude', 'latitude', { type: 'number', step: 'any', min: -90, max: 90, required: true }),
+    field('Longitude', 'longitude', { type: 'number', step: 'any', min: -180, max: 180, required: true }),
+    field('Timezone', 'timezone', { value: Intl.DateTimeFormat().resolvedOptions().timeZone, required: true }),
+    h('label', {}, h('input', { name: 'in_israel', type: 'checkbox' }), ' Lives in Israel (Yom Tov observance)'),
+    field('Candle lighting (minutes before sunset)', 'candle_lighting_minutes', { type: 'number', min: 0, placeholder: 'default 18' }),
+    h('label', {}, 'Notes', h('textarea', { name: 'notes', rows: 3 })),
+    h('button', { type: 'submit' }, 'Add client'), msg);
+  app.replaceChildren(h('p', {}, h('a', { href: '#/' }, '← Dashboard')), h('h2', {}, 'Add client'), form);
 }
 
 function handle(err) {
@@ -140,7 +161,7 @@ function handle(err) {
 
 async function route() {
   const m = /^#\/client\/([0-9a-f-]{36})$/i.exec(location.hash);
-  try { await (m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (location.hash === '#/client/new' ? renderAddClient() : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {

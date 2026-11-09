@@ -17,6 +17,25 @@ const prompt = (goal, hoursAgo, status) =>
      VALUES ($1, now() - make_interval(hours => $2), (now() AT TIME ZONE 'America/New_York')::date, 1, now() - make_interval(hours => $2), 'sms', $3) RETURNING id`,
     [goal.id, hoursAgo, status],
   );
+// Six weeks of history so the charts have something to show (a few days left unanswered on purpose).
+await db.query(`UPDATE goal SET target_json = '{"type":"percent_yes","threshold":80}' WHERE id = $1`, [spoon.id]);
+await db.query(`UPDATE goal SET target_json = '{"type":"avg_rating","threshold":4}' WHERE id = $1`, [bedtime.id]);
+for (let i = 42; i >= 1; i--) {
+  for (const [goal, rate] of [[spoon, i / 42], [bedtime, i / 42]]) {
+    const p = await w.one(
+      `INSERT INTO prompt (goal_id, scheduled_for, prompt_date, short_code, sent_at, channel, status)
+       VALUES ($1, now() - make_interval(days => $2), (now() - make_interval(days => $2)) AT TIME ZONE 'America/New_York', 1, now() - make_interval(days => $2), 'sms', $3) RETURNING id`,
+      [goal.id, i, i % 9 === 0 ? 'no_response' : 'answered'],
+    );
+    if (i % 9 === 0) continue;
+    const better = Math.random() > rate * 0.7; // improves over time
+    await db.query(
+      `INSERT INTO response (prompt_id, value_bool, value_int, source, raw_text, comment) VALUES ($1, $2, $3, 'sms', 'demo', $4)`,
+      [p.id, goal === spoon ? better : null, goal === bedtime ? Math.min(5, Math.round(1 + (1 - rate) * 3 + Math.random() * 1.5)) : null, i % 11 === 0 ? 'tough day, needed help' : null],
+    );
+  }
+}
+await db.query(`INSERT INTO annotation (goal_id, date, text) VALUES ($1, current_date - 21, 'New visual schedule started')`, [spoon.id]);
 await prompt(spoon, 5, 'answered');
 const p2 = await prompt(bedtime, 2, 'sent');
 await db.query(`INSERT INTO response (prompt_id, raw_text, source, parse_status) VALUES ($1, 'he was kind of ok?', 'sms', 'unparsed')`, [p2.id]);

@@ -193,3 +193,36 @@ test('static dashboard is served', async () => {
   assert.equal(res.status, 200);
   assert.match(await res.text(), /Totty's ABA/);
 });
+
+test('goal series: missing replies are not counted as No; trend and annotations are returned', async () => {
+  const { cookie } = await login();
+  const g = await world.addGoal('Series goal');
+  let i = 0;
+  for (const v of [false, false, true, true, null, true, true, true]) {
+    const day = `2026-10-${String(10 + i++).padStart(2, '0')}`;
+    const p = await world.one(
+      `INSERT INTO prompt (goal_id, scheduled_for, prompt_date, channel, status) VALUES ($1, $2, $3, 'sms', $4) RETURNING id`,
+      [g.id, `${day}T22:30:00Z`, day, v === null ? 'no_response' : 'answered'],
+    );
+    if (v !== null) await db.query(`INSERT INTO response (prompt_id, value_bool, source) VALUES ($1, $2, 'sms')`, [p.id, v]);
+  }
+  const a = await call(`/api/goals/${g.id}/annotations`, { method: 'POST', cookie, body: { date: '2026-10-14', text: 'new intervention' } });
+  assert.equal(a.status, 201);
+  assert.equal((await call(`/api/goals/${g.id}/annotations`, { method: 'POST', cookie, body: { date: 'nope', text: 'x' } })).status, 400);
+  const s = await call(`/api/goals/${g.id}/series?range=all`, { cookie });
+  assert.equal(s.status, 200);
+  assert.equal(s.json.points.length, 8);
+  const missing = s.json.points.find((p) => p.status === 'no_response');
+  assert.equal(missing.answered, false);
+  assert.equal(missing.value_bool, null);
+  assert.equal(s.json.trend, 'improving');
+  assert.equal(s.json.annotations[0].text, 'new intervention');
+});
+
+test("another clinician's goal series and annotations are 404", async () => {
+  const other = await seedWorld(db, { email: 'third@example.test' });
+  const g = await other.addGoal('Private');
+  const { cookie } = await login();
+  assert.equal((await call(`/api/goals/${g.id}/series`, { cookie })).status, 404);
+  assert.equal((await call(`/api/goals/${g.id}/annotations`, { method: 'POST', cookie, body: { date: '2026-10-01', text: 'x' } })).status, 404);
+});

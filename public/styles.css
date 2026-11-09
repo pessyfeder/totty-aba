@@ -42,3 +42,23 @@ a { color: var(--accent); }
 .unparsed form { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
 .unparsed input[name=note] { flex: 1 1 160px; }
 .scroll { overflow-x: auto; }
+a.button { display: inline-block; padding: 6px 12px; border: 1px solid currentColor; border-radius: 6px; text-decoration: none; }
+form.login textarea { width: 100%; font: inherit; }
+.chart { width: 100%; height: auto; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+.chart .grid-line { stroke: var(--line); }
+.chart .tick { fill: var(--muted); font-size: 10px; }
+.chart .line { stroke: var(--accent); stroke-width: 2; }
+.chart .target { stroke: var(--ok); stroke-dasharray: 5 4; }
+.chart .phase { stroke: var(--warn); stroke-dasharray: 2 3; }
+.chart .wk { fill: var(--accent); }
+.chart .dot.yes { fill: var(--ok); }
+.chart .dot.no { fill: var(--bad); }
+.chart .dot.rate { fill: var(--accent); opacity: .8; }
+.chart .dot.none { fill: none; stroke: var(--muted); stroke-width: 1.5; }
+.legend { display: flex; gap: 12px; flex-wrap: wrap; font-size: .85rem; color: var(--muted); margin: 4px 0; }
+.range { display: flex; gap: 6px; flex-wrap: wrap; margin: 6px 0; }
+.range button { background: var(--card); color: var(--text); border: 1px solid var(--line); min-height: 36px; padding: 4px 12px; }
+.range button[aria-pressed=true] { background: var(--accent); color: #fff; }
+.goal-card { margin-bottom: 14px; }
+.inline-form { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; align-items: end; }
+.trend-improving { color: var(--ok); } .trend-declining { color: var(--bad); }
