@@ -129,21 +129,36 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     }
   }
 
-  /** One reminder after N hours without a reply (default 3). Blocked windows just wait. */
-  async function sendReminders(at) {
+  /**
+   * Follow-ups (SPEC 5.4): with no reply, text again after followup_after_minutes (default 30), then again
+   * that long after each one, up to max_followups (default 3). Never during quiet hours or a Shabbos window
+   * (a stale follow-up is simply dropped: the prompt becomes no_response at the end of the local day).
+   */
+  async function sendFollowUps(at) {
     const { rows } = await db.query(
-      `SELECT ${SEND_COLUMNS} ${SEND_JOINS}
-        WHERE p.status = 'sent' AND p.reminder_sent_at IS NULL AND p.channel = 'sms'
-          AND p.sent_at <= $1::timestamptz - make_interval(hours => COALESCE((cn.settings_json->>'reminder_after_hours')::int, 3))
-          AND g.status = 'active' AND c.status = 'active'`,
+      `SELECT ${SEND_COLUMNS}, p.followups_sent, p.last_followup_at ${SEND_JOINS}
+        WHERE p.status = 'sent' AND p.channel = 'sms'
+          AND p.followups_sent < COALESCE((cn.settings_json->>'max_followups')::int, 3)
+          AND COALESCE(p.last_followup_at, p.sent_at)
+              <= $1::timestamptz - make_interval(mins => COALESCE((cn.settings_json->>'followup_after_minutes')::int, 30))
+          AND g.status = 'active' AND c.status = 'active' AND cl.status = 'active'
+        ORDER BY p.sent_at, p.id`,
       [at],
     );
     for (const r of rows) {
+      const q = r.settings_json.quiet_hours;
+      const hhmm = DateTime.fromJSDate(at, { zone: r.timezone }).toFormat('HH:mm');
+      if (q && (hhmm < q.start || hhmm >= q.end)) continue;
       try {
         await messenger.send({ client: r, settings: r.settings_json, to: r.phone, body: buildBody(r, { reminder: true }), promptId: r.id });
-        await db.query(`UPDATE prompt SET reminder_sent_at = $2 WHERE id = $1`, [r.id, at]);
+        await db.query(
+          `UPDATE prompt SET followups_sent = followups_sent + 1, last_followup_at = $2, reminder_sent_at = COALESCE(reminder_sent_at, $2)
+            WHERE id = $1 AND status = 'sent' AND followups_sent = $3`,
+          [r.id, at, r.followups_sent],
+        );
+        if (staggerMs) await sleep(staggerMs);
       } catch (err) {
-        if (!(err instanceof ShabbosRefusal)) console.error(`reminder ${r.id} failed:`, err.message);
+        if (!(err instanceof ShabbosRefusal)) console.error(`follow-up ${r.id} failed:`, err.message);
       }
     }
   }
@@ -163,9 +178,9 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     const at = now();
     await generatePrompts(at);
     await sendDue(at);
-    await sendReminders(at);
+    await sendFollowUps(at);
     await markNoResponse(at);
   }
 
-  return { tick, generatePrompts, sendDue, sendReminders, markNoResponse };
+  return { tick, generatePrompts, sendDue, sendFollowUps, markNoResponse };
 }

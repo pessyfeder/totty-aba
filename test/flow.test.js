@@ -168,14 +168,64 @@ test('AC5: unanswered becomes no_response at day end; a late reply still attache
   assert.equal((await prompts())[0].prompt_date.toISOString().slice(0, 10), '2026-11-04');
 });
 
-test('one reminder is sent after 3 hours, never two', async () => {
+test('follow-ups: one every 30 minutes without a reply, at most 3, never a fourth', async () => {
   await world.addGoal('Uses a spoon');
   await scheduler.tick();
-  env.at('2026-11-05T02:40:00Z'); // 3h09m later, still the same local day
-  await scheduler.sendReminders(env.now());
-  await scheduler.sendReminders(env.now());
+  assert.equal(env.sent.length, 1);
+  env.at('2026-11-04T23:55:00Z'); // 24 min after the prompt: too early
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 1);
+  for (const [i, t] of ['2026-11-05T00:02:00Z', '2026-11-05T00:33:00Z', '2026-11-05T01:04:00Z'].entries()) {
+    env.at(t);
+    await scheduler.sendFollowUps(env.now());
+    await scheduler.sendFollowUps(env.now()); // a second pass in the same minute sends nothing
+    assert.equal(env.sent.length, 2 + i);
+    assert.match(env.sent.at(-1).body, /^Reminder: /);
+  }
+  env.at('2026-11-05T03:00:00Z');
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 4); // the prompt plus 3 follow-ups
+  assert.equal((await prompts())[0].followups_sent, 3);
+});
+
+test('a reply stops further follow-ups', async () => {
+  await world.addGoal('Uses a spoon');
+  await scheduler.tick();
+  env.at('2026-11-05T00:02:00Z');
+  await scheduler.sendFollowUps(env.now());
   assert.equal(env.sent.length, 2);
-  assert.match(env.sent[1].body, /^Reminder: /);
+  await inbound('y');
+  env.at('2026-11-05T00:40:00Z');
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 2);
+});
+
+test('follow-ups are not sent in quiet hours or during Shabbos', async () => {
+  await world.addGoal('Uses a spoon', { time: '20:45' });
+  env.at('2026-11-05T01:50:00Z'); // 8:50pm EST Wednesday
+  await scheduler.tick();
+  assert.equal(env.sent.length, 1);
+  env.at('2026-11-05T02:20:00Z'); // 9:20pm: quiet hours (default 21:00 end)
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 1);
+
+  await db.query(`UPDATE prompt SET sent_at = '2026-11-07T15:00:00Z', followups_sent = 0, last_followup_at = NULL`);
+  env.at('2026-11-07T16:00:00Z'); // Saturday noon
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 1);
+  assert.equal((await outbound()).length, 1);
+  assert.equal((await prompts())[0].followups_sent, 0);
+});
+
+test('follow-up timing and count come from settings', async () => {
+  await db.query(`UPDATE clinician SET settings_json = settings_json || '{"followup_after_minutes": 10, "max_followups": 1}'`);
+  await world.addGoal('Uses a spoon');
+  await scheduler.tick();
+  env.at('2026-11-04T23:45:00Z');
+  await scheduler.sendFollowUps(env.now());
+  env.at('2026-11-04T23:58:00Z');
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 2);
 });
 
 test('replies from unknown numbers are logged and ignored', async () => {

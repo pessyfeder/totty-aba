@@ -84,7 +84,8 @@ Each goal has:
 - Optional: record a voice comment and transcribe it.
 
 **Reminders and retries**
-- If no response within N hours (default 3), send one reminder. Then mark as `no_response` at end of day.
+- **Follow-ups**: if there is no reply 30 minutes after the prompt (`followup_after_minutes`), send a follow-up text ("Reminder: ..." with the same question), and again 30 minutes after each follow-up, up to **3 follow-ups** (`max_followups`). A reply at any point stops them. Follow-ups are never sent in quiet hours or a Shabbos/Yom Tov window, and a follow-up that could not be sent is dropped, not queued. After the last follow-up the prompt stays open until the end of the client's local day, then becomes `no_response`.
+- Follow-up by **voice call** (for contacts whose preferred channel is a call) arrives with voice prompts in milestone 3: the same timing and limit will apply, with the call replacing the text.
 - Late replies (up to 24h) are still accepted and attached to the original prompt's date.
 
 ### 5.5 Charts and progress
@@ -126,7 +127,7 @@ Each goal has:
 - Clients needing attention.
 
 ### 5.8 Settings
-- Location and timezone, Shabbos/Yom Tov rules, quiet hours (e.g., no messages before 8am or after 9pm), sender number, report options, retry policy.
+- Location and timezone, Shabbos/Yom Tov rules, quiet hours (e.g., no messages before 8am or after 9pm), sender number, report options, follow-up timing and limit (defaults 30 minutes, 3 follow-ups).
 
 ## 6. Data model (draft)
 - `clinician(id, name, email, password_hash, timezone, location, settings_json)`
@@ -134,7 +135,7 @@ Each goal has:
 - `reinforcement(id, client_id, name, note)`
 - `contact(id, client_id, name, relationship, phone, email, preferred_channel, language)`
 - `goal(id, client_id, contact_id, title, description, response_type, channel, schedule_json, date_added, start_date, end_date, status, target_json)`
-- `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason)`
+- `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason, followups_sent, last_followup_at)`
 - `response(id, prompt_id, received_at, value_bool, value_int, comment, raw_text, source, parse_status)`
 - `annotation(id, goal_id, date, text)`
 - `report(id, client_id, period_type, period_start, period_end, status, content_json, pdf_path, sent_at, note, link_token_hash, link_expires_at)`
