@@ -49,10 +49,11 @@ How a new client gets from first contact to active prompts. Two tracks lead into
 4. **Consultation**: the family books a consultation on Totty's Google Calendar. The meeting happens, where Totty and the family discuss goals and reinforcements.
 5. **Enter meeting outcomes**: the goals and preferred reinforcements (5.2, 5.6a) agreed in the meeting are entered into the app, either manually by Totty or automatically (e.g., from meeting notes), always with Totty's review before saving.
 6. **Go**: Totty presses a **Go** (activate) button on the client. From then on the app takes over: prompts are scheduled and sent per the goals' schedules, subject to the Shabbos/quiet-hours rules and each contact's recorded consent. Until Go is pressed, no prompt is sent to the family.
-7. **Ongoing meetings**: a weekly Google Calendar booking link lets the family schedule meetings with Totty. This complements the one-time check-in prompt in 5.7a.
+7. **Ongoing meetings**: a weekly booking link, from a ready-made scheduling tool such as Google Calendar appointment schedules, lets the family schedule meetings with Totty. The link is embedded in the one-time check-in text (5.7a) and also in every weekly message to the parent (the weekly report message, 5.6b), so families can always book the next meeting. It is the same `CHECKIN_BOOKING_URL`.
 
 Notes:
 - A client has an intake status: `inquiry`, `paperwork_sent`, `paperwork_received`, `consult_scheduled`, `ready` (awaiting Go), `active`. Only `active` clients receive prompts.
+- **Decisions**: the intake form and document upload are hosted in an **external tool**, not built into the app; the app receives submissions and pre-fills the client (step 3). Booking links (consultation and weekly) come from a ready-made scheduling tool such as Google Calendar; the app does not create bookings or links itself, it stores the URLs in Settings (e.g., `INTAKE_FORM_URL`, `CONSULT_BOOKING_URL`, `CHECKIN_BOOKING_URL`) and includes them in messages.
 - Intake data and documents are PHI and follow the same privacy rules as section 8. Documents are stored encrypted and are not included in SMS.
 
 ### 5.2 Goals
@@ -197,14 +198,14 @@ Each goal has:
 
 ## 10. Milestones
 1. **MVP**: login, clients, contacts, goals, SMS yes/no + duration prompts, scheduler with Shabbos guard, per-goal charts.
-2. **Client intake (5.1a)**: intake status and the **Go** button (no prompts until a client is active), intake form and document upload feeding a pre-filled new client, Google Calendar consultation and weekly booking links, entering goals and reinforcements from the meeting.
+2. **Client intake (5.1a)**: intake status and the **Go** button (no prompts until a client is active), manually importing external intake-form submissions and documents into a pre-filled new client, consultation and weekly booking links (external scheduler URLs in Settings), entering goals and reinforcements from the meeting (by hand until the meeting-notes question is settled).
 3. On-demand PDF reports (create, preview, edit, send).
 4. Voice-call prompts, reminders and retries, dashboard.
 5. Annotations, manual data entry, Yom Tov calendar, multi-clinician support.
 6. **Cross-device app (later stage)**: Totty's app runs on both phone and computer. One responsive web app (installable to the phone home screen as a PWA) with a layout that adapts from phone to desktop, covering every Totty-facing screen: dashboard, clients, goals, charts, and report create/preview/edit. No separate native apps unless a later need (e.g. push notifications on iOS) requires it. The Shabbos lock applies the same on every device.
 
 ## 11. Open questions
-0. **Intake (5.1a)**: which tool hosts the intake form and document upload (built into the app, or an external form)? Is the Google Calendar integration read-only (to detect booked consultations) or does the app also create the booking links? Should meeting notes be entered by hand only, or captured automatically? Does the weekly booking link replace or add to the one-time check-in text (5.7a)?
+0. **Intake (5.1a)**: partly resolved. Decided: external form tool; booking links from a ready-made scheduler such as Google Calendar (the app stores URLs, does not create bookings); the weekly link is embedded in the check-in text (5.7a) and also in the weekly messages. **To confirm**: "weekly messages" is read as the weekly report message to parents; if it means something else (e.g., the daily prompts), say so. Submissions reach the app by **manual import for now** (Totty brings the submitted data and documents in by hand; an automatic webhook/email feed is a possible later step). **Still open**: which external form tool is used, and whether meeting notes are entered by hand only or captured automatically.
 1. **Prompt volume**: how many clients and goals per client? This affects Twilio costs and the combined-message design.
 2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
