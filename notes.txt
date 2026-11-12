@@ -1,0 +1,5 @@
+take yes/no or duration
+
+time-to-schedule prompt follow-up (would you like to?) appointment link after weekly amount links to website
+has to be pre-paid 48 hours before
+
