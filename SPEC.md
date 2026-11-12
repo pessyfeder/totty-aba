@@ -197,10 +197,11 @@ Each goal has:
 
 ## 10. Milestones
 1. **MVP**: login, clients, contacts, goals, SMS yes/no + duration prompts, scheduler with Shabbos guard, per-goal charts.
-2. On-demand PDF reports (create, preview, edit, send).
-3. Voice-call prompts, reminders and retries, dashboard.
-4. Annotations, manual data entry, Yom Tov calendar, multi-clinician support.
-5. **Cross-device app (later stage)**: Totty's app runs on both phone and computer. One responsive web app (installable to the phone home screen as a PWA) with a layout that adapts from phone to desktop, covering every Totty-facing screen: dashboard, clients, goals, charts, and report create/preview/edit. No separate native apps unless a later need (e.g. push notifications on iOS) requires it. The Shabbos lock applies the same on every device.
+2. **Client intake (5.1a)**: intake status and the **Go** button (no prompts until a client is active), intake form and document upload feeding a pre-filled new client, Google Calendar consultation and weekly booking links, entering goals and reinforcements from the meeting.
+3. On-demand PDF reports (create, preview, edit, send).
+4. Voice-call prompts, reminders and retries, dashboard.
+5. Annotations, manual data entry, Yom Tov calendar, multi-clinician support.
+6. **Cross-device app (later stage)**: Totty's app runs on both phone and computer. One responsive web app (installable to the phone home screen as a PWA) with a layout that adapts from phone to desktop, covering every Totty-facing screen: dashboard, clients, goals, charts, and report create/preview/edit. No separate native apps unless a later need (e.g. push notifications on iOS) requires it. The Shabbos lock applies the same on every device.
 
 ## 11. Open questions
 0. **Intake (5.1a)**: which tool hosts the intake form and document upload (built into the app, or an external form)? Is the Google Calendar integration read-only (to detect booked consultations) or does the app also create the booking links? Should meeting notes be entered by hand only, or captured automatically? Does the weekly booking link replace or add to the one-time check-in text (5.7a)?
