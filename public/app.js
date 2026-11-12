@@ -146,7 +146,9 @@ async function renderDashboard() {
         ? h('div', { class: 'scroll' }, h('table', { class: 'compact' },
             h('tbody', {}, d.today.map((p) => h('tr', {},
               h('td', {}, fmtTime(p.scheduled_for)), h('td', {}, p.first_name), h('td', {}, p.title),
-              h('td', { class: `s-${p.status}` }, STATUS[p.status] ?? p.status, p.status === 'deferred' && p.deferred_reason ? ` (${p.deferred_reason.replace('_', ' ')})` : ''))))))
+              h('td', { class: `s-${p.status}` }, p.status === 'answered' && (p.value_bool != null || p.value_minutes != null)
+                ? (p.response_type === 'yes_no' ? (p.value_bool ? 'Yes' : 'No') : `${p.value_minutes} min`)
+                : (STATUS[p.status] ?? p.status), p.status === 'deferred' && p.deferred_reason ? ` (${p.deferred_reason.replace('_', ' ')})` : ''))))))
         : h('p', { class: 'muted' }, 'Nothing scheduled today.')),
   ].filter(Boolean));
   apply();

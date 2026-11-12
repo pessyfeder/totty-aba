@@ -22,10 +22,12 @@ export async function loadDashboard(db, clinician, at) {
   }
 
   const { rows: today } = await db.query(
-    `SELECT p.id, p.scheduled_for, p.status, p.deferred_reason, g.title, c.id AS client_id, c.first_name
+    `SELECT p.id, p.scheduled_for, p.status, p.deferred_reason, g.title, g.response_type, r.value_bool, r.value_minutes,
+            c.id AS client_id, c.first_name
        FROM prompt p
        JOIN goal g ON g.id = p.goal_id
        JOIN client c ON c.id = g.client_id
+       LEFT JOIN LATERAL (SELECT * FROM response WHERE prompt_id = p.id AND parse_status <> 'unparsed' ORDER BY received_at DESC LIMIT 1) r ON true
       WHERE c.clinician_id = $1
         AND p.prompt_date = ($2::timestamptz AT TIME ZONE c.timezone)::date
       ORDER BY p.scheduled_for, c.last_name`,
