@@ -40,6 +40,21 @@ Single-clinician in v1. Design the data model with a `clinician_id` so multi-use
 - Client page shows: first and last name, gender, age, DOB, admission date, parent/guardian names, phone(s), email, preferred channel, language, notes, and the list of goals with a chart each.
 - Client list with search and an "attention needed" flag (e.g., missed responses or declining trend).
 
+### 5.1a Client intake flow
+How a new client gets from first contact to active prompts. Two tracks lead into the same client record, then Totty starts the app.
+
+1. **Inquiry**: the client (family) reaches out through the website. Totty follows up by talk, text, or WhatsApp.
+2. **Intake paperwork**: Totty sends an email with an intake form and a document request (e.g., consent, insurance, assessments). The family fills out the form and returns the documents.
+3. **Auto-fill**: the submitted form feeds into the app and pre-fills a new client (name, DOB, gender, location, parent/guardian contacts, language, preferred channel, notes). Uploaded documents are attached to the client. Totty reviews and confirms before the client is created; nothing is created or contacted automatically.
+4. **Consultation**: the family books a consultation on Totty's Google Calendar. The meeting happens, where Totty and the family discuss goals and reinforcements.
+5. **Enter meeting outcomes**: the goals and preferred reinforcements (5.2, 5.6a) agreed in the meeting are entered into the app, either manually by Totty or automatically (e.g., from meeting notes), always with Totty's review before saving.
+6. **Go**: Totty presses a **Go** (activate) button on the client. From then on the app takes over: prompts are scheduled and sent per the goals' schedules, subject to the Shabbos/quiet-hours rules and each contact's recorded consent. Until Go is pressed, no prompt is sent to the family.
+7. **Ongoing meetings**: a weekly Google Calendar booking link lets the family schedule meetings with Totty. This complements the one-time check-in prompt in 5.7a.
+
+Notes:
+- A client has an intake status: `inquiry`, `paperwork_sent`, `paperwork_received`, `consult_scheduled`, `ready` (awaiting Go), `active`. Only `active` clients receive prompts.
+- Intake data and documents are PHI and follow the same privacy rules as section 8. Documents are stored encrypted and are not included in SMS.
+
 ### 5.2 Goals
 Each goal has:
 - Title and description (e.g., "Uses a spoon independently at dinner").
@@ -138,7 +153,7 @@ Each goal has:
 
 ## 6. Data model (draft)
 - `clinician(id, name, email, password_hash, timezone, location, settings_json)`
-- `client(id, clinician_id, first_name, last_name, gender, age, dob, admission_date, notes, location, timezone, status)`
+- `client(id, clinician_id, first_name, last_name, gender, age, dob, admission_date, notes, location, timezone, status, intake_status, activated_at)`
 - `reinforcement(id, client_id, name, note)`
 - `contact(id, client_id, name, relationship, phone, email, preferred_channel, language, first_message_at, checkin_prompt_sent_at)`
 - `goal(id, client_id, contact_id, title, description, response_type, channel, schedule_json, date_added, start_date, end_date, status, target_json)`
@@ -188,6 +203,7 @@ Each goal has:
 5. **Cross-device app (later stage)**: Totty's app runs on both phone and computer. One responsive web app (installable to the phone home screen as a PWA) with a layout that adapts from phone to desktop, covering every Totty-facing screen: dashboard, clients, goals, charts, and report create/preview/edit. No separate native apps unless a later need (e.g. push notifications on iOS) requires it. The Shabbos lock applies the same on every device.
 
 ## 11. Open questions
+0. **Intake (5.1a)**: which tool hosts the intake form and document upload (built into the app, or an external form)? Is the Google Calendar integration read-only (to detect booked consultations) or does the app also create the booking links? Should meeting notes be entered by hand only, or captured automatically? Does the weekly booking link replace or add to the one-time check-in text (5.7a)?
 1. **Prompt volume**: how many clients and goals per client? This affects Twilio costs and the combined-message design.
 2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
