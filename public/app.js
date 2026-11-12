@@ -12,7 +12,7 @@ function h(tag, attrs = {}, ...kids) {
     else if (v === true) node.setAttribute(k, '');
     else if (v !== false && v != null) node.setAttribute(k, v);
   }
-  for (const kid of kids.flat()) node.append(kid instanceof Node ? kid : document.createTextNode(kid ?? ''));
+  for (const kid of kids.flat()) if (kid !== false) node.append(kid instanceof Node ? kid : document.createTextNode(kid ?? ''));
   return node;
 }
 
@@ -65,14 +65,34 @@ function renderLogin(message = '') {
   app.replaceChildren(form);
 }
 
-function clientCard(c) {
-  return h('article', { class: `card${c.attention.length ? ' attn' : ''}` },
-    h('h3', {}, h('a', { href: `#/client/${c.id}` }, `${c.first_name} ${c.last_name}`)),
-    c.attention.map((a) => h('div', { class: 'muted' }, `⚠ ${a}`)),
-    h('div', { class: 'muted' }, 'Preferred reinforcements'),
+// Open/closed state of collapsibles survives re-renders (e.g. the reload after saving a reply).
+const openState = new Map([['attention', true], ['replies', true], ['clients', true]]);
+function collapsible(key, summaryKids, body, { cls = '' } = {}) {
+  const d = h('details', { class: `fold ${cls}` }, h('summary', {}, summaryKids), body);
+  d.open = openState.get(key) ?? false;
+  d.addEventListener('toggle', () => openState.set(key, d.open));
+  return d;
+}
+const badge = (text, kind = '') => h('span', { class: `badge ${kind}` }, text);
+
+function clientRow(c, prompts) {
+  const done = prompts.filter((p) => p.status === 'answered').length;
+  const bad = prompts.some((p) => ['no_response', 'failed'].includes(p.status));
+  const head = [
+    h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`),
+    c.attention.length ? badge(`⚠ ${c.attention.length}`, 'bad') : '',
+    prompts.length ? badge(`${done}/${prompts.length} today`, bad ? 'bad' : done === prompts.length ? 'ok' : '') : '',
+  ];
+  const body = h('div', { class: 'row-body' },
+    c.attention.map((a) => h('div', { class: 'warn-line' }, `⚠ ${a}`)),
+    prompts.map((p) => h('div', { class: 'muted' }, `${fmtTime(p.scheduled_for)} · ${p.title} · ${STATUS[p.status] ?? p.status}`)),
     c.reinforcements.length
       ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', { title: i.note ?? '' }, i.name)))
-      : h('div', { class: 'muted' }, 'None recorded'));
+      : h('div', { class: 'muted' }, 'No reinforcements recorded'));
+  const el = collapsible(`client:${c.id}`, head, body, { cls: 'row' });
+  el.dataset.name = `${c.first_name} ${c.last_name}`.toLowerCase();
+  el.dataset.attn = c.attention.length ? '1' : '';
+  return el;
 }
 
 function unparsedItem(u, reload) {
@@ -88,10 +108,8 @@ function unparsedItem(u, reload) {
       : { value_int: Number(val.value), audit_note: note.value };
     try { await api(`/responses/${u.id}`, { method: 'PATCH', body }); reload(); } catch (ex) { msg.textContent = ex.message; }
   } }, val, note, h('button', { type: 'submit' }, 'Save'), msg);
-  return h('article', { class: 'card unparsed' },
-    h('strong', {}, `${u.first_name}: ${u.title}`),
-    h('div', {}, `“${u.raw_text}”`),
-    h('div', { class: 'muted' }, `Received ${fmtDateTime(u.received_at)}`), form);
+  return h('article', { class: 'reply' },
+    h('div', {}, h('strong', {}, `${u.first_name}: ${u.title}`), ` “${u.raw_text}”`, h('span', { class: 'muted' }, ` · ${fmtDateTime(u.received_at)}`)), form);
 }
 
 async function renderDashboard() {
@@ -99,24 +117,59 @@ async function renderDashboard() {
   logoutBtn.hidden = false;
   const reload = () => renderDashboard().catch(handle);
   const sh = d.shabbos;
-  app.replaceChildren(
+  const byClient = new Map();
+  for (const p of d.today) byClient.set(p.client_id, [...(byClient.get(p.client_id) ?? []), p]);
+  const answered = d.today.filter((p) => p.status === 'answered').length;
+  const rows = d.clients.map((c) => clientRow(c, byClient.get(c.id) ?? []));
+
+  const filter = h('input', { type: 'search', placeholder: `Filter ${d.clients.length} clients…`, 'aria-label': 'Filter clients', class: 'filter' });
+  const onlyAttn = h('input', { type: 'checkbox' });
+  const count = h('span', { class: 'muted' });
+  const apply = () => {
+    const q = filter.value.trim().toLowerCase();
+    let n = 0;
+    for (const r of rows) {
+      const show = (!q || r.dataset.name.includes(q)) && (!onlyAttn.checked || r.dataset.attn);
+      r.hidden = !show;
+      if (show) n++;
+    }
+    count.textContent = `${n} shown`;
+  };
+  filter.addEventListener('input', apply);
+  onlyAttn.addEventListener('change', apply);
+  const setAll = (open) => rows.forEach((r) => { if (!r.hidden) r.open = open; });
+
+  const clientsBody = h('div', {},
+    h('div', { class: 'toolbar' }, filter,
+      h('label', { class: 'check' }, onlyAttn, ' Needs attention'),
+      h('button', { type: 'button', class: 'link', onclick: () => setAll(true) }, 'Expand all'),
+      h('button', { type: 'button', class: 'link', onclick: () => setAll(false) }, 'Collapse all'),
+      count),
+    d.clients.length ? h('div', { class: 'rows' }, rows) : h('p', { class: 'muted' }, 'No clients yet.'));
+
+  app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
-    d.attention.length > 0 && h('section', {}, h('h2', {}, 'Needs attention'),
-      h('ul', {}, d.attention.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}` }, c.first_name), ` — ${c.attention.join('; ')}`)))),
-    h('section', {}, h('h2', {}, 'Clients'),
-      h('p', {}, h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), ' ', h('a', { href: '#/archived' }, 'Archived clients')),
-      d.clients.length ? h('div', { class: 'grid' }, d.clients.map(clientCard)) : h('p', { class: 'muted' }, 'No clients yet.')),
-    h('section', {}, h('h2', {}, "Today's prompts"),
+    h('div', { class: 'stats' },
+      h('span', {}, h('strong', {}, String(d.clients.length)), ' clients'),
+      h('span', { class: d.attention.length ? 'bad' : '' }, h('strong', {}, String(d.attention.length)), ' need attention'),
+      h('span', { class: d.unparsed.length ? 'bad' : '' }, h('strong', {}, String(d.unparsed.length)), ' replies to review'),
+      h('span', {}, h('strong', {}, `${answered}/${d.today.length}`), ' answered today'),
+      h('span', { class: 'spacer' }),
+      h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
+    d.unparsed.length > 0 && collapsible('replies', [h('strong', {}, 'Replies to review'), badge(String(d.unparsed.length), 'bad')],
+      h('div', { class: 'list' }, d.unparsed.map((u) => unparsedItem(u, reload)))),
+    d.attention.length > 0 && collapsible('attention', [h('strong', {}, 'Needs attention'), badge(String(d.attention.length), 'bad')],
+      h('ul', { class: 'list tight' }, d.attention.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}` }, `${c.first_name} ${c.last_name}`), ` — ${c.attention.join('; ')}`)))),
+    collapsible('clients', [h('strong', {}, 'Clients'), badge(String(d.clients.length))], clientsBody),
+    collapsible('today', [h('strong', {}, "Today's prompts"), badge(`${answered}/${d.today.length} answered`)],
       d.today.length
-        ? h('div', { class: 'scroll' }, h('table', {},
-            h('thead', {}, h('tr', {}, ['Time', 'Client', 'Goal', 'Status'].map((t) => h('th', { scope: 'col' }, t)))),
+        ? h('div', { class: 'scroll' }, h('table', { class: 'compact' },
             h('tbody', {}, d.today.map((p) => h('tr', {},
               h('td', {}, fmtTime(p.scheduled_for)), h('td', {}, p.first_name), h('td', {}, p.title),
               h('td', { class: `s-${p.status}` }, STATUS[p.status] ?? p.status, p.status === 'deferred' && p.deferred_reason ? ` (${p.deferred_reason.replace('_', ' ')})` : ''))))))
         : h('p', { class: 'muted' }, 'Nothing scheduled today.')),
-    h('section', {}, h('h2', {}, `Replies to review (${d.unparsed.length})`),
-      d.unparsed.length ? h('div', { class: 'grid' }, d.unparsed.map((u) => unparsedItem(u, reload))) : h('p', { class: 'muted' }, 'All replies understood.')),
-  );
+  ].filter(Boolean));
+  apply();
 }
 
 const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);
