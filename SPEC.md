@@ -119,14 +119,12 @@ Each goal has:
 ### 5.6a Preferred reinforcements
 - Each client has a simple list of **preferred reinforcements** (also called reinforcers), e.g., "bubbles", "iPad time", "gummy bears". It is a record only: no data collection, no scoring, and no chart.
 - Each entry is a name and an optional note. Totty adds, edits, and removes entries.
-- The list is shown on the client page and on that client's dashboard card.
+- The list is shown on the client page.
 
 ### 5.7 Dashboard
-- A card per client listing their preferred reinforcements (see 5.6a), with a link to the client page.
-- Today's prompts and their status (scheduled, sent, answered, no response).
-- Unparsed replies queue.
+- The dashboard is just the list of clients, with an **Add client** button and a link to Archived clients. Each client links to the client page.
 - A notice with the reopen time while a Shabbos / Yom Tov window is in effect. No notice about upcoming windows.
-- Clients needing attention.
+- Everything else lives on the client page: attention flags, today's prompts and their status (scheduled, sent, answered with the actual reply, no response), preferred reinforcements, goals, and progress charts.
 
 ### 5.7a Parent check-in prompt
 - Seven days (one week) after a parent first receives messages from the app, they get a one-time text prompting them to set up a **check-in appointment with Yisroel Feder, BCBA, LBA**.

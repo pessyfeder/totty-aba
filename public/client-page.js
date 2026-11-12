@@ -5,6 +5,8 @@ import { reportsSection } from './reports-page.js';
 const RANGES = [['week', '1 week'], ['month', '1 month'], ['3months', '3 months'], ['all', 'All']];
 const TREND = { improving: 'Improving', flat: 'Flat', declining: 'Declining', not_enough_data: 'Not enough data yet' };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const STATUS = { scheduled: 'Scheduled', deferred: 'Deferred', sending: 'Sending', sent: 'Sent', answered: 'Answered', no_response: 'No response', skipped: 'Skipped', failed: 'Failed' };
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Small form helper: runs onSubmit with the FormData and shows any error beside the button. */
@@ -98,11 +100,26 @@ export async function renderClient(ctx, id) {
     'Add', (f) => post('/reinforcements', trimmed(f)));
 
   const reports = await reportsSection(ctx, id);
+  const dash = await api('/dashboard');
+  const me = dash.clients.find((x) => x.id === id);
+  const prompts = dash.today.filter((p) => p.client_id === id);
+  const todaySection = [
+    h('h2', {}, 'Today'),
+    ...(me?.attention ?? []).map((a) => h('div', { class: 'warn-line' }, `⚠ ${a}`)),
+    prompts.length
+      ? h('table', { class: 'compact' }, h('tbody', {}, prompts.map((p) => h('tr', {},
+          h('td', {}, fmtTime(p.scheduled_for)), h('td', {}, p.title),
+          h('td', { class: `s-${p.status}` }, p.status === 'answered' && (p.value_bool != null || p.value_minutes != null)
+            ? (p.response_type === 'yes_no' ? (p.value_bool ? 'Yes' : 'No') : `${p.value_minutes} min`)
+            : (STATUS[p.status] ?? p.status), p.status === 'deferred' && p.deferred_reason ? ` (${p.deferred_reason.replace('_', ' ')})` : '')))))
+      : h('p', { class: 'muted' }, 'Nothing scheduled today.'),
+  ];
 
   app.replaceChildren(
     h('p', {}, h('a', { href: '#/' }, '← Dashboard')),
     h('h2', {}, `${c.first_name} ${c.last_name}`, ' ', h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
     h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
+    ...todaySection,
     h('h2', {}, 'Preferred reinforcements'),
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
     reinforcementForm,

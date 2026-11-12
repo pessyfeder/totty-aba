@@ -33,9 +33,7 @@ async function api(path, { method = 'GET', body } = {}) {
   return data;
 }
 
-const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const fmtDateTime = (iso) => new Date(iso).toLocaleString([], { weekday: 'long', hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' });
-const STATUS = { scheduled: 'Scheduled', deferred: 'Deferred', sending: 'Sending', sent: 'Sent', answered: 'Answered', no_response: 'No response', skipped: 'Skipped', failed: 'Failed' };
 
 let showingLocked = false;
 
@@ -65,92 +63,20 @@ function renderLogin(message = '') {
   app.replaceChildren(form);
 }
 
-// Open/closed state of collapsibles survives re-renders (e.g. the reload after saving a reply).
-const openState = new Map([['attention', true], ['replies', true], ['clients', true]]);
-function collapsible(key, summaryKids, body, { cls = '' } = {}) {
-  const d = h('details', { class: `fold ${cls}` }, h('summary', {}, summaryKids), body);
-  d.open = openState.get(key) ?? false;
-  d.addEventListener('toggle', () => openState.set(key, d.open));
-  return d;
-}
-const badge = (text, kind = '') => h('span', { class: `badge ${kind}` }, text);
-
-function clientRow(c, prompts) {
-  const done = prompts.filter((p) => p.status === 'answered').length;
-  const bad = prompts.some((p) => ['no_response', 'failed'].includes(p.status));
-  const head = [
-    h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`),
-    c.attention.length ? badge(`⚠ ${c.attention.length}`, 'bad') : '',
-    prompts.length ? badge(`${done}/${prompts.length} today`, bad ? 'bad' : done === prompts.length ? 'ok' : '') : '',
-  ];
-  const body = h('div', { class: 'row-body' },
-    c.attention.map((a) => h('div', { class: 'warn-line' }, `⚠ ${a}`)),
-    prompts.map((p) => h('div', { class: 'muted' }, `${fmtTime(p.scheduled_for)} · ${p.title} · ${STATUS[p.status] ?? p.status}`)),
-    c.reinforcements.length
-      ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', { title: i.note ?? '' }, i.name)))
-      : h('div', { class: 'muted' }, 'No reinforcements recorded'));
-  const el = collapsible(`client:${c.id}`, head, body, { cls: 'row' });
-  el.dataset.name = `${c.first_name} ${c.last_name}`.toLowerCase();
-  el.dataset.attn = c.attention.length ? '1' : '';
-  return el;
-}
-
 async function renderDashboard() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
-  const reload = () => renderDashboard().catch(handle);
   const sh = d.shabbos;
-  const byClient = new Map();
-  for (const p of d.today) byClient.set(p.client_id, [...(byClient.get(p.client_id) ?? []), p]);
-  const answered = d.today.filter((p) => p.status === 'answered').length;
-  const rows = d.clients.map((c) => clientRow(c, byClient.get(c.id) ?? []));
-
-  const filter = h('input', { type: 'search', placeholder: `Filter ${d.clients.length} clients…`, 'aria-label': 'Filter clients', class: 'filter' });
-  const onlyAttn = h('input', { type: 'checkbox' });
-  const count = h('span', { class: 'muted' });
-  const apply = () => {
-    const q = filter.value.trim().toLowerCase();
-    let n = 0;
-    for (const r of rows) {
-      const show = (!q || r.dataset.name.includes(q)) && (!onlyAttn.checked || r.dataset.attn);
-      r.hidden = !show;
-      if (show) n++;
-    }
-    count.textContent = `${n} shown`;
-  };
-  filter.addEventListener('input', apply);
-  onlyAttn.addEventListener('change', apply);
-  const setAll = (open) => rows.forEach((r) => { if (!r.hidden) r.open = open; });
-
-  const clientsBody = h('div', {},
-    h('div', { class: 'toolbar' }, filter,
-      h('label', { class: 'check' }, onlyAttn, ' Needs attention'),
-      h('button', { type: 'button', class: 'link', onclick: () => setAll(true) }, 'Expand all'),
-      h('button', { type: 'button', class: 'link', onclick: () => setAll(false) }, 'Collapse all'),
-      count),
-    d.clients.length ? h('div', { class: 'rows' }, rows) : h('p', { class: 'muted' }, 'No clients yet.'));
-
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('div', { class: 'stats' },
-      h('span', {}, h('strong', {}, String(d.clients.length)), ' clients'),
-      h('span', {}, h('strong', {}, `${answered}/${d.today.length}`), ' answered today'),
+      h('h2', {}, 'Clients'),
       h('span', { class: 'spacer' }),
       h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
-    d.attention.length > 0 && collapsible('attention', [h('strong', {}, 'Needs attention'), badge(String(d.attention.length), 'bad')],
-      h('ul', { class: 'list tight' }, d.attention.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}` }, `${c.first_name} ${c.last_name}`), ` — ${c.attention.join('; ')}`)))),
-    collapsible('clients', [h('strong', {}, 'Clients'), badge(String(d.clients.length))], clientsBody),
-    collapsible('today', [h('strong', {}, "Today's prompts"), badge(`${answered}/${d.today.length} answered`)],
-      d.today.length
-        ? h('div', { class: 'scroll' }, h('table', { class: 'compact' },
-            h('tbody', {}, d.today.map((p) => h('tr', {},
-              h('td', {}, fmtTime(p.scheduled_for)), h('td', {}, p.first_name), h('td', {}, p.title),
-              h('td', { class: `s-${p.status}` }, p.status === 'answered' && (p.value_bool != null || p.value_minutes != null)
-                ? (p.response_type === 'yes_no' ? (p.value_bool ? 'Yes' : 'No') : `${p.value_minutes} min`)
-                : (STATUS[p.status] ?? p.status), p.status === 'deferred' && p.deferred_reason ? ` (${p.deferred_reason.replace('_', ' ')})` : ''))))))
-        : h('p', { class: 'muted' }, 'Nothing scheduled today.')),
+    d.clients.length
+      ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`))))
+      : h('p', { class: 'muted' }, 'No clients yet.'),
   ].filter(Boolean));
-  apply();
 }
 
 const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);
