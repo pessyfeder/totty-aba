@@ -13,7 +13,7 @@ Single-clinician in v1. Design the data model with a `clinician_id` so multi-use
 
 ## 3. Goals and non-goals
 **Goals**
-- Capture parent-reported goal data with minimal effort (reply Y/N or a number).
+- Capture parent-reported goal data with minimal effort (reply Y/N, or a number of minutes for duration goals).
 - Show progress per goal over time.
 - Let Totty create a progress report for any client and date range on demand, and send it to the parent.
 - Never contact families on Shabbos.
@@ -45,7 +45,7 @@ Each goal has:
 - Title and description (e.g., "Uses a spoon independently at dinner").
 - **Response type** (one per goal):
   - `yes_no`: parent replies Y or N.
-  - `rating`: parent replies 0-5, with an optional free-text comment.
+  - `duration`: parent replies with a number of minutes (e.g., `15`), meaning how long the behavior lasted or the activity took. The reply is a plain number; an optional comment may follow it.
 - **Schedule**: days of week and a time of day (client's local timezone). Can be daily, specific days, or weekly.
 - **Contact** to prompt, and **channel** (SMS or voice call). Default to the contact's preference.
 - **Date added**: the date the goal was added to the client's plan. Defaults to today on creation (Totty may set it when adding the goal) and is shown on the goal and its chart.
@@ -72,14 +72,15 @@ Each goal has:
 ### 5.4 Prompting and response capture
 **SMS**
 - Message states client name and goal. For example: "Hi, Mrs. Cohen. Did Dovid use a spoon at dinner today? Reply Y or N."
-- Accepts Y/YES/N/NO case-insensitively. For ratings: "Reply 0-5 (5 = best). You can add a comment after the number, e.g., `4 did great with reminders`."
-- For ratings, the reply `4` is accepted immediately. A follow-up "Any comment? Reply or ignore" is optional and configurable.
+- Accepts Y/YES/N/NO case-insensitively.
+- **Parent replies are one of two kinds**: a yes/no answer, or a number of minutes (duration). For a duration goal the message asks, e.g., "How many minutes did Dovid spend on X today? Reply with a number, e.g., `15`." The reply is the number of minutes the parent texts. Accepts whole numbers (and optionally a trailing "min"/"minutes"); `0` is a valid answer. A reply that is not a number is treated as unparseable (below). Values above a sanity limit (default 1440, one day) are treated as unparseable.
+- A reply is accepted immediately. A follow-up "Any comment? Reply or ignore" is optional and configurable.
 - Unparseable replies get one re-prompt; after that, store the raw text as unparsed and flag for review.
 - If several prompts are open for a contact, each message includes a short code (e.g., "Goal 2") and replies are matched to the most recent open prompt unless a code is given. A single combined message listing multiple goals is a later option.
 - No opt-out feature in the app. A parent who wants prompts to stop speaks to Totty directly, and Totty pauses or ends the goal (or the contact) himself.
 
 **Voice call**
-- Automated call (text-to-speech): read the question, accept keypad input (1 = yes, 2 = no; or digits 0-5 for rating), and repeat on no input.
+- Automated call (text-to-speech): read the question, accept keypad input (1 = yes, 2 = no; or digits followed by # for minutes on a duration goal), and repeat on no input.
 - If no answer, retry per retry policy (see below), then fall back to SMS if configured.
 - Optional: record a voice comment and transcribe it.
 
@@ -91,7 +92,7 @@ Each goal has:
 ### 5.5 Charts and progress
 - Per goal, a chart over a selectable range (1 week, 1 month, 3 months, all):
   - `yes_no`: percent met per week plus a daily dot strip (Y/N/no response).
-  - `rating`: line of daily 0-5 ratings with a moving average.
+  - `duration`: line or bars of daily minutes with a moving average, and the weekly average and total.
 - Target line and phase-change markers (Totty can annotate a date, e.g., "new intervention started").
 - Comments display on hover/click on the data point.
 - Missing responses shown distinctly, never counted as N.
@@ -100,7 +101,7 @@ Each goal has:
 
 ### 5.6 Progress reports
 - Reports are created on demand: Totty clicks **Create report** on a client's page and picks a period: **weekly** (Sunday-Saturday), **monthly** (calendar month), or **custom** (any start and end date). The default is the most recent completed week. Nothing is generated or sent automatically.
-- Contents: client name, date range, per-goal summary (responses received, % met or average rating, change vs. prior period, small chart), parent comments, Totty's optional note, and next-period focus.
+- Contents: client name, date range, per-goal summary (responses received, % met or average minutes, change vs. prior period, small chart), parent comments, Totty's optional note, and next-period focus.
 - Totty previews and edits the report, then chooses **Send** or **Download PDF**. Sending is always a manual action.
 - Delivery: the PDF is stored in the app and sent to the parent as an **SMS containing a secure link** (no email delivery). The link is unguessable and expires after a set period (default 14 days), and the text itself contains no progress details, only the child's first name. Reports can only be created or sent outside the Shabbos window; the app is locked for Totty during it (see 5.3).
 - Report history is viewable per client (period, type, status, date sent).
@@ -126,6 +127,13 @@ Each goal has:
 - A notice with the reopen time while a Shabbos / Yom Tov window is in effect. No notice about upcoming windows.
 - Clients needing attention.
 
+### 5.7a Parent check-in prompt
+- Seven days (one week) after a parent first receives messages from the app, they get a one-time text prompting them to set up a **check-in appointment with Yisroel Feder, BCBA, LBA**.
+- The seven days are counted from the first prompt actually sent to that contact (`first_message_at`), not from when the contact was created. The check-in text goes out at the next permitted time after day 7 and follows every send rule: never during Shabbos/Yom Tov, never in quiet hours, only to active contacts with recorded consent. If it cannot go out in a blocked window it is sent after the window ends (it is not dropped).
+- It is sent once per contact (`checkin_prompt_sent_at`), and is not repeated if the contact is paused and resumed. It is logged in the message log like any other message.
+- The text contains no progress details, only the child's first name and the invitation to schedule.
+- **The text includes a link to book the appointment** (a scheduling link, stored in Settings as `CHECKIN_BOOKING_URL`) **and a payment reminder**: payment is due up to 48 hours before the appointment. Example: "Time to schedule a check-in for <first name> with Yisroel Feder, BCBA, LBA: <link>. Please remember payment is due 48 hours before your appointment."
+
 ### 5.8 Settings
 - Location and timezone, Shabbos/Yom Tov rules, quiet hours (e.g., no messages before 8am or after 9pm), sender number, report options, follow-up timing and limit (defaults 30 minutes, 3 follow-ups).
 
@@ -133,10 +141,10 @@ Each goal has:
 - `clinician(id, name, email, password_hash, timezone, location, settings_json)`
 - `client(id, clinician_id, first_name, last_name, gender, age, dob, admission_date, notes, location, timezone, status)`
 - `reinforcement(id, client_id, name, note)`
-- `contact(id, client_id, name, relationship, phone, email, preferred_channel, language)`
+- `contact(id, client_id, name, relationship, phone, email, preferred_channel, language, first_message_at, checkin_prompt_sent_at)`
 - `goal(id, client_id, contact_id, title, description, response_type, channel, schedule_json, date_added, start_date, end_date, status, target_json)`
 - `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason, followups_sent, last_followup_at)`
-- `response(id, prompt_id, received_at, value_bool, value_int, comment, raw_text, source, parse_status)`
+- `response(id, prompt_id, received_at, value_bool, value_minutes, comment, raw_text, source, parse_status)`
 - `annotation(id, goal_id, date, text)`
 - `report(id, client_id, period_type, period_start, period_end, status, content_json, pdf_path, sent_at, note, link_token_hash, link_expires_at)`
 - `message_log(id, direction, to_from, body, provider_id, status, created_at)`
@@ -163,24 +171,28 @@ Each goal has:
 1. A prompt scheduled for Saturday 10:00 is not sent then, and is sent within 5 minutes after computed nightfall.
 2. A prompt scheduled for Friday 5:00 pm in a location where candle lighting is 4:30 pm is deferred until Saturday nightfall.
 3. Replying "y" to a yes/no prompt creates a response of true and the chart updates within 10 seconds.
-4. Replying "3 tough day, needed help" to a rating prompt stores value 3 and the comment.
+4. Replying "20 tough day, needed help" to a duration prompt stores 20 minutes and the comment.
 5. A day with no reply shows as "no response", not as a failed goal, in the chart and in the weekly percent.
 6. Clicking Create report on a client produces a preview containing every active goal for the chosen range, and no report is created or sent without that click.
 7. Pausing a goal or contact stops all further prompts for it.
 8. Calling the send function directly during Shabbos fails with a logged refusal.
 9. During the Shabbos window, logging in or performing any action as Totty is refused with a notice showing when the app reopens, and a parent's reply received then is still recorded.
+10. Replying "20" to a duration prompt stores 20 minutes and the chart updates; replying "abc" is treated as unparseable.
+11. A contact whose first prompt was sent 7 days ago receives the check-in text with Yisroel Feder, BCBA, LBA once, at a permitted time (not during Shabbos or quiet hours), and never again.
 
 ## 10. Milestones
-1. **MVP**: login, clients, contacts, goals, SMS yes/no + rating prompts, scheduler with Shabbos guard, per-goal charts.
+1. **MVP**: login, clients, contacts, goals, SMS yes/no + duration prompts, scheduler with Shabbos guard, per-goal charts.
 2. On-demand PDF reports (create, preview, edit, send).
 3. Voice-call prompts, reminders and retries, dashboard.
 4. Annotations, manual data entry, Yom Tov calendar, multi-clinician support.
+5. **Cross-device app (later stage)**: Totty's app runs on both phone and computer. One responsive web app (installable to the phone home screen as a PWA) with a layout that adapts from phone to desktop, covering every Totty-facing screen: dashboard, clients, goals, charts, and report create/preview/edit. No separate native apps unless a later need (e.g. push notifications on iOS) requires it. The Shabbos lock applies the same on every device.
 
 ## 11. Open questions
 1. **Prompt volume**: how many clients and goals per client? This affects Twilio costs and the combined-message design.
-2. **Response type**: Y/N or 0-5? Is the type chosen by Totty per goal, or should a goal ever allow both?
+2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
 4. **Voice calls**: automated robot voice only, or could Totty ever want to be called in too?
 5. **Languages**: English only, or also Hebrew/Yiddish prompts?
 6. **Parents on tablets and computers**: texts reach phones only. Do any parents need prompts on a tablet or computer? Options: (a) prompts also sent by email with a private link to a one-tap answer page that works on any device, no login (recommended; texts stay the default so basic and kosher phones keep working); (b) an installable parent web app with push notifications (needs a parent login, does not work on basic phones); (c) WhatsApp (needs a WhatsApp Business setup and approved message templates). Not built; waiting on Totty.
 7. **Follow-up calls**: follow-ups are texts today. For parents who prefer calls, should a follow-up be a call, and should it fall back to a text? (Needs the voice milestone.)
+8. **Check-in booking**: the text carries a booking link; which scheduling tool does the link point to, and how and where does the parent pay (in the link, or separately)? Is it only the one text, or a reminder if they do not respond?
