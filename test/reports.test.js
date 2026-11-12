@@ -29,7 +29,7 @@ before(async () => {
       `INSERT INTO prompt (goal_id, scheduled_for, prompt_date, channel, status) VALUES ($1, $2, $3, 'sms', $4) RETURNING id`,
       [goal.id, `${d}T22:30:00Z`, d, vals[i] === null ? 'no_response' : 'answered'],
     );
-    if (vals[i] !== null) await db.query(`INSERT INTO response (prompt_id, value_bool, comment, source) VALUES ($1, $2, $3, 'sms')`, [p.id, vals[i], i === 1 ? 'tough day' : null]);
+    if (vals[i] !== null) await db.query(`INSERT INTO response (prompt_id, value_bool, source) VALUES ($1, $2, 'sms')`, [p.id, vals[i]]);
   }
 });
 after(async () => { server.close(); await rm(dir, { recursive: true, force: true }); });
@@ -74,7 +74,7 @@ test('a created report includes every active goal; no reply is not counted as No
   assert.equal(g.asked, 4);
   assert.equal(g.received, 3);
   assert.equal(g.metric, 67); // 2 yes of 3 answered, the missed day is excluded
-  assert.deepEqual(g.comments.map((x) => x.text), ['tough day']);
+  assert.ok(!('comments' in g));
   assert.equal(r.content.goals.find((x) => x.title === 'No replies yet goal').metric, null);
   assert.equal((await call(`/api/clients/${world.client.id}/reports`, { method: 'POST', body: { ...WEEK, period_start: '2026-10-26' } })).status, 400);
 });
@@ -82,9 +82,9 @@ test('a created report includes every active goal; no reply is not counted as No
 test('draft can be edited, downloaded as PDF; sending needs consent, then freezes it and texts only a link', async () => {
   const id = (await call(`/api/clients/${world.client.id}/reports`, { method: 'POST', body: WEEK })).json.id;
   const gid = (await call(`/api/reports/${id}`)).json.content.goals.find((x) => x.title === 'Uses a spoon').goal_id;
-  const patch = await call(`/api/reports/${id}`, { method: 'PATCH', body: { note: 'Great week!', next_focus: 'Cup drinking', goals: { [gid]: { remark: 'Improving', exclude_comments: [0] } } } });
+  const patch = await call(`/api/reports/${id}`, { method: 'PATCH', body: { note: 'Great week!', next_focus: 'Cup drinking', goals: { [gid]: { remark: 'Improving' } } } });
   assert.equal(patch.status, 200);
-  assert.equal(patch.json.content.goals.find((x) => x.goal_id === gid).comments[0].include, false);
+  assert.equal(patch.json.content.goals.find((x) => x.goal_id === gid).remark, 'Improving');
 
   const pdf = await call(`/api/reports/${id}/pdf`);
   assert.equal(pdf.type, 'application/pdf');

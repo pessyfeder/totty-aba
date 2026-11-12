@@ -68,7 +68,7 @@ export function reportRoutes({ app, db, messenger, config, now, HttpError, bad, 
       res.json(view(r));
     });
 
-    // What Totty may edit while previewing: his note, next-period focus, a remark per goal, and which comments show.
+    // What Totty may edit while previewing: his note, next-period focus, and a remark per goal.
     app.patch('/api/reports/:id', async (req, res) => {
       const r = await ownedReport(req, req.params.id);
       if (r.status !== 'draft') throw new HttpError(409, 'This report has been finalized and can no longer be edited');
@@ -84,7 +84,6 @@ export function reportRoutes({ app, db, messenger, config, now, HttpError, bad, 
         const e = b.goals?.[g.goal_id];
         if (!e) continue;
         if ('remark' in e) g.remark = text(e.remark, 2000);
-        if (Array.isArray(e.exclude_comments)) g.comments.forEach((c, i) => { c.include = !e.exclude_comments.includes(i); });
       }
       const note = 'note' in b ? text(b.note, 4000) : r.note;
       const { rows } = await db.query('UPDATE report SET content_json = $2, note = $3 WHERE id = $1 RETURNING *', [r.id, JSON.stringify(content), note]);

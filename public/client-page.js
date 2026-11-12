@@ -34,7 +34,7 @@ function goalCard({ h, api, handle }, g, contacts, reload) {
     const chart = chartFor(g, d.points, d.annotations);
     const legend = g.response_type === 'yes_no'
       ? ['● Yes', '● No', '○ No response (never counted as No)', '┄ Target', '┆ Note']
-      : ['● Rating', '— 7-reply average', '○ No response', '┄ Target', '┆ Note'];
+      : ['● Minutes', '— 7-reply average', '○ No response', '┄ Target', '┆ Note'];
     body.replaceChildren(chart ?? h('p', { class: 'muted' }, 'No prompts in this range yet.'),
       chart ? h('div', { class: 'legend' }, legend.map((t) => h('span', {}, t))) : '');
   }
@@ -50,7 +50,7 @@ function goalCard({ h, api, handle }, g, contacts, reload) {
   const owner = contacts.find((c) => c.id === g.contact_id);
   const card = h('article', { class: 'card goal-card' },
     h('h3', {}, g.title),
-    h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : '0–5 rating'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`),
+    h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`),
     summary, rangeBar, body, g.status === 'archived' ? '' : note,
     g.status === 'archived' ? h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.') : h('div', {},
       h('button', { type: 'button', class: 'link', onclick: () => {
@@ -77,17 +77,17 @@ export async function renderClient(ctx, id) {
     lbl('Goal', h('input', { name: 'title', required: true, placeholder: 'e.g. Used words to ask for help' })),
     lbl('Question texted to parent (optional)', h('input', { name: 'question_text' })),
     lbl('Ask', h('select', { name: 'contact_id', required: true }, c.contacts.map((p) => h('option', { value: p.id }, p.name)))),
-    lbl('Answer type', h('select', { name: 'response_type' }, h('option', { value: 'yes_no' }, 'Yes / No'), h('option', { value: 'rating' }, 'Rating 0–5'))),
+    lbl('Answer type', h('select', { name: 'response_type' }, h('option', { value: 'yes_no' }, 'Yes / No'), h('option', { value: 'duration' }, 'Minutes'))),
     lbl('Time', h('input', { name: 'time', type: 'time', value: '18:30', required: true })),
     lbl('Start date', h('input', { name: 'start_date', type: 'date', value: today(), required: true })),
-    lbl('Target (% yes or average rating, optional)', h('input', { name: 'target', type: 'number', min: 0, step: 'any' })),
+    lbl('Target (% yes or average minutes, optional)', h('input', { name: 'target', type: 'number', min: 0, step: 'any' })),
     h('fieldset', {}, h('legend', {}, 'Days'), DAYS.map((d, i) => h('label', {}, h('input', { name: 'day', type: 'checkbox', value: i, checked: true }), ` ${d}`))),
   ], 'Add goal', async (f) => {
     const days = f.getAll('day').map(Number);
     const body = trimmed(f);
     for (const k of ['day', 'time', 'target']) delete body[k];
     const t = f.get('target');
-    if (t) body.target_json = f.get('response_type') === 'yes_no' ? { type: 'percent_yes', threshold: Number(t) } : { type: 'avg_rating', threshold: Number(t) };
+    if (t) body.target_json = f.get('response_type') === 'yes_no' ? { type: 'percent_yes', threshold: Number(t) } : { type: 'avg_minutes', threshold: Number(t) };
     await post('/goals', { ...body, channel: 'sms', schedule_json: { days, time: f.get('time') } });
   });
 

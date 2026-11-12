@@ -32,7 +32,7 @@ export function lastCompletedWeek(today) {
 
 async function pointsFor(db, goalId, start, end) {
   const { rows } = await db.query(
-    `SELECT p.prompt_date::text AS date, (r.id IS NOT NULL) AS answered, r.value_bool, r.value_int, r.comment
+    `SELECT p.prompt_date::text AS date, (r.id IS NOT NULL) AS answered, r.value_bool, r.value_minutes
        FROM prompt p
        LEFT JOIN LATERAL (SELECT * FROM response WHERE prompt_id = p.id AND parse_status <> 'unparsed' ORDER BY received_at DESC LIMIT 1) r ON true
       WHERE p.goal_id = $1 AND p.prompt_date BETWEEN $2::date AND $3::date AND p.status IN ('answered', 'no_response', 'sent')
@@ -48,7 +48,7 @@ function metric(points, type) {
   if (!answered.length) return null;
   return type === 'yes_no'
     ? Math.round((100 * answered.filter((p) => p.value_bool).length) / answered.length)
-    : Math.round((10 * answered.reduce((s, p) => s + p.value_int, 0)) / answered.length) / 10;
+    : Math.round(answered.reduce((s, p) => s + p.value_minutes, 0) / answered.length);
 }
 
 /**
@@ -78,7 +78,6 @@ export async function buildContent(db, client, { type, start, end }) {
       asked: points.length, received: points.filter((p) => p.answered).length,
       metric: m, prior_metric: pm, change: m != null && pm != null ? Math.round((m - pm) * 10) / 10 : null,
       points, annotations,
-      comments: points.filter((p) => p.comment).map((p) => ({ date: p.date, text: p.comment, include: true })),
       remark: '',
     });
   }
@@ -89,7 +88,7 @@ export async function buildContent(db, client, { type, start, end }) {
   };
 }
 
-export const metricLabel = (g) => (g.metric == null ? 'No replies yet' : g.response_type === 'yes_no' ? `${g.metric}% yes` : `Average ${g.metric} of 5`);
+export const metricLabel = (g) => (g.metric == null ? 'No replies yet' : g.response_type === 'yes_no' ? `${g.metric}% yes` : `Average ${g.metric} min`);
 export const changeLabel = (g) => (g.change == null ? 'No prior period to compare' : `${g.change > 0 ? '+' : ''}${g.change}${g.response_type === 'yes_no' ? ' points' : ''} vs prior period`);
 
 // pdfkit's built-in fonts cover Latin-1 only; anything else would print as garbage, so show '?'.
@@ -112,9 +111,8 @@ export function renderPdf(content, { note = '' } = {}) {
       .text(`${g.received} of ${g.asked} replies received${g.status !== 'active' ? ` (${g.status})` : ''}`).fillColor('#000');
     doc.fontSize(11).text(`${metricLabel(g)} · ${changeLabel(g)}`);
     const target = g.target_json?.threshold;
-    if (target != null) doc.fontSize(10).fillColor('#555').text(`Target: ${g.response_type === 'yes_no' ? `${target}% yes` : `average ${target}`}`).fillColor('#000');
+    if (target != null) doc.fontSize(10).fillColor('#555').text(`Target: ${g.response_type === 'yes_no' ? `${target}% yes` : `average ${target} min`}`).fillColor('#000');
     smallChart(doc, g, W);
-    for (const c of g.comments.filter((x) => x.include)) doc.fontSize(10).fillColor('#333').text(`${c.date}: "${safe(c.text)}"`, { indent: 8 }).fillColor('#000');
     for (const a of g.annotations) doc.fontSize(10).fillColor('#7a5300').text(`${a.date}: ${safe(a.text)}`, { indent: 8 }).fillColor('#000');
     if (g.remark) doc.fontSize(11).moveDown(0.3).text(safe(g.remark));
     doc.moveDown();
@@ -126,7 +124,7 @@ export function renderPdf(content, { note = '' } = {}) {
   return done;
 }
 
-/** Daily marks: yes/no dots (green yes, red no, hollow grey = no reply) or a 0-5 line. */
+/** Daily marks: yes/no dots (green yes, red no, hollow grey = no reply) or a minutes line. */
 function smallChart(doc, g, W) {
   const pts = g.points;
   if (!pts.length) return;
@@ -142,12 +140,13 @@ function smallChart(doc, g, W) {
       else doc.fillColor(p.value_bool ? '#1b6e3c' : '#b3261e').circle(cx, cy, 3.5).fill();
     });
   } else {
-    const y = (v) => y0 + h - 4 - (v / 5) * (h - 8);
+    const top = Math.max(1, ...pts.filter((p) => p.answered).map((p) => p.value_minutes));
+    const y = (v) => y0 + h - 4 - (v / top) * (h - 8);
     let first = true;
     doc.lineWidth(1).strokeColor('#2456c8');
-    pts.forEach((p, i) => { if (!p.answered) return; if (first) { doc.moveTo(px(i), y(p.value_int)); first = false; } else doc.lineTo(px(i), y(p.value_int)); });
+    pts.forEach((p, i) => { if (!p.answered) return; if (first) { doc.moveTo(px(i), y(p.value_minutes)); first = false; } else doc.lineTo(px(i), y(p.value_minutes)); });
     doc.stroke();
-    pts.forEach((p, i) => { if (p.answered) doc.fillColor('#2456c8').circle(px(i), y(p.value_int), 2).fill(); else doc.lineWidth(0.8).strokeColor('#888').circle(px(i), y0 + h - 3, 1.5).stroke(); });
+    pts.forEach((p, i) => { if (p.answered) doc.fillColor('#2456c8').circle(px(i), y(p.value_minutes), 2).fill(); else doc.lineWidth(0.8).strokeColor('#888').circle(px(i), y0 + h - 3, 1.5).stroke(); });
   }
   doc.restore();
   doc.x = x0;

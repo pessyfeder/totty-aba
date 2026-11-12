@@ -75,7 +75,7 @@ Each goal has:
 - Accepts Y/YES/N/NO case-insensitively.
 - **Parent replies are one of two kinds**: a yes/no answer, or a number of minutes (duration). For a duration goal the message asks, e.g., "How many minutes did Dovid spend on X today? Reply with a number, e.g., `15`." The reply is the number of minutes the parent texts. Accepts whole numbers (and optionally a trailing "min"/"minutes"); `0` is a valid answer. A reply that is not a number is treated as unparseable (below). Values above a sanity limit (default 1440, one day) are treated as unparseable.
 - **Replies carry no notes or comments**: a parent's reply is only Y/N or a number of minutes, and the app never asks for a comment. Any extra text is ignored (the reply is still recorded from the Y/N or number it starts with). A reply is accepted immediately.
-- Unparseable replies get one re-prompt; after that, store the raw text as unparsed and flag for review.
+- Every unusable reply (unreadable, or a number above the limit) gets a follow-up message telling the parent it could not be read and asking them to try again ("Please reply Y or N" / "Please reply with a number of minutes, e.g. 15"), each time, with no retry limit. Nothing is stored or queued for Totty; the prompt stays open until a usable reply arrives.
 - If several prompts are open for a contact, each message includes a short code (e.g., "Goal 2") and replies are matched to the most recent open prompt unless a code is given. A single combined message listing multiple goals is a later option.
 - No opt-out feature in the app. A parent who wants prompts to stop speaks to Totty directly, and Totty pauses or ends the goal (or the contact) himself.
 
@@ -95,11 +95,11 @@ Each goal has:
 - Target line and phase-change markers (Totty can annotate a date, e.g., "new intervention started").
 - Missing responses shown distinctly, never counted as N.
 - Client overview page shows all goal charts, with a summary of trend (improving, flat, declining).
-- Totty can manually add or edit a data point (with an audit note), e.g., when a parent tells him by phone.
+- Totty can manually add or edit a data point (Y/N or minutes, no note needed; the change is recorded in the audit log), e.g., when a parent tells him by phone.
 
 ### 5.6 Progress reports
 - Reports are created on demand: Totty clicks **Create report** on a client's page and picks a period: **weekly** (Sunday-Saturday), **monthly** (calendar month), or **custom** (any start and end date). The default is the most recent completed week. Nothing is generated or sent automatically.
-- Contents: client name, date range, per-goal summary (responses received, % met or average minutes, change vs. prior period, small chart), parent comments, Totty's optional note, and next-period focus.
+- Contents: client name, date range, per-goal summary (responses received, % met or average minutes, change vs. prior period, small chart), Totty's optional note, and next-period focus.
 - Totty previews and edits the report, then chooses **Send** or **Download PDF**. Sending is always a manual action.
 - Delivery: the PDF is stored in the app and sent to the parent as an **SMS containing a secure link** (no email delivery). The link is unguessable and expires after a set period (default 14 days), and the text itself contains no progress details, only the child's first name. Reports can only be created or sent outside the Shabbos window; the app is locked for Totty during it (see 5.3).
 - Report history is viewable per client (period, type, status, date sent).
@@ -107,11 +107,11 @@ Each goal has:
   - Period choices snap to whole periods: weekly is always Sunday to Saturday, monthly is a whole calendar month, custom allows up to one year. Create report builds a **draft** and opens the preview.
   - The report includes **every active goal**, even with no replies, plus any paused or archived goal that was asked something in the period. "Change vs. prior period" compares with the immediately preceding period of the same length.
   - Only answered prompts count: a day with no reply is shown as a missing mark and is never counted as No (5.5).
-  - In the preview Totty can edit his note, the next-period focus, a remark under each goal, and untick any parent comment he does not want included. Everything else is generated from the data and cannot be edited.
+  - In the preview Totty can edit his note, the next-period focus, and a remark under each goal. Everything else is generated from the data and cannot be edited.
   - **Download PDF** produces the current draft without changing anything. **Send to parent** asks Totty to pick a contact (active, with a mobile number and recorded consent), confirms, then freezes the report, stores the PDF, and texts the link right away. A report that has been sent cannot be edited or sent again; to send updated figures Totty creates a new report.
   - The text reads: "A progress report for <first name> is ready: <link>". If the text cannot go out (including a Shabbos refusal), nothing is stored as sent and the report stays a draft.
   - The link opens the PDF with no login, until it expires (default 14 days, `REPORT_LINK_DAYS`). Only a hash of the token is stored. After expiry it shows a short "ask Totty for a new one" message. Opening the link is read-only, so it works during Shabbos; only Totty's actions are locked.
-  - PDFs use standard Latin fonts: characters outside them (for example Hebrew in a parent comment) print as "?" in the PDF in v1.
+  - PDFs use standard Latin fonts: characters outside them (for example Hebrew in Totty's note or a remark) print as "?" in the PDF in v1.
 
 ### 5.6a Preferred reinforcements
 - Each client has a simple list of **preferred reinforcements** (also called reinforcers), e.g., "bubbles", "iPad time", "gummy bears". It is a record only: no data collection, no scoring, and no chart.
@@ -142,7 +142,7 @@ Each goal has:
 - `contact(id, client_id, name, relationship, phone, email, preferred_channel, language, first_message_at, checkin_prompt_sent_at)`
 - `goal(id, client_id, contact_id, title, description, response_type, channel, schedule_json, date_added, start_date, end_date, status, target_json)`
 - `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason, followups_sent, last_followup_at)`
-- `response(id, prompt_id, received_at, value_bool, value_minutes, comment, raw_text, source, parse_status)`
+- `response(id, prompt_id, received_at, value_bool, value_minutes, raw_text, source, parse_status)`
 - `annotation(id, goal_id, date, text)`
 - `report(id, client_id, period_type, period_start, period_end, status, content_json, pdf_path, sent_at, note, link_token_hash, link_expires_at)`
 - `message_log(id, direction, to_from, body, provider_id, status, created_at)`

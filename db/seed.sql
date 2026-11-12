@@ -24,6 +24,6 @@ VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000
         '{"days": [0,1,2,3,4,5,6], "time": "18:30"}', '2026-09-08',
         '{"type": "percent_yes", "threshold": 80, "weeks": 2}'),
        ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1',
-        'Bedtime routine', 'Follows bedtime routine with minimal prompting', 'rating', 'sms',
+        'Time to settle at bedtime', 'Minutes from lights out until asleep', 'duration', 'sms',
         '{"days": [0,1,2,3,4], "time": "20:00"}', '2026-09-08',
-        '{"type": "avg_rating", "threshold": 4}');
+        '{"type": "avg_minutes", "threshold": 20}');

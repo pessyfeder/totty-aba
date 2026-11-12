@@ -112,22 +112,20 @@ test('PATCH ignores unknown fields instead of letting them reach SQL', async () 
   assert.equal((await call(`/api/clients/${world.client.id}`, { cookie })).status, 200);
 });
 
-test('manual data entry and resolving an unparsed reply need an audit note', async () => {
+test('manual data entry and resolving an unparsed reply take minutes with no note, and the dashboard carries no reply text', async () => {
   const { cookie } = await login();
-  const goal = await world.addGoal('Bedtime', { type: 'rating' });
+  const goal = await world.addGoal('Bedtime', { type: 'duration' });
   const p = await world.one(`INSERT INTO prompt (goal_id, scheduled_for, prompt_date, channel, status) VALUES ($1, now(), current_date, 'sms', 'no_response') RETURNING id`, [goal.id]);
-  assert.equal((await call(`/api/prompts/${p.id}/response`, { method: 'POST', cookie, body: { value_int: 4 } })).status, 400);
-  assert.equal((await call(`/api/prompts/${p.id}/response`, { method: 'POST', cookie, body: { value_int: 9, audit_note: 'phone' } })).status, 400);
-  const ok = await call(`/api/prompts/${p.id}/response`, { method: 'POST', cookie, body: { value_int: 4, audit_note: 'Mom told me by phone' } });
+  assert.equal((await call(`/api/prompts/${p.id}/response`, { method: 'POST', cookie, body: { value_minutes: 2000 } })).status, 400);
+  const ok = await call(`/api/prompts/${p.id}/response`, { method: 'POST', cookie, body: { value_minutes: 40 } });
   assert.equal(ok.status, 201);
   assert.equal(ok.json.source, 'manual');
 
   const u = await world.one(`INSERT INTO response (prompt_id, raw_text, source, parse_status) VALUES ($1, 'huh', 'sms', 'unparsed') RETURNING id`, [p.id]);
   const dash = await call('/api/dashboard', { cookie });
-  assert.ok(dash.json.unparsed.some((x) => x.id === u.id));
-  const fixed = await call(`/api/responses/${u.id}`, { method: 'PATCH', cookie, body: { value_int: 2, audit_note: 'reviewed' } });
+  assert.ok(!('unparsed' in dash.json));
+  const fixed = await call(`/api/responses/${u.id}`, { method: 'PATCH', cookie, body: { value_minutes: 25 } });
   assert.equal(fixed.json.parse_status, 'reviewed');
-  assert.ok(!(await call('/api/dashboard', { cookie })).json.unparsed.some((x) => x.id === u.id));
 });
 
 test('dashboard flags a client with missed responses and shows the next Shabbos window', async () => {

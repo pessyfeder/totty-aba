@@ -95,23 +95,6 @@ function clientRow(c, prompts) {
   return el;
 }
 
-function unparsedItem(u, reload) {
-  const note = h('input', { name: 'note', placeholder: 'Note (e.g. parent told me by phone)', required: true, 'aria-label': 'Audit note' });
-  const val = u.response_type === 'yes_no'
-    ? h('select', { name: 'v', 'aria-label': 'Answer' }, h('option', { value: 'true' }, 'Yes'), h('option', { value: 'false' }, 'No'))
-    : h('select', { name: 'v', 'aria-label': 'Rating' }, [0, 1, 2, 3, 4, 5].map((n) => h('option', { value: n }, String(n))));
-  const msg = h('span', { class: 'error', role: 'alert' });
-  const form = h('form', { onsubmit: async (e) => {
-    e.preventDefault();
-    const body = u.response_type === 'yes_no'
-      ? { value_bool: val.value === 'true', audit_note: note.value }
-      : { value_int: Number(val.value), audit_note: note.value };
-    try { await api(`/responses/${u.id}`, { method: 'PATCH', body }); reload(); } catch (ex) { msg.textContent = ex.message; }
-  } }, val, note, h('button', { type: 'submit' }, 'Save'), msg);
-  return h('article', { class: 'reply' },
-    h('div', {}, h('strong', {}, `${u.first_name}: ${u.title}`), ` “${u.raw_text}”`, h('span', { class: 'muted' }, ` · ${fmtDateTime(u.received_at)}`)), form);
-}
-
 async function renderDashboard() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
@@ -152,12 +135,9 @@ async function renderDashboard() {
     h('div', { class: 'stats' },
       h('span', {}, h('strong', {}, String(d.clients.length)), ' clients'),
       h('span', { class: d.attention.length ? 'bad' : '' }, h('strong', {}, String(d.attention.length)), ' need attention'),
-      h('span', { class: d.unparsed.length ? 'bad' : '' }, h('strong', {}, String(d.unparsed.length)), ' replies to review'),
       h('span', {}, h('strong', {}, `${answered}/${d.today.length}`), ' answered today'),
       h('span', { class: 'spacer' }),
       h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
-    d.unparsed.length > 0 && collapsible('replies', [h('strong', {}, 'Replies to review'), badge(String(d.unparsed.length), 'bad')],
-      h('div', { class: 'list' }, d.unparsed.map((u) => unparsedItem(u, reload)))),
     d.attention.length > 0 && collapsible('attention', [h('strong', {}, 'Needs attention'), badge(String(d.attention.length), 'bad')],
       h('ul', { class: 'list tight' }, d.attention.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}` }, `${c.first_name} ${c.last_name}`), ` — ${c.attention.join('; ')}`)))),
     collapsible('clients', [h('strong', {}, 'Clients'), badge(String(d.clients.length))], clientsBody),

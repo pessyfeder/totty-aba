@@ -113,18 +113,18 @@ test('AC3: replying "y" records true and answers the prompt', async () => {
   assert.equal((await prompts())[0].status, 'answered');
 });
 
-test('AC4: "3 tough day, needed help" stores value 3 and no comment', async () => {
-  await world.addGoal('Bedtime routine', { type: 'rating' });
+test('duration reply "15 minutes, tough day" stores 15 and ignores the extra text', async () => {
+  await world.addGoal('Bedtime routine', { type: 'duration' });
   await scheduler.tick();
-  await inbound('3 tough day, needed help');
+  await inbound('15 minutes, tough day');
   const { rows } = await db.query('SELECT * FROM response');
-  assert.equal(rows[0].value_int, 3);
-  assert.equal(rows[0].comment, null);
+  assert.equal(rows[0].value_minutes, 15);
+  assert.ok(!('comment' in rows[0]));
 });
 
 test('with several open prompts a "Goal N" code picks the prompt, otherwise the most recent', async () => {
   await world.addGoal('Uses a spoon');
-  await world.addGoal('Bedtime routine', { type: 'rating' });
+  await world.addGoal('Bedtime routine', { type: 'duration' });
   await scheduler.tick();
   assert.match(env.sent[0].body, /Goal 1:/);
   assert.match(env.sent[1].body, /Goal 2:/);
@@ -133,15 +133,17 @@ test('with several open prompts a "Goal N" code picks the prompt, otherwise the 
   assert.deepEqual(rows.map((r) => [r.title, r.value_bool]), [['Uses a spoon', false]]);
 });
 
-test('unparseable reply: one re-prompt, then stored as unparsed for review', async () => {
+test('unusable reply: every time the parent is told and asked to try again, nothing is queued, then a good reply records', async () => {
   await world.addGoal('Uses a spoon');
   await scheduler.tick();
   assert.equal((await inbound('he was great!')).outcome, 'reprompted');
   assert.equal(env.sent.length, 2);
-  assert.match(env.sent[1].body, /Please reply Y or N/);
-  assert.equal((await inbound('he was great!!')).outcome, 'unparsed');
-  const { rows } = await db.query(`SELECT raw_text, parse_status FROM response`);
-  assert.deepEqual(rows, [{ raw_text: 'he was great!!', parse_status: 'unparsed' }]);
+  assert.match(env.sent[1].body, /couldn't read.*Please reply Y or N/);
+  assert.equal((await inbound('he was great!!')).outcome, 'reprompted');
+  assert.equal(env.sent.length, 3);
+  assert.equal((await db.query(`SELECT 1 FROM response`)).rows.length, 0);
+  assert.equal((await inbound('y')).outcome, 'recorded');
+  assert.equal((await db.query(`SELECT 1 FROM response`)).rows.length, 1);
 });
 
 test('AC9: replies during Shabbos are still recorded, and nothing is sent back', async () => {

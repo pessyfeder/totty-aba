@@ -12,14 +12,15 @@ test('yes/no rejects other text', () => {
   for (const t of ['maybe', 'yesterday', 'nope', '']) assert.equal(parseReply(t, 'yes_no').ok, false, t);
 });
 
-test('rating stores value and ignores extra text', () => {
-  const r = parseReply('3 tough day, needed help', 'rating');
-  assert.deepEqual(r, { ok: true, valueInt: 3, comment: null });
-  assert.equal(parseReply('4', 'rating').comment, null);
+test('duration stores minutes and ignores extra text', () => {
+  assert.deepEqual(parseReply('15 tough day, needed help', 'duration'), { ok: true, valueMinutes: 15 });
+  assert.deepEqual(parseReply('0', 'duration'), { ok: true, valueMinutes: 0 });
+  assert.deepEqual(parseReply('20 min', 'duration'), { ok: true, valueMinutes: 20 });
+  assert.deepEqual(parseReply('1440', 'duration'), { ok: true, valueMinutes: 1440 });
 });
 
-test('rating rejects out of range and multi-digit', () => {
-  for (const t of ['6', '10', '4.5', 'five']) assert.equal(parseReply(t, 'rating').ok, false, t);
+test('duration rejects non-numbers, decimals and values above a day', () => {
+  for (const t of ['1441', '4.5', 'fifteen', '', 'about 15']) assert.equal(parseReply(t, 'duration').ok, false, t);
 });
 
 test('goal code is extracted and stripped', () => {

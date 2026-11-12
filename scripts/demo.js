@@ -8,7 +8,7 @@ import { createMessenger, consoleProvider } from '../src/messaging.js';
 const db = await makeDb();
 const w = await seedWorld(db);
 const spoon = await w.addGoal('Uses a spoon', { question: 'Did Dovid use a spoon at dinner today?' });
-const bedtime = await w.addGoal('Bedtime routine', { type: 'rating', time: '20:00' });
+const bedtime = await w.addGoal('Time to settle at bedtime', { type: 'duration', time: '20:00' });
 await db.query('UPDATE contact SET consent_given_at = now()');
 await db.query(`INSERT INTO reinforcement (client_id, name, note) VALUES ($1, 'bubbles', NULL), ($1, 'iPad time', '5 minute max')`, [w.client.id]);
 
@@ -20,7 +20,7 @@ const prompt = (goal, hoursAgo, status) =>
   );
 // Six weeks of history so the charts have something to show (a few days left unanswered on purpose).
 await db.query(`UPDATE goal SET target_json = '{"type":"percent_yes","threshold":80}' WHERE id = $1`, [spoon.id]);
-await db.query(`UPDATE goal SET target_json = '{"type":"avg_rating","threshold":4}' WHERE id = $1`, [bedtime.id]);
+await db.query(`UPDATE goal SET target_json = '{"type":"avg_minutes","threshold":20}' WHERE id = $1`, [bedtime.id]);
 for (let i = 42; i >= 1; i--) {
   for (const [goal, rate] of [[spoon, i / 42], [bedtime, i / 42]]) {
     const p = await w.one(
@@ -31,15 +31,14 @@ for (let i = 42; i >= 1; i--) {
     if (i % 9 === 0) continue;
     const better = Math.random() > rate * 0.7; // improves over time
     await db.query(
-      `INSERT INTO response (prompt_id, value_bool, value_int, source, raw_text) VALUES ($1, $2, $3, 'sms', 'demo')`,
-      [p.id, goal === spoon ? better : null, goal === bedtime ? Math.min(5, Math.round(1 + (1 - rate) * 3 + Math.random() * 1.5)) : null],
+      `INSERT INTO response (prompt_id, value_bool, value_minutes, source, raw_text) VALUES ($1, $2, $3, 'sms', 'demo')`,
+      [p.id, goal === spoon ? better : null, goal === bedtime ? Math.round(10 + (1 - rate) * 35 + Math.random() * 10) : null],
     );
   }
 }
 await db.query(`INSERT INTO annotation (goal_id, date, text) VALUES ($1, current_date - 21, 'New visual schedule started')`, [spoon.id]);
 await prompt(spoon, 5, 'answered');
-const p2 = await prompt(bedtime, 2, 'sent');
-await db.query(`INSERT INTO response (prompt_id, raw_text, source, parse_status) VALUES ($1, 'he was kind of ok?', 'sms', 'unparsed')`, [p2.id]);
+await prompt(bedtime, 2, 'sent');
 await prompt(spoon, 0, 'scheduled');
 
 const messenger = createMessenger({ db, provider: consoleProvider() });

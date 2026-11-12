@@ -15,7 +15,7 @@ export function buildBody(row, { reminder = false } = {}) {
   const how =
     row.response_type === 'yes_no'
       ? 'Reply Y or N.'
-      : 'Reply 0-5 (5 = best).';
+      : 'Reply with the number of minutes, e.g. 15.';
   return `${reminder ? 'Reminder: ' : ''}Hi, ${row.contact_name}. ${code}${question} ${how}`;
 }
 

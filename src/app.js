@@ -264,12 +264,12 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
 
   /** improving / flat / declining from the first vs second half of answered values. Missing replies are ignored. */
   const trendOf = (points, type) => {
-    const vals = points.filter((p) => p.answered).map((p) => (type === 'yes_no' ? (p.value_bool ? 100 : 0) : p.value_int));
+    const vals = points.filter((p) => p.answered).map((p) => (type === 'yes_no' ? (p.value_bool ? 100 : 0) : p.value_minutes));
     if (vals.length < 4) return 'not_enough_data';
     const avg = (a) => a.reduce((x, y) => x + y, 0) / a.length;
     const mid = Math.floor(vals.length / 2);
     const d = avg(vals.slice(mid)) - avg(vals.slice(0, mid));
-    const eps = type === 'yes_no' ? 10 : 0.5;
+    const eps = type === 'yes_no' ? 10 : 5;
     return d > eps ? 'improving' : d < -eps ? 'declining' : 'flat';
   };
 
@@ -279,7 +279,7 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     const days = RANGE_DAYS[req.query.range];
     const since = days ? new Date(now().getTime() - days * 864e5) : new Date(0);
     const { rows: points } = await db.query(
-      `SELECT p.id AS prompt_id, p.prompt_date::text AS date, p.status, r.id AS response_id, r.value_bool, r.value_int, r.comment, r.source,
+      `SELECT p.id AS prompt_id, p.prompt_date::text AS date, p.status, r.id AS response_id, r.value_bool, r.value_minutes, r.source,
               (r.id IS NOT NULL) AS answered
          FROM prompt p
          LEFT JOIN LATERAL (SELECT * FROM response WHERE prompt_id = p.id AND parse_status <> 'unparsed' ORDER BY received_at DESC LIMIT 1) r ON true
@@ -302,13 +302,12 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
 
   // ---- Manual data entry / resolving unparsed replies (SPEC 5.5, 5.7); always with an audit note ----
   const valueFrom = (body, responseType) => {
-    if (!body?.audit_note) throw bad('audit_note is required');
     if (responseType === 'yes_no') {
       if (typeof body.value_bool !== 'boolean') throw bad('value_bool (true/false) is required');
-      return { value_bool: body.value_bool, value_int: null };
+      return { value_bool: body.value_bool, value_minutes: null };
     }
-    if (!Number.isInteger(body.value_int) || body.value_int < 0 || body.value_int > 5) throw bad('value_int must be 0-5');
-    return { value_bool: null, value_int: body.value_int };
+    if (!Number.isInteger(body.value_minutes) || body.value_minutes < 0 || body.value_minutes > 1440) throw bad('value_minutes must be a whole number from 0 to 1440');
+    return { value_bool: null, value_minutes: body.value_minutes };
   };
 
   app.post('/api/prompts/:id/response', async (req, res) => {
@@ -317,7 +316,7 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
         WHERE p.id = $1 AND c.clinician_id = $2`, [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
     const v = valueFrom(req.body, rows[0].response_type);
-    const row = await insertRow('response', { prompt_id: req.params.id, ...v, comment: req.body.comment ?? null, source: 'manual', audit_note: req.body.audit_note });
+    const row = await insertRow('response', { prompt_id: req.params.id, ...v, source: 'manual' });
     await db.query(`UPDATE prompt SET status = 'answered' WHERE id = $1`, [req.params.id]);
     await audit(req, 'manual_response', 'response', row.id);
     res.status(201).json(row);
@@ -330,9 +329,9 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     if (!rows.length) throw new HttpError(404, 'Not found');
     const v = valueFrom(req.body, rows[0].response_type);
     const { rows: out } = await db.query(
-      `UPDATE response SET value_bool = $2, value_int = $3, comment = COALESCE($4, comment), parse_status = 'reviewed', audit_note = $5
+      `UPDATE response SET value_bool = $2, value_minutes = $3, parse_status = 'reviewed'
         WHERE id = $1 RETURNING *`,
-      [req.params.id, v.value_bool, v.value_int, req.body.comment ?? null, req.body.audit_note],
+      [req.params.id, v.value_bool, v.value_minutes],
     );
     await db.query(`UPDATE prompt SET status = 'answered' WHERE id = $1`, [rows[0].prompt_id]);
     await audit(req, 'review_response', 'response', req.params.id);

@@ -8,7 +8,7 @@ let db;
 
 before(async () => {
   db = new PGlite();
-  for (const f of ['001_init', '002_goal_question_text', '003_rename_incentive_to_reinforcement', '004_goal_archived_status', '005_followups']) await db.exec(await read(`db/migrations/${f}.sql`));
+  for (const f of ['001_init', '002_goal_question_text', '003_rename_incentive_to_reinforcement', '004_goal_archived_status', '005_followups', '006_duration_replaces_rating']) await db.exec(await read(`db/migrations/${f}.sql`));
   await db.exec(await read('db/seed.sql'));
 });
 
@@ -48,13 +48,13 @@ test('no prompt is sent twice: unique per goal and scheduled instant', async () 
   await rejects(ins, [rows[0].id]);
 });
 
-test('rating is limited to 0-5, manual responses need an audit note', async () => {
+test('minutes are limited to 0-1440 and responses have no comment column', async () => {
   const { rows } = await db.query('SELECT id FROM prompt LIMIT 1');
   const id = rows[0].id;
-  await rejects(`INSERT INTO response (prompt_id, value_int, source) VALUES ($1, 6, 'sms')`, [id]);
-  await rejects(`INSERT INTO response (prompt_id, value_bool, source) VALUES ($1, true, 'manual')`, [id]);
+  await rejects(`INSERT INTO response (prompt_id, value_minutes, source) VALUES ($1, 1441, 'sms')`, [id]);
+  await rejects(`INSERT INTO response (prompt_id, value_minutes, comment, source) VALUES ($1, 3, 'x', 'sms')`, [id]);
   await db.query(
-    `INSERT INTO response (prompt_id, value_int, comment, source) VALUES ($1, 3, 'tough day, needed help', 'sms')`,
+    `INSERT INTO response (prompt_id, value_minutes, source) VALUES ($1, 30, 'sms')`,
     [id],
   );
 });

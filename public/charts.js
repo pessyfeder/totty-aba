@@ -48,7 +48,7 @@ function markers(svg, x, annotations, h) {
 
 export function chartFor(goal, points, annotations) {
   if (!points.length) return null;
-  return goal.response_type === 'yes_no' ? yesNoChart(goal, points, annotations) : ratingChart(goal, points, annotations);
+  return goal.response_type === 'yes_no' ? yesNoChart(goal, points, annotations) : durationChart(goal, points, annotations);
 }
 
 function yesNoChart(goal, points, annotations) {
@@ -74,23 +74,27 @@ function yesNoChart(goal, points, annotations) {
   return svg;
 }
 
-function ratingChart(goal, points, annotations) {
+function durationChart(goal, points, annotations) {
   const h = 190, top = 24, base = 150;
   const { svg, x } = frame(points, annotations, h);
-  const y = (v) => base - (v / 5) * (base - top);
-  for (let t = 0; t <= 5; t++) svg.append(s('line', { x1: L, x2: W - R, y1: y(t), y2: y(t), class: 'grid-line' }), s('text', { x: 14, y: y(t) + 4, class: 'tick' }, String(t)));
-  const thr = goal.target_json?.type === 'avg_rating' ? goal.target_json.threshold : null;
-  if (thr != null) svg.append(s('line', { x1: L, x2: W - R, y1: y(thr), y2: y(thr), class: 'target' }, s('title', {}, `Target ${thr}`)));
-  const vals = points.map((p) => (p.answered ? p.value_int : null));
+  const thr = goal.target_json?.type === 'avg_minutes' ? goal.target_json.threshold : null;
+  // Axis tops out at the largest reply (or the target), rounded up to a tidy step.
+  const max = Math.max(10, thr ?? 0, ...points.filter((p) => p.answered).map((p) => p.value_minutes));
+  const step = [5, 10, 15, 30, 60, 120, 240, 480].find((n) => max / n <= 5) ?? 480;
+  const topVal = Math.ceil(max / step) * step;
+  const y = (v) => base - (v / topVal) * (base - top);
+  for (let t = 0; t <= topVal; t += step) svg.append(s('line', { x1: L, x2: W - R, y1: y(t), y2: y(t), class: 'grid-line' }), s('text', { x: 2, y: y(t) + 4, class: 'tick' }, `${t}m`));
+  if (thr != null) svg.append(s('line', { x1: L, x2: W - R, y1: y(thr), y2: y(thr), class: 'target' }, s('title', {}, `Target ${thr} min`)));
+  const vals = points.map((p) => (p.answered ? p.value_minutes : null));
   const avg = movingAverage(vals);
   const pts = points.map((p, i) => (avg[i] == null ? null : `${x(day(p.date))},${y(avg[i])}`)).filter(Boolean);
   if (pts.length > 1) svg.append(s('polyline', { class: 'line', fill: 'none', points: pts.join(' ') }, s('title', {}, '7-reply moving average')));
   points.forEach((p) => {
     const cx = x(day(p.date));
     if (!p.answered) return svg.append(s('circle', { cx, cy: base + 14, r: 3, class: 'dot none' }, s('title', {}, `${p.date}: no response`)));
-    svg.append(s('circle', { cx, cy: y(p.value_int), r: 4, class: 'dot rate' }, s('title', {}, `${p.date}: ${p.value_int}`)));
+    svg.append(s('circle', { cx, cy: y(p.value_minutes), r: 4, class: 'dot rate' }, s('title', {}, `${p.date}: ${p.value_minutes} min`)));
   });
   markers(svg, x, annotations, h);
-  svg.setAttribute('aria-label', `${goal.title}: daily ratings with moving average`);
+  svg.setAttribute('aria-label', `${goal.title}: daily minutes with moving average`);
   return svg;
 }

@@ -63,19 +63,16 @@ export async function renderReport({ h, api, app, logoutBtn, handle }, id) {
   const reload = () => renderReport({ h, api, app, logoutBtn, handle }, id).catch(handle);
   const msg = h('p', { class: 'error', role: 'alert' });
 
-  const inputs = new Map(); // goal_id -> { remark, boxes }
+  const inputs = new Map(); // goal_id -> { remark }
   const goalBlocks = c.goals.map((g) => {
     const remark = h('textarea', { rows: 2, 'aria-label': `Remark on ${g.title}`, disabled: !draft }, g.remark ?? '');
-    const boxes = g.comments.map((cm) => h('input', { type: 'checkbox', checked: cm.include, disabled: !draft }));
-    inputs.set(g.goal_id, { remark, boxes });
+    inputs.set(g.goal_id, { remark });
     const chart = chartFor(g, g.points, g.annotations);
     return h('article', { class: 'card goal-card' },
       h('h3', {}, g.title),
       h('div', { class: 'muted' }, `${g.received} of ${g.asked} replies received${g.status !== 'active' ? ` · ${g.status}` : ''}`),
       h('p', {}, h('strong', {}, metricLabel(g)), ` · ${changeLabel(g)}`),
       chart ?? h('p', { class: 'muted' }, 'No prompts in this period.'),
-      g.comments.length ? h('div', {}, h('div', { class: 'muted' }, draft ? 'Parent comments (untick to leave one out)' : 'Parent comments'),
-        g.comments.map((cm, i) => h('label', { class: 'check' }, boxes[i], ` ${cm.date}: “${cm.text}”`))) : '',
       h('label', {}, 'Your remark (optional)', remark));
   });
 
@@ -85,7 +82,7 @@ export async function renderReport({ h, api, app, logoutBtn, handle }, id) {
     note: note.value, next_focus: focus.value,
     goals: Object.fromEntries(c.goals.map((g) => {
       const x = inputs.get(g.goal_id);
-      return [g.goal_id, { remark: x.remark.value, exclude_comments: x.boxes.flatMap((b, i) => (b.checked ? [] : [i])) }];
+      return [g.goal_id, { remark: x.remark.value }];
     })),
   });
   const save = () => api(`/reports/${id}`, { method: 'PATCH', body: collect() });
