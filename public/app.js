@@ -134,7 +134,6 @@ async function renderDashboard() {
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('div', { class: 'stats' },
       h('span', {}, h('strong', {}, String(d.clients.length)), ' clients'),
-      h('span', { class: d.attention.length ? 'bad' : '' }, h('strong', {}, String(d.attention.length)), ' need attention'),
       h('span', {}, h('strong', {}, `${answered}/${d.today.length}`), ' answered today'),
       h('span', { class: 'spacer' }),
       h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
