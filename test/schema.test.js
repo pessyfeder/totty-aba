@@ -8,7 +8,7 @@ let db;
 
 before(async () => {
   db = new PGlite();
-  for (const f of ['001_init', '002_goal_question_text', '003_rename_incentive_to_reinforcement', '004_goal_archived_status', '005_followups', '006_duration_replaces_rating']) await db.exec(await read(`db/migrations/${f}.sql`));
+  for (const f of ['001_init', '002_goal_question_text', '003_rename_incentive_to_reinforcement', '004_goal_archived_status', '005_followups', '006_duration_replaces_rating', '007_client_intake_status']) await db.exec(await read(`db/migrations/${f}.sql`));
   await db.exec(await read('db/seed.sql'));
 });
 
