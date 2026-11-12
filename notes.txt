@@ -19,8 +19,10 @@ appointment scheduling:
 manual - when client reaches out. 
 client responds, manual - upload files to app. 
 automatic - initial consult email with google calendar link 
-automatic - weekly "schedule appointment" texts with google calendar link
+automatic - bi-weekly (every 14 days) "schedule appointment" texts with google calendar link
 
 client and appointment type information should be visible to Totty
 
 show me client intake documents
+
+set up google calendar functions
