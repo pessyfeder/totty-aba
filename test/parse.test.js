@@ -12,9 +12,9 @@ test('yes/no rejects other text', () => {
   for (const t of ['maybe', 'yesterday', 'nope', '']) assert.equal(parseReply(t, 'yes_no').ok, false, t);
 });
 
-test('rating stores value and comment', () => {
+test('rating stores value and ignores extra text', () => {
   const r = parseReply('3 tough day, needed help', 'rating');
-  assert.deepEqual(r, { ok: true, valueInt: 3, comment: 'tough day, needed help' });
+  assert.deepEqual(r, { ok: true, valueInt: 3, comment: null });
   assert.equal(parseReply('4', 'rating').comment, null);
 });
 

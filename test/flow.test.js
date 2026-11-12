@@ -113,13 +113,13 @@ test('AC3: replying "y" records true and answers the prompt', async () => {
   assert.equal((await prompts())[0].status, 'answered');
 });
 
-test('AC4: "3 tough day, needed help" stores value 3 and the comment', async () => {
+test('AC4: "3 tough day, needed help" stores value 3 and no comment', async () => {
   await world.addGoal('Bedtime routine', { type: 'rating' });
   await scheduler.tick();
   await inbound('3 tough day, needed help');
   const { rows } = await db.query('SELECT * FROM response');
   assert.equal(rows[0].value_int, 3);
-  assert.equal(rows[0].comment, 'tough day, needed help');
+  assert.equal(rows[0].comment, null);
 });
 
 test('with several open prompts a "Goal N" code picks the prompt, otherwise the most recent', async () => {

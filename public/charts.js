@@ -67,7 +67,7 @@ function yesNoChart(goal, points, annotations) {
   for (const p of points) {
     const cls = !p.answered ? 'dot none' : p.value_bool ? 'dot yes' : 'dot no';
     const label = !p.answered ? 'no response' : p.value_bool ? 'Yes' : 'No';
-    svg.append(s('circle', { cx: x(day(p.date)), cy: 160, r: 4, class: cls }, s('title', {}, `${p.date}: ${label}${p.comment ? ` — ${p.comment}` : ''}`)));
+    svg.append(s('circle', { cx: x(day(p.date)), cy: 160, r: 4, class: cls }, s('title', {}, `${p.date}: ${label}`)));
   }
   markers(svg, x, annotations, h);
   svg.setAttribute('aria-label', `${goal.title}: weekly percent yes and daily answers`);
@@ -88,7 +88,7 @@ function ratingChart(goal, points, annotations) {
   points.forEach((p) => {
     const cx = x(day(p.date));
     if (!p.answered) return svg.append(s('circle', { cx, cy: base + 14, r: 3, class: 'dot none' }, s('title', {}, `${p.date}: no response`)));
-    svg.append(s('circle', { cx, cy: y(p.value_int), r: 4, class: 'dot rate' }, s('title', {}, `${p.date}: ${p.value_int}${p.comment ? ` — ${p.comment}` : ''}`)));
+    svg.append(s('circle', { cx, cy: y(p.value_int), r: 4, class: 'dot rate' }, s('title', {}, `${p.date}: ${p.value_int}`)));
   });
   markers(svg, x, annotations, h);
   svg.setAttribute('aria-label', `${goal.title}: daily ratings with moving average`);

@@ -15,7 +15,7 @@ export function buildBody(row, { reminder = false } = {}) {
   const how =
     row.response_type === 'yes_no'
       ? 'Reply Y or N.'
-      : 'Reply 0-5 (5 = best). You can add a comment after the number, e.g., `4 did great with reminders`.';
+      : 'Reply 0-5 (5 = best).';
   return `${reminder ? 'Reminder: ' : ''}Hi, ${row.contact_name}. ${code}${question} ${how}`;
 }
 
