@@ -205,6 +205,38 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     res.json(row);
   });
 
+  // Intake progress (SPEC 5.1a): Totty moves a client along before Go. `active` is reached only through Go.
+  app.post('/api/clients/:id/intake-status', async (req, res) => {
+    const next = req.body?.intake_status;
+    if (!['inquiry', 'paperwork_sent', 'paperwork_received', 'consult_scheduled', 'ready'].includes(next)) throw bad('Invalid intake status');
+    const { rows } = await db.query(
+      `UPDATE client SET intake_status = $3, updated_at = now()
+        WHERE id = $1 AND clinician_id = $2 AND intake_status <> 'active' RETURNING *`,
+      [req.params.id, req.clinician.id, next],
+    );
+    if (!rows.length) {
+      await ownedClient(req, req.params.id);
+      throw bad('Client is already active');
+    }
+    await audit(req, 'update', 'client', rows[0].id, { fields: ['intake_status'] });
+    res.json(rows[0]);
+  });
+
+  // Go (SPEC 5.1a): activates a client that is ready; only then does the app start prompting the family.
+  app.post('/api/clients/:id/go', async (req, res) => {
+    const { rows } = await db.query(
+      `UPDATE client SET intake_status = 'active', activated_at = now(), updated_at = now()
+        WHERE id = $1 AND clinician_id = $2 AND intake_status = 'ready' RETURNING *`,
+      [req.params.id, req.clinician.id],
+    );
+    if (!rows.length) {
+      await ownedClient(req, req.params.id); // 404 if not theirs
+      throw bad('Client must be in "ready" status before Go');
+    }
+    await audit(req, 'activate', 'client', rows[0].id);
+    res.json(rows[0]);
+  });
+
   // ---- Reinforcements (record only, SPEC 5.6a) ----
   app.post('/api/clients/:id/reinforcements', async (req, res) => {
     await ownedClient(req, req.params.id);

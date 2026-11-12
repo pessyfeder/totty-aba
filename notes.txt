@@ -3,3 +3,14 @@ take yes/no or duration
 time-to-schedule prompt follow-up (would you like to?) appointment link after weekly amount links to website
 has to be pre-paid 48 hours before
 
+
+Client intake flow: 
+
+client reaches out on web -> talk / text / WhatsApp -> email form + docs requests -> client fills out -> feed into app which fills out new client fields. 
+
+schedule on google calendar consultation -> have meeting -> discuss goals and reinforcements -> auto or manual enter info into app. 
+
+press "go" or something to that affect; app takes over the rest. 
+
+weekly google calendar link to schedule meetings.
+

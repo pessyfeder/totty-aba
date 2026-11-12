@@ -6,6 +6,7 @@ const RANGES = [['week', '1 week'], ['month', '1 month'], ['3months', '3 months'
 const TREND = { improving: 'Improving', flat: 'Flat', declining: 'Declining', not_enough_data: 'Not enough data yet' };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STATUS = { scheduled: 'Scheduled', deferred: 'Deferred', sending: 'Sending', sent: 'Sent', answered: 'Answered', no_response: 'No response', skipped: 'Skipped', failed: 'Failed' };
+const INTAKE = { inquiry: 'Inquiry', paperwork_sent: 'Paperwork sent', paperwork_received: 'Paperwork received', consult_scheduled: 'Consult scheduled', ready: 'Ready (awaiting Go)', active: 'Active' };
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -115,10 +116,27 @@ export async function renderClient(ctx, id) {
       : h('p', { class: 'muted' }, 'Nothing scheduled today.'),
   ];
 
+  const isActive = c.intake_status === 'active';
+  const statusSelect = h('select', { 'aria-label': 'Intake status', disabled: isActive, onchange: (e) => {
+    api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: e.target.value } }).then(reload, handle);
+  } }, Object.entries(INTAKE).filter(([k]) => k !== 'active' || isActive)
+    .map(([k, label]) => h('option', { value: k, selected: k === c.intake_status }, label)));
+  const intakeSection = h('div', { class: 'intake' },
+    h('span', {}, 'Intake: ', h('span', { class: `badge ${isActive ? 'ok' : ''}` }, INTAKE[c.intake_status] ?? c.intake_status), ' '),
+    isActive
+      ? h('span', { class: 'muted' }, `Active since ${String(c.activated_at).slice(0, 10)}`)
+      : [statusSelect, ' ',
+        h('button', { type: 'button', disabled: c.intake_status !== 'ready', title: c.intake_status === 'ready' ? '' : 'Set status to "Ready" first', onclick: () => {
+          if (!confirm(`Press Go for ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
+          api(`/clients/${id}/go`, { method: 'POST' }).then(reload, handle);
+        } }, 'Go'),
+        h('p', { class: 'muted' }, 'No prompts are sent until Go is pressed.')]);
+
   app.replaceChildren(
     h('p', {}, h('a', { href: '#/' }, '← Dashboard')),
     h('h2', {}, `${c.first_name} ${c.last_name}`, ' ', h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
     h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
+    intakeSection,
     ...todaySection,
     h('h2', {}, 'Preferred reinforcements'),
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),

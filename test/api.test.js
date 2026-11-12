@@ -241,6 +241,33 @@ test('editing a client can change and clear optional fields; invalid edits are r
   assert.equal(rows.length, 1);
 });
 
+test('Go activates a ready client and is refused from any other intake status', async () => {
+  const { cookie } = await login();
+  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Go', last_name: 'Test', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  assert.equal(c.json.intake_status, 'inquiry');
+  assert.equal((await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} })).status, 400);
+  await db.query(`UPDATE client SET intake_status = 'ready' WHERE id = $1`, [c.json.id]);
+  const go = await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} });
+  assert.equal(go.status, 200);
+  assert.equal(go.json.intake_status, 'active');
+  assert.ok(go.json.activated_at);
+  assert.equal((await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} })).status, 400);
+  assert.equal((await call('/api/clients/999999/go', { method: 'POST', cookie, body: {} })).status, 404);
+});
+
+test('intake status can be moved along but never to active, and not once active', async () => {
+  const { cookie } = await login();
+  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'In', last_name: 'Take', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  const set = (v) => call(`/api/clients/${c.json.id}/intake-status`, { method: 'POST', cookie, body: { intake_status: v } });
+  assert.equal((await set('paperwork_sent')).json.intake_status, 'paperwork_sent');
+  assert.equal((await set('active')).status, 400);
+  assert.equal((await set('bogus')).status, 400);
+  assert.equal((await set('ready')).json.intake_status, 'ready');
+  await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} });
+  assert.equal((await set('inquiry')).status, 400);
+  assert.equal((await call('/api/clients/999999/intake-status', { method: 'POST', cookie, body: { intake_status: 'ready' } })).status, 404);
+});
+
 test('archived clients are listed separately and can be restored', async () => {
   const { cookie } = await login();
   const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Arch', last_name: 'Ived', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
