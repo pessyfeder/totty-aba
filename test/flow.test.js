@@ -234,3 +234,33 @@ test('replies from unknown numbers are logged and ignored', async () => {
   assert.equal((await inbound('y', '+15555559999')).outcome, 'unknown_sender');
   assert.equal((await db.query('SELECT 1 FROM message_log WHERE direction = $1', ['inbound'])).rows.length, 1);
 });
+
+test('intake gating: a client who is not active gets no prompts, until activated', async () => {
+  await world.addGoal('Uses a spoon');
+  await db.query(`UPDATE client SET intake_status = 'ready', activated_at = NULL`);
+  await scheduler.tick();
+  assert.equal(env.sent.length, 0);
+  assert.equal((await prompts()).length, 0);
+
+  await db.query(`UPDATE client SET intake_status = 'active', activated_at = now()`);
+  await scheduler.tick();
+  assert.equal(env.sent.length, 1);
+});
+
+test('intake gating: already-queued prompts and follow-ups stop if the client leaves active', async () => {
+  await world.addGoal('Uses a spoon');
+  await scheduler.generatePrompts(env.now());
+  await db.query(`UPDATE client SET intake_status = 'ready'`);
+  await scheduler.tick();
+  assert.equal(env.sent.length, 0);
+  assert.ok((await prompts()).every((p) => p.status === 'skipped' || p.status === 'scheduled'));
+
+  await db.query(`UPDATE client SET intake_status = 'active'`);
+  await db.query(`UPDATE prompt SET status = 'scheduled'`);
+  await scheduler.tick();
+  assert.equal(env.sent.length, 1);
+  await db.query(`UPDATE client SET intake_status = 'inquiry'`);
+  env.at('2026-11-05T00:10:00Z'); // 39 min later, follow-up would be due
+  await scheduler.tick();
+  assert.equal(env.sent.length, 1);
+});

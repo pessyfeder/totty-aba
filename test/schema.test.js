@@ -72,3 +72,13 @@ test('unparsed responses may have no value; parsed ones may not', async () => {
 test('contact phone must be E.164', async () => {
   await rejects(`UPDATE contact SET phone = '555-0100'`);
 });
+
+test('new clients default to inquiry; intake_status is constrained', async () => {
+  const { rows } = await db.query(
+    `INSERT INTO client (clinician_id, first_name, last_name, admission_date, timezone)
+     SELECT id, 'N', 'M', current_date, 'UTC' FROM clinician LIMIT 1 RETURNING intake_status, activated_at`,
+  );
+  assert.equal(rows[0].intake_status, 'inquiry');
+  assert.equal(rows[0].activated_at, null);
+  await rejects(`UPDATE client SET intake_status = 'bogus'`);
+});

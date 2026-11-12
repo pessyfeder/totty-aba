@@ -29,7 +29,8 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
          FROM goal g
          JOIN client cl ON cl.id = g.client_id
          JOIN contact c ON c.id = g.contact_id
-        WHERE g.status = 'active' AND cl.status = 'active' AND c.status = 'active' AND g.channel = 'sms'
+        WHERE g.status = 'active' AND cl.status = 'active' AND cl.intake_status = 'active'
+          AND c.status = 'active' AND g.channel = 'sms'
         ORDER BY g.created_at, g.id`,
     );
     const seenPerContact = new Map();
@@ -56,7 +57,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
   const SEND_COLUMNS = `
     p.id, p.goal_id, p.scheduled_for, p.short_code, p.deferred_reason, p.attempts, p.sent_at,
     g.title, g.question_text, g.response_type,
-    g.status AS goal_status, c.status AS contact_status, cl.status AS client_status,
+    g.status AS goal_status, c.status AS contact_status, cl.status AS client_status, cl.intake_status,
     c.name AS contact_name, c.phone, cl.first_name,
     cl.latitude, cl.longitude, cl.timezone, cl.in_israel, cl.candle_lighting_minutes,
     cn.settings_json,
@@ -84,8 +85,8 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
 
     for (const r of rows) {
       const settings = r.settings_json;
-      if (r.goal_status !== 'active' || r.contact_status !== 'active' || r.client_status !== 'active') {
-        await setStatus(r.id, 'skipped'); // paused/ended goal or contact stops all further prompts
+      if (r.goal_status !== 'active' || r.contact_status !== 'active' || r.client_status !== 'active' || r.intake_status !== 'active') {
+        await setStatus(r.id, 'skipped'); // paused/ended goal or contact, or client not yet Go, stops all further prompts
         continue;
       }
       if (settings.deferred_prompt_policy !== 'send_all' && latest.get(r.goal_id) !== r.id) {
@@ -141,7 +142,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
           AND p.followups_sent < COALESCE((cn.settings_json->>'max_followups')::int, 3)
           AND COALESCE(p.last_followup_at, p.sent_at)
               <= $1::timestamptz - make_interval(mins => COALESCE((cn.settings_json->>'followup_after_minutes')::int, 30))
-          AND g.status = 'active' AND c.status = 'active' AND cl.status = 'active'
+          AND g.status = 'active' AND c.status = 'active' AND cl.status = 'active' AND cl.intake_status = 'active'
         ORDER BY p.sent_at, p.id`,
       [at],
     );

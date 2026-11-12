@@ -4,10 +4,10 @@ VALUES ('00000000-0000-0000-0000-000000000001', 'Totty (dev)', 'totty@example.te
         'REPLACE_WITH_REAL_HASH', 'America/New_York', 'Brooklyn, NY', 40.6782, -73.9442);
 
 INSERT INTO client (id, clinician_id, first_name, last_name, gender, dob, admission_date,
-                    location_name, latitude, longitude, timezone)
+                    location_name, latitude, longitude, timezone, intake_status, activated_at)
 VALUES ('00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-000000000001',
         'Dovid', 'Cohen', 'male', '2020-03-14', '2026-09-01',
-        'Lakewood, NJ', 40.0979, -74.2176, 'America/New_York');
+        'Lakewood, NJ', 40.0979, -74.2176, 'America/New_York', 'active', now());
 
 INSERT INTO reinforcement (client_id, name, note)
 VALUES ('00000000-0000-0000-0000-0000000000c1', 'bubbles', NULL),
