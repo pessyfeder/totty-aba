@@ -80,12 +80,15 @@ Each goal has:
 - No opt-out feature in the app. A parent who wants prompts to stop speaks to Totty directly, and Totty pauses or ends the goal (or the contact) himself.
 
 **Voice call**
-- Automated call (text-to-speech): read the question, accept keypad input (1 = yes, 2 = no; or digits followed by # for minutes on a duration goal), and repeat on no input.
-- If no answer, retry per retry policy (see below), then fall back to SMS if configured.
+- Automated call (text-to-speech): read the question, then accept either **keypad** or **spoken** input. Keypad: 1 = yes, 2 = no; or digits followed by # for minutes on a duration goal. Spoken: the parent says "yes" or "no", or a number of minutes ("fifteen", "15 minutes"), recognised with speech recognition in English only (no Hebrew or Yiddish recognition, for voice or text, since replies carry no comments). The prompt says both ways ("Press 1 or say yes; press 2 or say no").
+- Spoken replies follow the same rules as SMS: only a yes/no or a number of minutes is kept, any extra words are ignored, `0` is valid, and values above the sanity limit (default 1440) are unusable. A reply is accepted immediately; the app reads back what it heard ("Got it, yes") and ends the goal's question.
+- **Unusable input** (unrecognised speech, a key other than 1/2, or minutes above the limit): the call says it could not understand and asks again, up to 3 times in the same call. If still unusable, the call ends politely and the prompt stays open. A text follow-up ("Please reply Y or N" / "Please reply with a number of minutes, e.g. 15") is sent right away if the contact has a mobile number and it is permitted time, in line with the SMS rule that an unusable reply always gets a try-again follow-up. No input at all (silence) is repeated once, then treated as no answer.
+- **Several open goals for one contact**: one call asks the goals one after another, in order, each by name ("Goal 1 of 3: Did Dovid use a spoon at dinner today?"). Each answer is recorded as soon as it is given, so hanging up part-way keeps the answered goals and leaves the rest open. Unanswered goals follow the retry policy below.
+- **No answer / voicemail**: never leave a voicemail with PHI; if a machine answers, hang up and treat it as no answer. Retry per the retry policy (see below), then fall back to SMS if configured.
 
 **Reminders and retries**
 - **Follow-ups**: if there is no reply 30 minutes after the prompt (`followup_after_minutes`), send a follow-up text ("Reminder: ..." with the same question), and again 30 minutes after each follow-up, up to **3 follow-ups** (`max_followups`). A reply at any point stops them. Follow-ups are never sent in quiet hours or a Shabbos/Yom Tov window, and a follow-up that could not be sent is dropped, not queued. After the last follow-up the prompt stays open until the end of the client's local day, then becomes `no_response`.
-- Follow-up by **voice call** (for contacts whose preferred channel is a call) arrives with voice prompts in milestone 3: the same timing and limit will apply, with the call replacing the text.
+- Follow-up by **voice call** (for contacts whose preferred channel is a call) arrives with voice prompts in milestone 3: the same timing and limit will apply, with the call replacing the text. Each follow-up call asks only the goals still open. An unanswered call counts as that follow-up; it does not add extra attempts beyond the 3 follow-ups. If the contact has a mobile number, a call follow-up that goes unanswered is also sent as a text, to avoid a silent miss. Calls obey the same Shabbos/Yom Tov and quiet-hours rules as texts, and a call that could not be placed is dropped, not queued. Spoken or keypad answers received on a late call are attached to the original prompt's date, like late text replies.
 - Late replies (up to 24h) are still accepted and attached to the original prompt's date.
 
 ### 5.5 Charts and progress
@@ -176,6 +179,7 @@ Each goal has:
 8. Calling the send function directly during Shabbos fails with a logged refusal.
 9. During the Shabbos window, logging in or performing any action as Totty is refused with a notice showing when the app reopens, and a parent's reply received then is still recorded.
 10. Replying "20" to a duration prompt stores 20 minutes and the chart updates; replying "abc" is treated as unparseable.
+10a. On a voice call, saying "yes" or pressing 1 records true; saying "twenty minutes" or keying 20# records 20 minutes. Three unusable inputs in one call end the call, leave the prompt open, and send a try-again text. Hanging up after answering the first of three goals keeps that answer and leaves the other two open.
 11. A contact whose first prompt was sent 7 days ago receives the check-in text with Yisroel Feder, BCBA, LBA once, at a permitted time (not during Shabbos or quiet hours), and never again.
 
 ## 10. Milestones
@@ -189,8 +193,7 @@ Each goal has:
 1. **Prompt volume**: how many clients and goals per client? This affects Twilio costs and the combined-message design.
 2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
-4. **Voice calls**: automated robot voice only, or could Totty ever want to be called in too?
-5. **Languages**: English only, or also Hebrew/Yiddish prompts?
+4. **Voice calls**: automated robot voice only, or could Totty ever want to be called in too?5. **Languages**: English only, or also Hebrew/Yiddish prompts?
 6. **Parents on tablets and computers**: texts reach phones only. Do any parents need prompts on a tablet or computer? Options: (a) prompts also sent by email with a private link to a one-tap answer page that works on any device, no login (recommended; texts stay the default so basic and kosher phones keep working); (b) an installable parent web app with push notifications (needs a parent login, does not work on basic phones); (c) WhatsApp (needs a WhatsApp Business setup and approved message templates). Not built; waiting on Totty.
 7. **Follow-up calls**: follow-ups are texts today. For parents who prefer calls, should a follow-up be a call, and should it fall back to a text? (Needs the voice milestone.)
 8. **Check-in booking**: the text carries a booking link; which scheduling tool does the link point to, and how and where does the parent pay (in the link, or separately)? Is it only the one text, or a reminder if they do not respond?
