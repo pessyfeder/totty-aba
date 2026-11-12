@@ -31,8 +31,8 @@ for (let i = 42; i >= 1; i--) {
     if (i % 9 === 0) continue;
     const better = Math.random() > rate * 0.7; // improves over time
     await db.query(
-      `INSERT INTO response (prompt_id, value_bool, value_int, source, raw_text, comment) VALUES ($1, $2, $3, 'sms', 'demo', $4)`,
-      [p.id, goal === spoon ? better : null, goal === bedtime ? Math.min(5, Math.round(1 + (1 - rate) * 3 + Math.random() * 1.5)) : null, i % 11 === 0 ? 'tough day, needed help' : null],
+      `INSERT INTO response (prompt_id, value_bool, value_int, source, raw_text) VALUES ($1, $2, $3, 'sms', 'demo')`,
+      [p.id, goal === spoon ? better : null, goal === bedtime ? Math.min(5, Math.round(1 + (1 - rate) * 3 + Math.random() * 1.5)) : null],
     );
   }
 }

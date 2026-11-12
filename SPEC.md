@@ -45,7 +45,7 @@ Each goal has:
 - Title and description (e.g., "Uses a spoon independently at dinner").
 - **Response type** (one per goal):
   - `yes_no`: parent replies Y or N.
-  - `duration`: parent replies with a number of minutes (e.g., `15`), meaning how long the behavior lasted or the activity took. The reply is a plain number; an optional comment may follow it.
+  - `duration`: parent replies with a number of minutes (e.g., `15`), meaning how long the behavior lasted or the activity took. The reply is a plain number only.
 - **Schedule**: days of week and a time of day (client's local timezone). Can be daily, specific days, or weekly.
 - **Contact** to prompt, and **channel** (SMS or voice call). Default to the contact's preference.
 - **Date added**: the date the goal was added to the client's plan. Defaults to today on creation (Totty may set it when adding the goal) and is shown on the goal and its chart.
@@ -74,7 +74,7 @@ Each goal has:
 - Message states client name and goal. For example: "Hi, Mrs. Cohen. Did Dovid use a spoon at dinner today? Reply Y or N."
 - Accepts Y/YES/N/NO case-insensitively.
 - **Parent replies are one of two kinds**: a yes/no answer, or a number of minutes (duration). For a duration goal the message asks, e.g., "How many minutes did Dovid spend on X today? Reply with a number, e.g., `15`." The reply is the number of minutes the parent texts. Accepts whole numbers (and optionally a trailing "min"/"minutes"); `0` is a valid answer. A reply that is not a number is treated as unparseable (below). Values above a sanity limit (default 1440, one day) are treated as unparseable.
-- A reply is accepted immediately. A follow-up "Any comment? Reply or ignore" is optional and configurable.
+- **Replies carry no notes or comments**: a parent's reply is only Y/N or a number of minutes, and the app never asks for a comment. Any extra text is ignored (the reply is still recorded from the Y/N or number it starts with). A reply is accepted immediately.
 - Unparseable replies get one re-prompt; after that, store the raw text as unparsed and flag for review.
 - If several prompts are open for a contact, each message includes a short code (e.g., "Goal 2") and replies are matched to the most recent open prompt unless a code is given. A single combined message listing multiple goals is a later option.
 - No opt-out feature in the app. A parent who wants prompts to stop speaks to Totty directly, and Totty pauses or ends the goal (or the contact) himself.
@@ -82,7 +82,6 @@ Each goal has:
 **Voice call**
 - Automated call (text-to-speech): read the question, accept keypad input (1 = yes, 2 = no; or digits followed by # for minutes on a duration goal), and repeat on no input.
 - If no answer, retry per retry policy (see below), then fall back to SMS if configured.
-- Optional: record a voice comment and transcribe it.
 
 **Reminders and retries**
 - **Follow-ups**: if there is no reply 30 minutes after the prompt (`followup_after_minutes`), send a follow-up text ("Reminder: ..." with the same question), and again 30 minutes after each follow-up, up to **3 follow-ups** (`max_followups`). A reply at any point stops them. Follow-ups are never sent in quiet hours or a Shabbos/Yom Tov window, and a follow-up that could not be sent is dropped, not queued. After the last follow-up the prompt stays open until the end of the client's local day, then becomes `no_response`.
@@ -94,7 +93,6 @@ Each goal has:
   - `yes_no`: percent met per week plus a daily dot strip (Y/N/no response).
   - `duration`: line or bars of daily minutes with a moving average, and the weekly average and total.
 - Target line and phase-change markers (Totty can annotate a date, e.g., "new intervention started").
-- Comments display on hover/click on the data point.
 - Missing responses shown distinctly, never counted as N.
 - Client overview page shows all goal charts, with a summary of trend (improving, flat, declining).
 - Totty can manually add or edit a data point (with an audit note), e.g., when a parent tells him by phone.
@@ -171,7 +169,7 @@ Each goal has:
 1. A prompt scheduled for Saturday 10:00 is not sent then, and is sent within 5 minutes after computed nightfall.
 2. A prompt scheduled for Friday 5:00 pm in a location where candle lighting is 4:30 pm is deferred until Saturday nightfall.
 3. Replying "y" to a yes/no prompt creates a response of true and the chart updates within 10 seconds.
-4. Replying "20 tough day, needed help" to a duration prompt stores 20 minutes and the comment.
+4. Replying "20 tough day" to a duration prompt stores 20 minutes and ignores the extra text.
 5. A day with no reply shows as "no response", not as a failed goal, in the chart and in the weekly percent.
 6. Clicking Create report on a client produces a preview containing every active goal for the chosen range, and no report is created or sent without that click.
 7. Pausing a goal or contact stops all further prompts for it.
