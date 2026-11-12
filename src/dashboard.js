@@ -1,7 +1,7 @@
 // Dashboard data (SPEC 5.7): client cards, today's prompts, Shabbos window, attention flags.
 import { locationFrom, nextWindow } from './shabbos.js';
 
-const MISSED_THRESHOLD = 3; // no_response prompts in the last 7 days that flag a client
+const MISSED_THRESHOLD = 3; // no_response prompts in the last 14 days that flag a client
 
 export async function loadDashboard(db, clinician, at) {
   const { rows: clients } = await db.query(
@@ -10,7 +10,7 @@ export async function loadDashboard(db, clinician, at) {
                FROM reinforcement i WHERE i.client_id = c.id) AS reinforcements,
             (SELECT count(*)::int FROM prompt p JOIN goal g ON g.id = p.goal_id
               WHERE g.client_id = c.id AND p.status = 'no_response'
-                AND p.scheduled_for > $2::timestamptz - interval '7 days') AS missed_7d
+                AND p.scheduled_for > $2::timestamptz - interval '14 days') AS missed_14d
        FROM client c
       WHERE c.clinician_id = $1 AND c.status = 'active'
       ORDER BY lower(c.last_name), lower(c.first_name)`,
@@ -18,7 +18,7 @@ export async function loadDashboard(db, clinician, at) {
   );
   for (const c of clients) {
     c.attention = [];
-    if (c.missed_7d >= MISSED_THRESHOLD) c.attention.push(`${c.missed_7d} missed responses in the last 7 days`);
+    if (c.missed_14d >= MISSED_THRESHOLD) c.attention.push(`${c.missed_14d} missed responses in the last 14 days`);
   }
 
   const { rows: today } = await db.query(

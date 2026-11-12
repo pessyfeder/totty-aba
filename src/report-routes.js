@@ -4,7 +4,7 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DateTime } from 'luxon';
 import { ShabbosRefusal } from './messaging.js';
-import { buildContent, checkPeriod, lastCompletedWeek, renderPdf } from './reports.js';
+import { buildContent, checkPeriod, lastCompletedBiweek, renderPdf } from './reports.js';
 
 const sha256 = (t) => crypto.createHash('sha256').update(t).digest('hex');
 const dateOnly = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : String(d).slice(0, 10));
@@ -43,7 +43,7 @@ export function reportRoutes({ app, db, messenger, config, now, HttpError, bad, 
         `SELECT id, period_type, to_char(period_start, 'YYYY-MM-DD') AS period_start, to_char(period_end, 'YYYY-MM-DD') AS period_end,
                 status, sent_at, created_at FROM report WHERE client_id = $1 ORDER BY period_end DESC, created_at DESC`, [req.params.id]);
       const today = DateTime.fromJSDate(now(), { zone: client.timezone }).toISODate();
-      res.json({ reports: rows, default_period: { period_type: 'weekly', ...lastCompletedWeek(today) } });
+      res.json({ reports: rows, default_period: { period_type: 'biweekly', ...lastCompletedBiweek(today) } });
     });
 
     app.post('/api/clients/:id/reports', async (req, res) => {

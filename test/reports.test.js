@@ -5,10 +5,10 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { makeDb, makeEnv, seedWorld, PASSWORD } from './helpers.js';
 import { createApp } from '../src/app.js';
-import { checkPeriod, lastCompletedWeek } from '../src/reports.js';
+import { checkPeriod, lastCompletedBiweek } from '../src/reports.js';
 
 let db, env, world, server, base, dir, cookie, goal, quiet;
-const WEEK = { period_type: 'weekly', period_start: '2026-10-25', period_end: '2026-10-31' };
+const WEEK = { period_type: 'biweekly', period_start: '2026-10-18', period_end: '2026-10-31' };
 
 before(async () => {
   dir = await mkdtemp(path.join(tmpdir(), 'reports-'));
@@ -46,21 +46,21 @@ async function call(p, { method = 'GET', body } = {}) {
   return { status: res.status, json, buf, type: res.headers.get('content-type'), cookie: res.headers.get('set-cookie')?.split(';')[0] };
 }
 
-test('period rules: weekly is Sunday-Saturday, monthly is a whole month, default is the last completed week', () => {
-  assert.ok(checkPeriod('weekly', '2026-10-25', '2026-10-31'));
-  assert.throws(() => checkPeriod('weekly', '2026-10-26', '2026-11-01'), /Sunday/);
+test('period rules: bi-weekly is 14 days Sunday-Saturday, monthly is a whole month, default is the last completed 14 days', () => {
+  assert.ok(checkPeriod('biweekly', '2026-10-18', '2026-10-31'));
+  assert.throws(() => checkPeriod('biweekly', '2026-10-19', '2026-11-01'), /Sunday/);
   assert.ok(checkPeriod('monthly', '2026-10-01', '2026-10-31'));
   assert.throws(() => checkPeriod('monthly', '2026-10-05', '2026-10-31'), /month/);
   assert.ok(checkPeriod('custom', '2026-10-03', '2026-10-09'));
   assert.throws(() => checkPeriod('custom', '2026-10-09', '2026-10-03'), /before/);
-  assert.deepEqual(lastCompletedWeek('2026-11-04'), { start: '2026-10-25', end: '2026-10-31' });
-  assert.deepEqual(lastCompletedWeek('2026-11-07'), { start: '2026-10-25', end: '2026-10-31' }); // Saturday is not complete yet
+  assert.deepEqual(lastCompletedBiweek('2026-11-04'), { start: '2026-10-18', end: '2026-10-31' });
+  assert.deepEqual(lastCompletedBiweek('2026-11-07'), { start: '2026-10-18', end: '2026-10-31' }); // Saturday is not complete yet
 });
 
-test('history endpoint suggests the last completed week; nothing is created until Create is clicked', async () => {
+test('history endpoint suggests the last completed 14 days; nothing is created until Create is clicked', async () => {
   const r = await call(`/api/clients/${world.client.id}/reports`);
   assert.deepEqual(r.json.reports, []);
-  assert.deepEqual(r.json.default_period, { period_type: 'weekly', start: '2026-10-25', end: '2026-10-31' });
+  assert.deepEqual(r.json.default_period, { period_type: 'biweekly', start: '2026-10-18', end: '2026-10-31' });
 });
 
 test('a created report includes every active goal; no reply is not counted as No', async () => {

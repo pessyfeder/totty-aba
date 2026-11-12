@@ -17,16 +17,16 @@ export async function reportsSection({ h, api, handle }, clientId) {
   const { reports, default_period: dp } = await api(`/clients/${clientId}/reports`);
   const msg = h('span', { class: 'error', role: 'alert' });
   const type = h('select', { name: 'period_type', 'aria-label': 'Period' },
-    [['weekly', 'Weekly (Sun–Sat)'], ['monthly', 'Monthly'], ['custom', 'Custom dates']].map(([v, t]) => h('option', { value: v }, t)));
+    [['biweekly', 'Bi-weekly (14 days, Sun–Sat)'], ['monthly', 'Monthly'], ['custom', 'Custom dates']].map(([v, t]) => h('option', { value: v }, t)));
   const start = h('input', { name: 'start', type: 'date', value: dp.start, required: true, 'aria-label': 'Start date' });
   const end = h('input', { name: 'end', type: 'date', value: dp.end, required: true, 'aria-label': 'End date' });
-  // Weekly and monthly snap the dates to whole periods; custom leaves them alone.
+  // Bi-weekly and monthly snap the dates to whole periods; custom leaves them alone.
   const snap = () => {
-    if (type.value === 'weekly' && start.value) {
+    if (type.value === 'biweekly' && start.value) {
       const d = new Date(`${start.value}T00:00:00Z`);
       d.setUTCDate(d.getUTCDate() - d.getUTCDay());
       start.value = d.toISOString().slice(0, 10);
-      d.setUTCDate(d.getUTCDate() + 6);
+      d.setUTCDate(d.getUTCDate() + 13);
       end.value = d.toISOString().slice(0, 10);
     } else if (type.value === 'monthly' && start.value) {
       const b = monthBounds(start.value);

@@ -7,7 +7,7 @@ A web app for Totty, a BCBA, to track client progress on behavioral goals. Paren
 | Role | Description | Access |
 |---|---|---|
 | Totty (BCBA, admin) | Manages clients, goals, schedules, and reports | Full web app, password login |
-| Parent / caregiver | Answers prompts and receives weekly reports | SMS/voice only, no login in v1 |
+| Parent / caregiver | Answers prompts and receives bi-weekly reports | SMS/voice only, no login in v1 |
 
 Single-clinician in v1. Design the data model with a `clinician_id` so multi-user can be added later.
 
@@ -38,7 +38,7 @@ Single-clinician in v1. Design the data model with a `clinician_id` so multi-use
 - **Archiving**: **Archive client** (on the edit page, after confirmation) stops all prompts for the client and removes them from the dashboard and client list. History and charts are kept. The dashboard links to an **Archived clients** list; opening a client there leads to its edit page, where **Restore client** is offered. An archived client can be restored, which resumes prompts from the next scheduled slot (missed slots are not backfilled).
 - Each client has an **admission date** (date admitted to Totty's services), required when creating the client.
 - Client page shows: first and last name, gender, age, DOB, admission date, parent/guardian names, phone(s), email, preferred channel, language, notes, and the list of goals with a chart each.
-- Client list with search and an "attention needed" flag (e.g., missed responses or declining trend).
+- Client list with search and an "attention needed" flag (e.g., 3 or more missed responses in the last 14 days, or a declining trend).
 
 ### 5.1a Client intake flow
 How a new client gets from first contact to active prompts. Two tracks lead into the same client record, then Totty starts the app.
@@ -117,13 +117,13 @@ Each goal has:
 - Totty can manually add or edit a data point (Y/N or minutes, no note needed; the change is recorded in the audit log), e.g., when a parent tells him by phone.
 
 ### 5.6 Progress reports
-- Reports are created on demand: Totty clicks **Create report** on a client's page and picks a period: **weekly** (Sunday-Saturday), **monthly** (calendar month), or **custom** (any start and end date). The default is the most recent completed week. Nothing is generated or sent automatically.
+- Reports are created on demand: Totty clicks **Create report** on a client's page and picks a period: **bi-weekly** (14 days, two Sunday-Saturday weeks), **monthly** (calendar month), or **custom** (any start and end date). The default is the most recent completed 14 days. Nothing is generated or sent automatically.
 - Contents: client name, date range, per-goal summary (responses received, % met or average minutes, change vs. prior period, small chart), Totty's optional note, and next-period focus.
 - Totty previews and edits the report, then chooses **Send** or **Download PDF**. Sending is always a manual action.
 - Delivery: the PDF is stored in the app and sent to the parent as an **SMS containing a secure link** (no email delivery). The link is unguessable and expires after a set period (default 14 days), and the text itself contains no progress details, only the child's first name. Reports can only be created or sent outside the Shabbos window; the app is locked for Totty during it (see 5.3).
 - Report history is viewable per client (period, type, status, date sent).
 - **How it works in v1:**
-  - Period choices snap to whole periods: weekly is always Sunday to Saturday, monthly is a whole calendar month, custom allows up to one year. Create report builds a **draft** and opens the preview.
+  - Period choices snap to whole periods: bi-weekly is always 14 days, Sunday to Saturday, monthly is a whole calendar month, custom allows up to one year. Create report builds a **draft** and opens the preview.
   - The report includes **every active goal**, even with no replies, plus any paused or archived goal that was asked something in the period. "Change vs. prior period" compares with the immediately preceding period of the same length.
   - Only answered prompts count: a day with no reply is shown as a missing mark and is never counted as No (5.5).
   - In the preview Totty can edit his note, the next-period focus, and a remark under each goal. Everything else is generated from the data and cannot be edited.

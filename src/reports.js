@@ -9,11 +9,11 @@ const isoOf = (n) => new Date(n * 864e5).toISOString().slice(0, 10);
 
 /** Validates a period; returns {start, end} or throws an Error with a message fit to show Totty. */
 export function checkPeriod(type, start, end) {
-  if (!['weekly', 'monthly', 'custom'].includes(type)) throw new Error('period_type must be weekly, monthly or custom');
+  if (!['biweekly', 'monthly', 'custom'].includes(type)) throw new Error('period_type must be biweekly, monthly or custom');
   if (!DATE.test(start ?? '') || !DATE.test(end ?? '') || Number.isNaN(dayNum(start)) || Number.isNaN(dayNum(end))) throw new Error('start and end dates (YYYY-MM-DD) are required');
   if (end < start) throw new Error('End date is before start date');
   if (dayNum(end) - dayNum(start) + 1 > MAX_DAYS) throw new Error('A report can cover at most one year');
-  if (type === 'weekly' && (new Date(`${start}T00:00:00Z`).getUTCDay() !== 0 || dayNum(end) - dayNum(start) !== 6)) throw new Error('A weekly report runs Sunday to Saturday');
+  if (type === 'biweekly' && (new Date(`${start}T00:00:00Z`).getUTCDay() !== 0 || dayNum(end) - dayNum(start) !== 13)) throw new Error('A bi-weekly report runs 14 days, Sunday to Saturday');
   if (type === 'monthly') {
     const s = new Date(`${start}T00:00:00Z`);
     const last = new Date(Date.UTC(s.getUTCFullYear(), s.getUTCMonth() + 1, 0)).toISOString().slice(0, 10);
@@ -22,12 +22,12 @@ export function checkPeriod(type, start, end) {
   return { start, end };
 }
 
-/** The most recent completed Sunday-Saturday week relative to `today` (YYYY-MM-DD, client-local). */
-export function lastCompletedWeek(today) {
+/** The most recent completed 14-day (two Sunday-Saturday weeks) period relative to `today` (YYYY-MM-DD, client-local). */
+export function lastCompletedBiweek(today) {
   const dow = new Date(`${today}T00:00:00Z`).getUTCDay();
   const back = ((dow + 1) % 7) || 7; // Saturday is complete only once it has ended, so on a Saturday use the one before
   const sat = dayNum(today) - back;
-  return { start: isoOf(sat - 6), end: isoOf(sat) };
+  return { start: isoOf(sat - 13), end: isoOf(sat) };
 }
 
 async function pointsFor(db, goalId, start, end) {
