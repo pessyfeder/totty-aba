@@ -34,10 +34,17 @@ export async function loadDashboard(db, clinician, at) {
     [clinician.id, at],
   );
 
+  const { rows: appointments } = await db.query(
+    `SELECT a.id, a.client_id, a.type, a.starts_at, c.first_name, c.last_name
+       FROM appointment a LEFT JOIN client c ON c.id = a.client_id
+      WHERE a.clinician_id = $1 AND a.status = 'scheduled' AND a.starts_at >= $2
+      ORDER BY a.starts_at LIMIT 20`, [clinician.id, at]);
+
   const win = nextWindow(at, locationFrom(clinician, clinician.settings_json));
   return {
     clients,
     today,
+    appointments,
     attention: clients.filter((c) => c.attention.length),
     shabbos: win && { kind: win.kind, start: win.start, end: win.end, active: win.start <= at },
   };

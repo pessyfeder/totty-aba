@@ -4,6 +4,7 @@ import pg from 'pg';
 import { createApp } from './app.js';
 import { createMessenger, consoleProvider, twilioProvider } from './messaging.js';
 import { createScheduler } from './scheduler.js';
+import { syncAll, httpFetchText } from './calendar.js';
 
 const env = process.env;
 const production = env.NODE_ENV === 'production';
@@ -38,6 +39,7 @@ const scheduler = createScheduler({ db, messenger });
 const app = createApp({
   db,
   messenger,
+  fetchCalendar: httpFetchText,
   config: {
     production,
     sessionSecret: env.SESSION_SECRET,
@@ -64,3 +66,13 @@ setInterval(async () => {
 
 const port = Number(env.PORT ?? 3000);
 app.listen(port, () => console.log(`totty-aba listening on :${port}${twilioConfigured ? '' : ' (SMS to console)'}`));
+
+// Read-only Google Calendar sync (SPEC 5.7b): every 10 minutes for clinicians who connected a calendar.
+let syncing = false;
+const syncCalendars = async () => {
+  if (syncing) return;
+  syncing = true;
+  try { await syncAll({ db, fetchText: httpFetchText }); } finally { syncing = false; }
+};
+setInterval(syncCalendars, 10 * 60_000);
+syncCalendars();

@@ -8,6 +8,7 @@ import { loadDashboard } from './dashboard.js';
 import { handleInbound } from './inbound.js';
 import { reportRoutes } from './report-routes.js';
 import { intakeRoutes } from './intake-routes.js';
+import { normalizeFeedUrl, syncCalendar } from './calendar.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
@@ -55,7 +56,7 @@ function checkGoal(f, { partial }) {
   }
 }
 
-export function createApp({ db, messenger, config, now = () => new Date() }) {
+export function createApp({ db, messenger, config, now = () => new Date(), fetchCalendar }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '100kb' }));
@@ -166,7 +167,10 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
 
   // ---- Settings: booking and intake links (SPEC 5.1a). Empty string clears a link. ----
   app.get('/api/settings', (req, res) => {
-    res.json(Object.fromEntries(LINK_SETTINGS.map((k) => [k, req.clinician.settings_json?.[k] ?? ''])));
+    res.json({
+      ...Object.fromEntries(LINK_SETTINGS.map((k) => [k, req.clinician.settings_json?.[k] ?? ''])),
+      calendar_connected: Boolean(req.clinician.settings_json?.calendar_ics_url), // the secret feed address is never returned
+    });
   });
   app.put('/api/settings', async (req, res) => {
     const next = { ...req.clinician.settings_json };
@@ -178,9 +182,37 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
       if (u.protocol !== 'https:' && u.protocol !== 'http:') throw bad(`${k} must start with https://`);
       next[k] = u.href;
     }
+    if (req.body && 'calendar_ics_url' in req.body) {
+      const raw = String(req.body.calendar_ics_url ?? '').trim();
+      if (!raw) delete next.calendar_ics_url;
+      else {
+        const url = normalizeFeedUrl(raw);
+        if (!url) throw bad('calendar_ics_url must be the secret iCal address from Google Calendar (https://calendar.google.com/...)');
+        next.calendar_ics_url = url;
+      }
+    }
     await db.query('UPDATE clinician SET settings_json = $2 WHERE id = $1', [req.clinician.id, JSON.stringify(next)]);
-    await audit(req, 'update', 'settings', req.clinician.id, { fields: Object.keys(pick(req.body, LINK_SETTINGS)) });
-    res.json(Object.fromEntries(LINK_SETTINGS.map((k) => [k, next[k] ?? ''])));
+    await audit(req, 'update', 'settings', req.clinician.id, { fields: Object.keys(req.body ?? {}).filter((k) => LINK_SETTINGS.includes(k) || k === 'calendar_ics_url') });
+    res.json({ ...Object.fromEntries(LINK_SETTINGS.map((k) => [k, next[k] ?? ''])), calendar_connected: Boolean(next.calendar_ics_url) });
+  });
+
+  // ---- Appointments (SPEC 5.7b): read-only mirror of Google Calendar ----
+  app.post('/api/calendar/sync', async (req, res) => {
+    if (!req.clinician.settings_json?.calendar_ics_url) throw bad('Connect your calendar in Settings first');
+    if (!fetchCalendar) throw new HttpError(503, 'Calendar sync is not available');
+    let result;
+    try { result = await syncCalendar({ db, clinician: req.clinician, fetchText: fetchCalendar, now }); }
+    catch { throw new HttpError(502, 'Could not read the calendar feed'); }
+    await audit(req, 'sync', 'calendar', req.clinician.id, result);
+    res.json(result);
+  });
+  app.get('/api/appointments', async (req, res) => {
+    const { rows } = await db.query(
+      `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, c.first_name, c.last_name
+         FROM appointment a LEFT JOIN client c ON c.id = a.client_id
+        WHERE a.clinician_id = $1 AND a.status = 'scheduled' AND a.starts_at >= $2
+        ORDER BY a.starts_at`, [req.clinician.id, now()]);
+    res.json(rows);
   });
 
   // ---- Clients ----
@@ -205,11 +237,13 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
   app.get('/api/clients/:id', async (req, res) => {
     const { rows } = await db.query('SELECT * FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
+    const { rows: appointments } = await db.query(
+      `SELECT id, type, starts_at, ends_at, status, title FROM appointment WHERE client_id = $1 ORDER BY starts_at DESC`, [req.params.id]);
     const [contacts, goals, reinforcements] = await Promise.all(
       ['contact', 'goal', 'reinforcement'].map((t) => db.query(`SELECT * FROM ${t} WHERE client_id = $1 ORDER BY 1`, [req.params.id]).then((r) => r.rows)),
     );
     await audit(req, 'view', 'client', req.params.id);
-    res.json({ ...rows[0], contacts, goals, reinforcements });
+    res.json({ ...rows[0], contacts, goals, reinforcements, appointments });
   });
 
   app.patch('/api/clients/:id', async (req, res) => {
