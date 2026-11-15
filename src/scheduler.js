@@ -24,7 +24,7 @@ const CHECKIN_EVERY_DAYS = 14;
 
 export function buildCheckinBody(row, link) {
   return `Time to schedule a check-in for ${row.first_name} with Yisroel Feder, BCBA, LBA: ${link}. ` +
-    'Please remember payment is due 48 hours before your appointment.';
+    'You can book and pay for your appointment there.';
 }
 
 export function createScheduler({ db, messenger, now = () => new Date(), staggerMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
@@ -38,7 +38,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
          JOIN client cl ON cl.id = g.client_id
          JOIN contact c ON c.id = g.contact_id
         WHERE g.status = 'active' AND cl.status = 'active' AND cl.intake_status = 'active'
-          AND c.status = 'active' AND g.channel = 'sms'
+          AND c.status = 'active' AND c.consent_given_at IS NOT NULL AND g.channel = 'sms'
         ORDER BY g.created_at, g.id`,
     );
     const seenPerContact = new Map();
@@ -65,7 +65,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
   const SEND_COLUMNS = `
     p.id, p.goal_id, p.scheduled_for, p.short_code, p.deferred_reason, p.attempts, p.sent_at,
     g.title, g.question_text, g.response_type,
-    g.status AS goal_status, c.status AS contact_status, cl.status AS client_status, cl.intake_status,
+    g.status AS goal_status, c.status AS contact_status, c.consent_given_at, cl.status AS client_status, cl.intake_status,
     c.id AS contact_id, c.name AS contact_name, c.phone, cl.first_name,
     cl.latitude, cl.longitude, cl.timezone, cl.in_israel, cl.candle_lighting_minutes,
     cn.settings_json,
@@ -93,7 +93,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
 
     for (const r of rows) {
       const settings = r.settings_json;
-      if (r.goal_status !== 'active' || r.contact_status !== 'active' || r.client_status !== 'active' || r.intake_status !== 'active') {
+      if (r.goal_status !== 'active' || r.contact_status !== 'active' || !r.consent_given_at || r.client_status !== 'active' || r.intake_status !== 'active') {
         await setStatus(r.id, 'skipped'); // paused/ended goal or contact, or client not yet Go, stops all further prompts
         continue;
       }
@@ -140,27 +140,41 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
   }
 
   /**
-   * Follow-ups (SPEC 5.4): with no reply, text again after followup_after_minutes (default 30), then again
-   * that long after each one, up to max_followups (default 3). Never during quiet hours or a Shabbos window
-   * (a stale follow-up is simply dropped: the prompt becomes no_response at the end of the local day).
+   * Follow-ups (SPEC 5.4): with no reply, one text after followup_after_minutes (default 120), then a catch-up
+   * text the next morning (when quiet hours end), up to max_followups (default 2). With followup_catchup_morning
+   * off, follow-ups instead repeat every followup_after_minutes. Never during quiet hours or a Shabbos window
+   * (a follow-up that cannot go is simply dropped).
    */
   async function sendFollowUps(at) {
     const { rows } = await db.query(
-      `SELECT ${SEND_COLUMNS}, p.followups_sent, p.last_followup_at ${SEND_JOINS}
+      `SELECT ${SEND_COLUMNS}, p.followups_sent, p.last_followup_at, to_char(p.prompt_date, 'YYYY-MM-DD') AS prompt_day ${SEND_JOINS}
         WHERE p.status = 'sent' AND p.channel = 'sms'
-          AND p.followups_sent < COALESCE((cn.settings_json->>'max_followups')::int, 3)
-          AND COALESCE(p.last_followup_at, p.sent_at)
-              <= $1::timestamptz - make_interval(mins => COALESCE((cn.settings_json->>'followup_after_minutes')::int, 30))
-          AND g.status = 'active' AND c.status = 'active' AND cl.status = 'active' AND cl.intake_status = 'active'
+          AND p.followups_sent < COALESCE((cn.settings_json->>'max_followups')::int, 2)
+          AND p.sent_at > $1::timestamptz - interval '2 days'
+          AND g.status = 'active' AND c.status = 'active' AND c.consent_given_at IS NOT NULL
+          AND cl.status = 'active' AND cl.intake_status = 'active'
         ORDER BY p.sent_at, p.id`,
       [at],
     );
     for (const r of rows) {
-      const q = r.settings_json.quiet_hours;
-      const hhmm = DateTime.fromJSDate(at, { zone: r.timezone }).toFormat('HH:mm');
+      const settings = r.settings_json;
+      const local = DateTime.fromJSDate(at, { zone: r.timezone });
+      const afterMs = (settings.followup_after_minutes ?? 120) * 60e3;
+      const lastAt = new Date(r.last_followup_at ?? r.sent_at).getTime();
+      let due;
+      if (r.followups_sent === 0 || settings.followup_catchup_morning === false) {
+        due = lastAt + afterMs <= at.getTime();
+      } else {
+        // Catch-up: the morning after the prompt, once, and not on the same day as the previous follow-up.
+        const lastDay = DateTime.fromMillis(lastAt, { zone: r.timezone }).toISODate();
+        due = local.toISODate() === DateTime.fromISO(r.prompt_day).plus({ days: 1 }).toISODate() && lastDay < local.toISODate();
+      }
+      if (!due) continue;
+      const q = settings.quiet_hours;
+      const hhmm = local.toFormat('HH:mm');
       if (q && (hhmm < q.start || hhmm >= q.end)) continue;
       try {
-        await messenger.send({ client: r, settings: r.settings_json, to: r.phone, body: buildBody(r, { reminder: true }), promptId: r.id });
+        await messenger.send({ client: r, settings, to: r.phone, body: buildBody(r, { reminder: true }), promptId: r.id });
         await db.query(
           `UPDATE prompt SET followups_sent = followups_sent + 1, last_followup_at = $2, reminder_sent_at = COALESCE(reminder_sent_at, $2)
             WHERE id = $1 AND status = 'sent' AND followups_sent = $3`,
@@ -175,7 +189,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
 
   /**
    * Check-in text (SPEC 5.7a): 14 days after a contact's first message, then every 14 days after the last one,
-   * with the booking link and payment reminder. Same send rules as prompts: active client and contact, recorded
+   * with the link to the website's scheduling portal. Same send rules as prompts: active client and contact, recorded
    * consent, never in a Shabbos/Yom Tov window or quiet hours. A blocked one is sent once the window ends.
    */
   async function sendCheckins(at) {
@@ -215,13 +229,21 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     }
   }
 
-  /** At the end of the client's local day an unanswered prompt becomes no_response (never an N). */
+  /**
+   * At the end of the client's local day an unanswered prompt becomes no_response (never an N), except that
+   * the next-morning catch-up still has a chance: it waits until the catch-up has gone out or the next day ends.
+   */
   async function markNoResponse(at) {
     await db.query(
       `UPDATE prompt p SET status = 'no_response'
-         FROM goal g JOIN client cl ON cl.id = g.client_id
+         FROM goal g
+         JOIN client cl ON cl.id = g.client_id
+         JOIN clinician cn ON cn.id = cl.clinician_id
         WHERE p.goal_id = g.id AND p.status = 'sent'
-          AND ($1::timestamptz AT TIME ZONE cl.timezone)::date > p.prompt_date`,
+          AND ($1::timestamptz AT TIME ZONE cl.timezone)::date > p.prompt_date
+          AND (COALESCE((cn.settings_json->>'followup_catchup_morning')::boolean, true) IS NOT TRUE
+               OR p.followups_sent >= COALESCE((cn.settings_json->>'max_followups')::int, 2)
+               OR ($1::timestamptz AT TIME ZONE cl.timezone)::date > p.prompt_date + 1)`,
       [at],
     );
   }

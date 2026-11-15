@@ -19,7 +19,7 @@ const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_da
 const CONTACT_FIELDS = ['name', 'relationship', 'phone', 'email', 'preferred_channel', 'language', 'status', 'consent_given_at', 'consent_note'];
 const GOAL_FIELDS = ['contact_id', 'title', 'description', 'question_text', 'response_type', 'channel', 'schedule_json', 'date_added', 'start_date', 'end_date', 'status', 'target_json'];
 const REINFORCEMENT_FIELDS = ['name', 'note'];
-// Booking links to external tools (SPEC 5.1a, 5.7b): the app stores them and puts them in messages; it never creates bookings.
+// Links to the website's appointment scheduling portal (SPEC 5.1a, 5.7b): the app stores them and puts them in messages; the website handles booking and payment, the app never creates bookings.
 const LINK_SETTINGS = ['consult_booking_url', 'checkin_booking_url'];
 
 class HttpError extends Error {

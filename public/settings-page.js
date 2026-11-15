@@ -1,7 +1,7 @@
 // Settings UI (SPEC 5.1a, 5.7b): links to the external booking pages. The app only stores and sends them.
 const FIELDS = [
-  ['consult_booking_url', 'Consultation booking link', 'Emailed once intake paperwork is received (Google Calendar appointment schedule).'],
-  ['checkin_booking_url', 'Ongoing meeting booking link', 'Sent in the bi-weekly check-in text (every 14 days).'],
+  ['consult_booking_url', 'Consultation booking link', 'Link to the website scheduling portal. Emailed once intake paperwork is received.'],
+  ['checkin_booking_url', 'Ongoing meeting booking link', 'Link to the website scheduling portal (booking and payment). Sent in the bi-weekly check-in text (every 14 days).'],
 ];
 
 export async function renderSettings({ h, api, app, logoutBtn }) {

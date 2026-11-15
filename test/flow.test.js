@@ -13,6 +13,7 @@ beforeEach(async () => {
   db = await makeDb();
   env = makeEnv(db, WED);
   world = await seedWorld(db);
+  await db.query('UPDATE contact SET consent_given_at = now() WHERE id = $1', [world.contact.id]); // prompts need recorded consent
   scheduler = createScheduler({ db, messenger: env.messenger, now: env.now, staggerMs: 0 });
 });
 
@@ -168,6 +169,7 @@ test('AC9: replies during Shabbos are still recorded, and nothing is sent back',
 });
 
 test('AC5: unanswered becomes no_response at day end; a late reply still attaches to that prompt', async () => {
+  await db.query(`UPDATE clinician SET settings_json = settings_json || '{"followup_catchup_morning": false}'`);
   await world.addGoal('Uses a spoon');
   await scheduler.tick();
   env.at('2026-11-05T06:00:00Z'); // 1am next day, local
@@ -179,34 +181,65 @@ test('AC5: unanswered becomes no_response at day end; a late reply still attache
   assert.equal((await prompts())[0].prompt_date.toISOString().slice(0, 10), '2026-11-04');
 });
 
-test('follow-ups: one every 30 minutes without a reply, at most 3, never a fourth', async () => {
+test('follow-ups: one after 2 hours, a catch-up the next morning, never a third', async () => {
   await world.addGoal('Uses a spoon');
   await scheduler.tick();
   assert.equal(env.sent.length, 1);
-  env.at('2026-11-04T23:55:00Z'); // 24 min after the prompt: too early
+  env.at('2026-11-05T01:00:00Z'); // 89 min after the prompt: too early
   await scheduler.sendFollowUps(env.now());
   assert.equal(env.sent.length, 1);
-  for (const [i, t] of ['2026-11-05T00:02:00Z', '2026-11-05T00:33:00Z', '2026-11-05T01:04:00Z'].entries()) {
-    env.at(t);
-    await scheduler.sendFollowUps(env.now());
-    await scheduler.sendFollowUps(env.now()); // a second pass in the same minute sends nothing
-    assert.equal(env.sent.length, 2 + i);
-    assert.match(env.sent.at(-1).body, /^Reminder: /);
-  }
-  env.at('2026-11-05T03:00:00Z');
+  env.at('2026-11-05T01:32:00Z'); // 8:32pm: 2 hours after
   await scheduler.sendFollowUps(env.now());
-  assert.equal(env.sent.length, 4); // the prompt plus 3 follow-ups
-  assert.equal((await prompts())[0].followups_sent, 3);
+  await scheduler.sendFollowUps(env.now()); // a second pass in the same minute sends nothing
+  assert.equal(env.sent.length, 2);
+  assert.match(env.sent.at(-1).body, /^Reminder: /);
+  env.at('2026-11-05T06:00:00Z'); // 1am: quiet hours, and the catch-up is still pending
+  await scheduler.sendFollowUps(env.now());
+  await scheduler.markNoResponse(env.now());
+  assert.equal(env.sent.length, 2);
+  assert.equal((await prompts())[0].status, 'sent');
+  env.at('2026-11-05T13:00:00Z'); // 8:00am: quiet hours end
+  await scheduler.sendFollowUps(env.now());
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 3);
+  assert.match(env.sent.at(-1).body, /^Reminder: /);
+  env.at('2026-11-05T18:00:00Z');
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 3); // the prompt plus 2 follow-ups
+  assert.equal((await prompts())[0].followups_sent, 2);
+  await scheduler.markNoResponse(env.now());
+  assert.equal((await prompts())[0].status, 'no_response');
+});
+
+test('with the catch-up on, no_response waits until the catch-up window has passed', async () => {
+  await world.addGoal('Uses a spoon');
+  await scheduler.tick();
+  env.at('2026-11-05T06:00:00Z'); // 1am next day
+  await scheduler.markNoResponse(env.now());
+  assert.equal((await prompts())[0].status, 'sent');
+  env.at('2026-11-06T06:00:00Z'); // 1am the day after: the window is over
+  await scheduler.markNoResponse(env.now());
+  assert.equal((await prompts())[0].status, 'no_response');
+});
+
+test('catch-up only happens on the morning after the prompt, not later', async () => {
+  await world.addGoal('Uses a spoon');
+  await scheduler.tick();
+  env.at('2026-11-05T01:32:00Z');
+  await scheduler.sendFollowUps(env.now());
+  env.at('2026-11-06T13:00:00Z'); // two mornings later
+  await scheduler.sendFollowUps(env.now());
+  assert.equal(env.sent.length, 2);
 });
 
 test('a reply stops further follow-ups', async () => {
   await world.addGoal('Uses a spoon');
   await scheduler.tick();
-  env.at('2026-11-05T00:02:00Z');
+  env.at('2026-11-05T01:32:00Z');
   await scheduler.sendFollowUps(env.now());
   assert.equal(env.sent.length, 2);
   await inbound('y');
-  env.at('2026-11-05T00:40:00Z');
+  env.at('2026-11-05T13:00:00Z');
   await scheduler.sendFollowUps(env.now());
   assert.equal(env.sent.length, 2);
 });
@@ -216,12 +249,12 @@ test('follow-ups are not sent in quiet hours or during Shabbos', async () => {
   env.at('2026-11-05T01:50:00Z'); // 8:50pm EST Wednesday
   await scheduler.tick();
   assert.equal(env.sent.length, 1);
-  env.at('2026-11-05T02:20:00Z'); // 9:20pm: quiet hours (default 21:00 end)
+  env.at('2026-11-05T04:00:00Z'); // 11pm: 2h+ later but in quiet hours (default 21:00 end)
   await scheduler.sendFollowUps(env.now());
   assert.equal(env.sent.length, 1);
 
   await db.query(`UPDATE prompt SET sent_at = '2026-11-07T15:00:00Z', followups_sent = 0, last_followup_at = NULL`);
-  env.at('2026-11-07T16:00:00Z'); // Saturday noon
+  env.at('2026-11-07T17:30:00Z'); // Saturday 12:30pm
   await scheduler.sendFollowUps(env.now());
   assert.equal(env.sent.length, 1);
   assert.equal((await outbound()).length, 1);
@@ -269,7 +302,7 @@ test('intake gating: already-queued prompts and follow-ups stop if the client le
   await scheduler.tick();
   assert.equal(env.sent.length, 1);
   await db.query(`UPDATE client SET intake_status = 'inquiry'`);
-  env.at('2026-11-05T00:10:00Z'); // 39 min later, follow-up would be due
+  env.at('2026-11-05T01:40:00Z'); // 2h+ later, follow-up would be due
   await scheduler.tick();
   assert.equal(env.sent.length, 1);
 });

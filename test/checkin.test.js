@@ -36,7 +36,7 @@ test('14 days after the first message the check-in goes out once, then every 14 
   assert.equal(checkins().length, 1);
   assert.equal(checkins()[0].to, '+15555550100');
   assert.equal(checkins()[0].body,
-    `Time to schedule a check-in for Dovid with Yisroel Feder, BCBA, LBA: ${LINK}. Please remember payment is due 48 hours before your appointment.`);
+    `Time to schedule a check-in for Dovid with Yisroel Feder, BCBA, LBA: ${LINK}. You can book and pay for your appointment there.`);
 
   env.at('2026-12-02T22:00:00Z'); // 13 days later: not yet
   await scheduler.sendCheckins(env.now());
