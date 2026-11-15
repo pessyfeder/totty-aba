@@ -113,6 +113,15 @@ test('AC3: replying "y" records true and answers the prompt', async () => {
   assert.equal((await prompts())[0].status, 'answered');
 });
 
+test('two replies landing at the same moment record one response for the prompt', async () => {
+  await world.addGoal('Uses a spoon');
+  await scheduler.tick();
+  const results = await Promise.all([inbound('y'), inbound('y')]);
+  assert.deepEqual(results.map((r) => r.outcome).sort(), ['no_open_prompt', 'recorded']);
+  const { rows } = await db.query('SELECT * FROM response');
+  assert.equal(rows.length, 1);
+});
+
 test('duration reply "15 minutes, tough day" stores 15 and ignores the extra text', async () => {
   await world.addGoal('Bedtime routine', { type: 'duration' });
   await scheduler.tick();

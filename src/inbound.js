@@ -54,12 +54,24 @@ export async function handleInbound({ db, messenger, from, body, providerId = nu
 
   const parsed = parseReply(rest, target.response_type);
   if (parsed.ok) {
-    await db.query(
-      `INSERT INTO response (prompt_id, received_at, value_bool, value_minutes, raw_text, source)
-       VALUES ($1, $2, $3, $4, $5, 'sms')`,
+    // Claim the prompt and record the response in one statement. The conditional UPDATE takes the row
+    // lock, so if two webhooks land at the same moment only one sees the prompt still open; the other
+    // gets zero rows and records nothing.
+    const { rows: recorded } = await db.query(
+      `WITH claimed AS (
+         UPDATE prompt SET status = 'answered'
+          WHERE id = $1 AND status IN ('sent', 'no_response')
+          RETURNING id
+       )
+       INSERT INTO response (prompt_id, received_at, value_bool, value_minutes, raw_text, source)
+       SELECT id, $2, $3, $4, $5, 'sms' FROM claimed
+       RETURNING id`,
       [target.id, now, parsed.valueBool ?? null, parsed.valueMinutes ?? null, body],
     );
-    await db.query(`UPDATE prompt SET status = 'answered' WHERE id = $1`, [target.id]);
+    if (!recorded.length) {
+      await log('received', target.id); // lost the race: already answered by a concurrent message
+      return { outcome: 'no_open_prompt' };
+    }
     await log('received', target.id);
     return { outcome: 'recorded', promptId: target.id };
   }
