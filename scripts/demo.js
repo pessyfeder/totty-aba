@@ -36,6 +36,10 @@ for (let i = 42; i >= 1; i--) {
     );
   }
 }
+await db.query(`INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at, title) VALUES
+  ($1, $2, 'demo-1', 'check-in', now() + interval '2 days', 'Check-in'),
+  ($1, $2, 'demo-2', 'ongoing meeting', now() - interval '12 days', 'Meeting'),
+  ($1, NULL, 'demo-3', 'consultation', now() + interval '5 days', 'Consultation')`, [w.clinician.id, w.client.id]);
 await db.query(`INSERT INTO annotation (goal_id, date, text) VALUES ($1, current_date - 21, 'New visual schedule started')`, [spoon.id]);
 await prompt(spoon, 5, 'answered');
 await prompt(bedtime, 2, 'sent');

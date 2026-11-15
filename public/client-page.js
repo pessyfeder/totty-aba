@@ -196,6 +196,13 @@ export async function renderClient(ctx, id) {
     intakeSection,
     intakeDocs,
     ...todaySection,
+    h('h2', {}, 'Appointments'),
+    c.appointments.length
+      ? h('table', { class: 'compact' }, h('tbody', {}, c.appointments.map((a) => h('tr', {},
+          h('td', {}, new Date(a.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })),
+          h('td', {}, a.type),
+          h('td', { class: a.status === 'cancelled' ? 'muted' : '' }, a.status === 'cancelled' ? 'Cancelled' : new Date(a.starts_at) < new Date() ? 'Past' : 'Upcoming')))))
+      : h('p', { class: 'muted' }, 'No appointments yet.'),
     h('h2', {}, 'Preferred reinforcements'),
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
     reinforcementForm,

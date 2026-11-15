@@ -99,6 +99,13 @@ async function renderDashboard() {
       h('span', { class: 'spacer' }),
       h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived'), h('a', { href: '#/settings' }, 'Settings')),
     newFromForm(),
+    h('h2', {}, 'Upcoming appointments'),
+    d.appointments.length
+      ? h('table', { class: 'compact' }, h('tbody', {}, d.appointments.map((a) => h('tr', {},
+          h('td', {}, fmtDateTime(a.starts_at)),
+          h('td', {}, a.client_id ? h('a', { href: `#/client/${a.client_id}` }, `${a.first_name} ${a.last_name}`) : h('span', { class: 'muted' }, 'Unmatched client')),
+          h('td', {}, a.type)))))
+      : h('p', { class: 'muted' }, 'No upcoming appointments.'),
     d.clients.length
       ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`),
         ...c.attention.map((a) => h('span', { class: 'warn-line' }, ` ⚠ ${a}`)))))
