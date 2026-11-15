@@ -4,6 +4,7 @@ import pg from 'pg';
 import { createApp } from './app.js';
 import { createMessenger, consoleProvider, twilioProvider } from './messaging.js';
 import { createScheduler } from './scheduler.js';
+import { consoleMailer, sendApproved, smtpMailer, unconfiguredMailer } from './consult-email.js';
 import { syncAll, httpFetchText } from './calendar.js';
 
 const env = process.env;
@@ -36,9 +37,16 @@ const provider = twilioConfigured
 
 const messenger = createMessenger({ db, provider });
 const scheduler = createScheduler({ db, messenger });
+// Email (initial consultation email, SPEC 5.7b). Dev prints to the console; production without SMTP refuses to send.
+const smtpConfigured = env.SMTP_URL && env.EMAIL_FROM;
+const mailer = smtpConfigured
+  ? await smtpMailer({ url: env.SMTP_URL, from: env.EMAIL_FROM })
+  : production ? unconfiguredMailer : consoleMailer();
+if (production && !smtpConfigured) console.warn('SMTP_URL and EMAIL_FROM are not set: the consultation email cannot be sent');
 const app = createApp({
   db,
   messenger,
+  mailer,
   fetchCalendar: httpFetchText,
   config: {
     production,
@@ -57,6 +65,7 @@ setInterval(async () => {
   running = true;
   try {
     await scheduler.tick();
+    await sendApproved({ db, mailer }); // approved consultation emails that waited out a Shabbos window
   } catch (err) {
     console.error('scheduler tick failed:', err);
   } finally {

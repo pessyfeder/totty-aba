@@ -8,6 +8,8 @@ import { loadDashboard } from './dashboard.js';
 import { handleInbound } from './inbound.js';
 import { reportRoutes } from './report-routes.js';
 import { intakeRoutes } from './intake-routes.js';
+import { ensureDraft } from './consult-email.js';
+import * as consultEmail from './consult-email.js';
 import { normalizeFeedUrl, syncCalendar } from './calendar.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -56,7 +58,7 @@ function checkGoal(f, { partial }) {
   }
 }
 
-export function createApp({ db, messenger, config, now = () => new Date(), fetchCalendar }) {
+export function createApp({ db, messenger, mailer, config, now = () => new Date(), fetchCalendar }) {
   const app = express();
   app.disable('x-powered-by');
   app.use(express.json({ limit: '100kb' }));
@@ -274,8 +276,28 @@ export function createApp({ db, messenger, config, now = () => new Date(), fetch
       await ownedClient(req, req.params.id);
       throw bad('Client is already active');
     }
+    if (next === 'paperwork_received') await ensureDraft(db, rows[0].id);
     await audit(req, 'update', 'client', rows[0].id, { fields: ['intake_status'] });
     res.json(rows[0]);
+  });
+
+  // ---- Initial consultation email (SPEC 5.7b): drafted at paperwork_received, sent only after Totty approves ----
+  app.get('/api/clients/:id/consult-email', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    res.json(await consultEmail.preview(db, req.params.id));
+  });
+  app.post('/api/clients/:id/consult-email/approve', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    try { await consultEmail.approve(db, req.params.id); } catch (e) { throw bad(e.message); }
+    await audit(req, 'approve', 'consult_email', req.params.id);
+    if (mailer) await consultEmail.sendApproved({ db, mailer, now, clientId: req.params.id });
+    res.json(await consultEmail.preview(db, req.params.id));
+  });
+  app.post('/api/clients/:id/consult-email/cancel', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    if (!(await consultEmail.cancel(db, req.params.id))) throw bad('There is no unsent consultation email to cancel');
+    await audit(req, 'cancel', 'consult_email', req.params.id);
+    res.json(await consultEmail.preview(db, req.params.id));
   });
 
   // Go (SPEC 5.1a): activates a client that is ready; only then does the app start prompting the family.

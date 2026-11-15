@@ -20,6 +20,12 @@ export async function loadDashboard(db, clinician, at) {
     c.attention = [];
     if (c.missed_14d >= MISSED_THRESHOLD) c.attention.push(`${c.missed_14d} missed responses in the last 14 days`);
   }
+  // Consultation emails waiting for Totty's approval (SPEC 5.7b). These clients are not active yet, so they
+  // are listed apart from the client cards.
+  const { rows: toApprove } = await db.query(
+    `SELECT c.id, c.first_name, c.last_name FROM consult_email e JOIN client c ON c.id = e.client_id
+      WHERE c.clinician_id = $1 AND e.status = 'pending_approval' AND c.intake_status = 'paperwork_received'
+      ORDER BY e.created_at`, [clinician.id]);
 
   const { rows: today } = await db.query(
     `SELECT p.id, p.scheduled_for, p.status, p.deferred_reason, g.title, g.response_type, r.value_bool, r.value_minutes,
@@ -45,6 +51,7 @@ export async function loadDashboard(db, clinician, at) {
     clients,
     today,
     appointments,
+    emailsToApprove: toApprove,
     attention: clients.filter((c) => c.attention.length),
     shabbos: win && { kind: win.kind, start: win.start, end: win.end, active: win.start <= at },
   };

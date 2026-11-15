@@ -99,6 +99,8 @@ async function renderDashboard() {
       h('span', { class: 'spacer' }),
       h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived'), h('a', { href: '#/settings' }, 'Settings')),
     newFromForm(),
+    ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ Consultation email for ${c.first_name} ${c.last_name} is waiting for your approval. `,
+      h('a', { href: `#/client/${c.id}` }, 'Review'))),
     h('h2', {}, 'Upcoming appointments'),
     d.appointments.length
       ? h('table', { class: 'compact' }, h('tbody', {}, d.appointments.map((a) => h('tr', {},

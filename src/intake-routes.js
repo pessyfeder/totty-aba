@@ -2,6 +2,7 @@
 // Files arrive as the raw request body (filename in X-Filename), so no multipart dependency is needed.
 import crypto from 'node:crypto';
 import express from 'express';
+import { ensureDraft } from './consult-email.js';
 import { ALLOWED_EXT, MAX_UPLOAD_BYTES, applyFill, decrypt, encrypt, extOf, parseForm, planFill, safeFilename } from './intake.js';
 
 export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClient }) {
@@ -26,11 +27,13 @@ export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClie
     return id;
   };
 
-  /** Upload moves the client to paperwork_received, but never backwards from a later stage. */
+  /** Upload moves the client to paperwork_received, but never backwards from a later stage.
+   *  At paperwork_received the consultation email is drafted for Totty's approval (SPEC 5.7b). */
   const markReceived = async (clientId) => {
     const { rows } = await db.query(
       `UPDATE client SET intake_status = 'paperwork_received', updated_at = now()
         WHERE id = $1 AND intake_status IN ('inquiry', 'paperwork_sent') RETURNING id`, [clientId]);
+    await ensureDraft(db, clientId);
     return rows.length > 0;
   };
 

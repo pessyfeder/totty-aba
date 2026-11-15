@@ -119,6 +119,26 @@ async function intakeDocsSection({ h, api, handle }, id, reload) {
       : h('p', { class: 'muted' }, 'No intake documents yet.'));
 }
 
+/** Initial consultation email (SPEC 5.7b): Totty reads the exact text and approves or declines the first send. */
+async function consultEmailSection({ h, api, handle }, id, reload) {
+  const e = await api(`/clients/${id}/consult-email`);
+  if (!e || e.status === 'cancelled') return e ? h('p', { class: 'muted' }, 'Consultation email: not sent (you declined it).') : '';
+  const act = (path) => api(`/clients/${id}/consult-email/${path}`, { method: 'POST' }).then(reload, handle);
+  if (e.status === 'sent') return h('p', { class: 'ok-line' }, `✉ Consultation email sent to ${e.to} on ${String(e.sent_at).slice(0, 10)}.`);
+  if (e.status === 'failed') return h('p', { class: 'warn-line' }, `⚠ The consultation email could not be sent: ${e.last_error ?? 'unknown error'}`);
+  const approved = e.status !== 'pending_approval';
+  return h('section', {},
+    h('h2', {}, 'Consultation email'),
+    approved
+      ? h('p', { class: 'ok-line' }, '✉ Approved. It goes out as soon as it can (not during Shabbos or Yom Tov).')
+      : h('p', { class: 'muted' }, 'Paperwork received. Review this email to the family and approve it to send.'),
+    ...e.problems.map((p) => h('p', { class: 'warn-line' }, `⚠ ${p}`)),
+    e.last_error ? h('p', { class: 'warn-line' }, `⚠ Last attempt failed: ${e.last_error}`) : '',
+    e.text ? h('div', { class: 'card' }, h('div', { class: 'muted' }, `To: ${e.to}`), h('strong', {}, e.subject), h('pre', { style: 'white-space: pre-wrap; font: inherit' }, e.text)) : '',
+    h('button', { type: 'button', disabled: approved || e.problems.length > 0, onclick: () => act('approve') }, 'Approve and send'), ' ',
+    h('button', { type: 'button', class: 'link', onclick: () => { if (confirm("Don't send the consultation email?")) act('cancel'); } }, approved ? 'Cancel' : 'Decline'));
+}
+
 export async function renderClient(ctx, id) {
   const { h, api, app, logoutBtn, handle } = ctx;
   const c = await api(`/clients/${id}`);
@@ -157,6 +177,7 @@ export async function renderClient(ctx, id) {
     const box = document.querySelector('[role=status]');
     if (box && (last.filled?.length || last.conflicts?.length)) box.append(h('p', { class: 'ok-line' }, `Last upload filled: ${(last.filled ?? []).join(', ') || 'nothing new'}.`));
   }).catch((e) => h('p', { class: 'error' }, e.message));
+  const consultEmail = await consultEmailSection(ctx, id, reload).catch((e) => h('p', { class: 'error' }, e.message));
   const reports = await reportsSection(ctx, id);
   const dash = await api('/dashboard');
   const me = dash.clients.find((x) => x.id === id);
@@ -195,6 +216,7 @@ export async function renderClient(ctx, id) {
     h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
     intakeSection,
     intakeDocs,
+    consultEmail,
     ...todaySection,
     h('h2', {}, 'Appointments'),
     c.appointments.length

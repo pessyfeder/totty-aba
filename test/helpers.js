@@ -21,7 +21,9 @@ export function makeEnv(db, start) {
   let n = 0;
   const provider = { async send(m) { sent.push(m); return { id: `SM${n++}` }; } };
   const messenger = createMessenger({ db, provider, now });
-  return { clock, now, sent, messenger, at: (iso) => { clock.t = new Date(iso); } };
+  const mails = [];
+  const mailer = { async send(m) { mails.push(m); return { id: `mail${mails.length}` }; } };
+  return { clock, now, sent, messenger, mails, mailer, at: (iso) => { clock.t = new Date(iso); } };
 }
 
 export const PASSWORD = 'correct horse battery';
