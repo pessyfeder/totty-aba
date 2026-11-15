@@ -1,4 +1,4 @@
-# Totty's ABA
+# BTB - Behavior Treating Behavior
 
 See [SPEC.md](SPEC.md) for the product spec.
 

@@ -64,27 +64,14 @@ function renderLogin(message = '') {
   app.replaceChildren(form);
 }
 
-/** Creates a client straight from a returned intake form (SPEC 5.1a step 3). */
-function newFromForm() {
-  const input = h('input', { type: 'file', accept: '.csv,.json', required: true });
-  const msg = h('span', { class: 'error', role: 'alert' });
-  const form = h('form', { class: 'inline-form', onsubmit: async (e) => {
-    e.preventDefault();
-    msg.textContent = '';
-    const file = input.files[0];
-    try {
-      const res = await fetch('/api/intake/form', { method: 'POST', body: file,
-        headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'totty', 'X-Filename': encodeURIComponent(file.name) } });
-      const data = await res.json().catch(() => ({}));
-      if (res.status === 409 && data.client_id) { msg.replaceChildren(`${data.error}. `, h('a', { href: `#/client/${data.client_id}` }, 'Open client')); return; }
-      if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
-      alert(`Client created from the form. Their location and timezone were set to yours; edit the client to set the family's.${data.warnings.length ? `
-
-Check: ${data.warnings.join('; ')}` : ''}`);
-      location.hash = `#/client/${data.client_id}`;
-    } catch (ex) { msg.textContent = ex.message; }
-  } }, h('label', {}, 'New client from returned intake form (.csv or .json)', input), h('button', { type: 'submit' }, 'Create client'), msg);
-  return form;
+/** Sends a file as the raw request body (filename in X-Filename), like the server's intake routes expect. */
+async function postFile(path, file) {
+  const res = await fetch(path, { method: 'POST', body: file,
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'totty', 'X-Filename': encodeURIComponent(file.name) } });
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401) { renderLogin(); throw new Error('login'); }
+  if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
+  return data;
 }
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
@@ -133,15 +120,17 @@ async function renderClients() {
     backToDashboard(),
     h('div', { class: 'stats' },
       h('h2', {}, 'Clients'),
-      h('span', { class: d.attention.length ? 'bad' : '' }, h('strong', {}, String(d.attention.length)), ' need attention'),
-      h('span', { class: 'spacer' }),
-      h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
-    newFromForm(),
+      h('span', { class: 'spacer' })),
+    h('div', { class: 'chip-bar' },
+      h('a', { href: '#/client/new', class: 'chip chip-add' }, '+ Add client'),
+      h('a', { href: '#/archived', class: 'chip chip-archived' }, 'View Archived')),
     ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ Consultation email for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
     d.clients.length
-      ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`),
-        ...c.attention.map((a) => h('span', { class: 'warn-line' }, ` ⚠ ${a}`)))))
+      ? h('ul', { class: 'chips' }, d.clients.map((c) => h('li', { class: 'chip chip-client' },
+        h('span', { class: 'chip-name' }, `${c.first_name} ${c.last_name}`),
+        c.attention.length ? h('span', { class: 'chip-attn', title: c.attention.join('; ') }, `⚠ Needs attention: ${c.attention.join('; ')}`) : null,
+        h('a', { href: `#/client/${c.id}`, class: 'chip-view', 'aria-label': `View ${c.first_name} ${c.last_name}` }, 'View'))))
       : h('p', { class: 'muted' }, 'No clients yet.'),
   ].filter(Boolean));
 }
@@ -170,6 +159,27 @@ function renderClientForm(c = null) {
   const v = (k) => (c?.[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
   const field = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, value: v(name), ...attrs }));
   const OPTIONAL = ['gender', 'dob', 'location_name', 'candle_lighting_minutes', 'notes'];
+  // Upload intake form (new clients only): reads the file, fills the fields below, saves nothing until Create client.
+  let intakeFile = null;
+  const uploadMsg = h('span', { class: 'muted', role: 'status' });
+  const uploadInput = h('input', { type: 'file', accept: '.csv,.json', onchange: async () => {
+    const file = uploadInput.files[0];
+    intakeFile = null;
+    uploadMsg.className = 'muted';
+    uploadMsg.textContent = '';
+    if (!file) return;
+    try {
+      const parsed = await postFile('/api/intake/parse', file);
+      for (const [k, val] of Object.entries(parsed.client)) {
+        const el = form.elements[k];
+        if (el) el.value = val;
+      }
+      intakeFile = file;
+      const n = Object.keys(parsed.client).length;
+      uploadMsg.textContent = `Filled ${n} field${n === 1 ? '' : 's'} from the form. Check them, then click Create client.${parsed.warnings.length ? ` Check: ${parsed.warnings.join('; ')}` : ''}`;
+    } catch (ex) { uploadMsg.className = 'error'; uploadMsg.textContent = ex.message; uploadInput.value = ''; }
+  } });
+  const uploadRow = h('div', { class: 'upload-row' }, h('label', {}, 'Upload intake form (.csv or .json) to fill the fields', uploadInput), uploadMsg);
   const form = h('form', { class: 'login', onsubmit: async (e) => {
     e.preventDefault();
     msg.textContent = '';
@@ -183,9 +193,15 @@ function renderClientForm(c = null) {
     body.in_israel = f.get('in_israel') === 'on';
     try {
       const saved = c ? await api(`/clients/${c.id}`, { method: 'PATCH', body }) : await api('/clients', { method: 'POST', body });
+      if (!c && intakeFile) {
+        // Keep the uploaded form with the new client: stored encrypted, parents added, status advanced.
+        try { await postFile(`/api/clients/${saved.id}/intake/form`, intakeFile); }
+        catch (ex) { alert(`Client created, but the intake form could not be saved: ${ex.message}. Upload it again from the client's page.`); }
+      }
       location.hash = `#/client/${saved.id}`;
     } catch (ex) { msg.textContent = ex.message; }
   } },
+    !c && uploadRow,
     field('First name', 'first_name', { required: true }),
     field('Last name', 'last_name', { required: true }),
     field('Gender', 'gender'),
@@ -198,7 +214,7 @@ function renderClientForm(c = null) {
     h('label', {}, h('input', { name: 'in_israel', type: 'checkbox', checked: Boolean(c?.in_israel) }), ' Lives in Israel (Yom Tov observance)'),
     field('Candle lighting (minutes before sunset)', 'candle_lighting_minutes', { type: 'number', min: 0, placeholder: 'default 18' }),
     h('label', {}, 'Notes', h('textarea', { name: 'notes', rows: 3 }, c?.notes ?? '')),
-    h('button', { type: 'submit' }, c ? 'Save changes' : 'Add client'), msg);
+    h('button', { type: 'submit' }, c ? 'Save changes' : 'Create client'), msg);
   const archive = c && h('p', {}, h('button', { type: 'button', class: 'link', onclick: async () => {
     const restoring = c.status === 'archived';
     if (!restoring && !confirm(`Archive ${c.first_name}? Prompts stop and the client leaves the dashboard. History is kept and you can restore later.`)) return;

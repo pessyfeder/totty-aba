@@ -22,6 +22,28 @@
       "port": 3001
     },
     {
+      "name": "demo-3017",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "demo",
+        "--",
+        "3017"
+      ],
+      "port": 3017
+    },
+    {
+      "name": "demo-3020",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "demo",
+        "--",
+        "3020"
+      ],
+      "port": 3020
+    },
+    {
       "name": "demo-alt",
       "runtimeExecutable": "npm",
       "runtimeArgs": [

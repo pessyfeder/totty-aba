@@ -189,7 +189,7 @@ test('webhook refuses unsigned requests in production', async () => {
 test('static dashboard is served', async () => {
   const res = await fetch(`${base}/`);
   assert.equal(res.status, 200);
-  assert.match(await res.text(), /Totty's ABA/);
+  assert.match(await res.text(), /BTB - Behavior Treating Behavior/);
 });
 
 test('goal series: missing replies are not counted as No; trend and annotations are returned', async () => {

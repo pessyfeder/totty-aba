@@ -1,4 +1,4 @@
--- Totty's ABA: initial schema (SPEC.md section 6).
+-- BTB - Behavior Treating Behavior: initial schema (SPEC.md section 6).
 -- PostgreSQL 13+ (gen_random_uuid is built in).
 
 CREATE TABLE clinician (

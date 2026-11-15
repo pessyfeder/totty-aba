@@ -71,6 +71,13 @@ export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClie
     res.status(201).json(await ingestForm(req, req.params.id, f, form));
   });
 
+  // Reads a returned intake form and gives back its answers without saving anything, so the Add client page can
+  // pre-fill its fields. Nothing is stored until Totty clicks Create client.
+  app.post('/api/intake/parse', raw, async (req, res) => {
+    const { form } = readForm(req);
+    res.json(form);
+  });
+
   // The returned intake form with no client yet: the form creates the client (SPEC 5.1a step 3).
   // The form has no coordinates or timezone, so the new client starts with Totty's own (they drive the Shabbos
   // window, SPEC 5.3); the response flags this so he can set the family's real location.

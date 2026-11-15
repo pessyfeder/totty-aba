@@ -150,3 +150,20 @@ a.option:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; 
 .list.tight > li { box-shadow: none; }
 @media (max-width: 520px) { main { padding: 8px 14px 48px; } form.login { margin: 24px auto; padding: 20px; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+.upload-row { display: grid; gap: 6px; margin-bottom: 8px; }
+.upload-row input[type=file] { max-width: 100%; }
+
+.chip-bar { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; margin: 8px 0 14px; }
+.chip { display: inline-flex; align-items: center; gap: 10px; border-radius: 999px; font-weight: 600; text-decoration: none; }
+.chip-add { padding: 9px 18px; background: var(--accent); color: var(--on-accent); box-shadow: var(--shadow); }
+.chip-add:hover { filter: brightness(1.08); }
+.chip-archived { padding: 8px 18px; background: var(--card); color: var(--accent); border: 1px solid var(--accent); margin-left: auto; }
+.chip-archived:hover { background: var(--accent); color: var(--on-accent); }
+.chips { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 16px; padding: 0; list-style: none; }
+.chip-client { background: var(--card); border: 1px solid var(--line); box-shadow: var(--shadow); padding: 6px 6px 6px 16px; transition: border-color .15s; }
+.chip-client:hover { border-color: var(--accent); }
+.chips li.chip-client { width: 100%; max-width: 560px; }
+.chip-name { color: var(--text); }
+.chip-attn { margin-left: auto; color: #b45309; font-size: .82rem; font-weight: 600; }
+.chip-view { padding: 4px 12px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .85rem; text-decoration: none; }
+.chip-view:hover { filter: brightness(1.08); }
