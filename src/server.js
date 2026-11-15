@@ -18,6 +18,11 @@ if (env.SESSION_SECRET.length < 32) {
   process.exit(1);
 }
 
+if (production && (env.DOCUMENT_KEY ?? '').length < 32) {
+  console.error('DOCUMENT_KEY (at least 32 characters) is required in production: intake documents are encrypted with it');
+  process.exit(1);
+}
+
 const db = new pg.Pool({ connectionString: env.DATABASE_URL });
 const twilioConfigured = env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER;
 if (production && !twilioConfigured) {
@@ -36,6 +41,7 @@ const app = createApp({
   config: {
     production,
     sessionSecret: env.SESSION_SECRET,
+    documentKey: env.DOCUMENT_KEY || undefined,
     publicUrl: env.PUBLIC_URL ?? '',
     reportsDir: env.REPORTS_DIR || undefined,
     reportLinkDays: Number(env.REPORT_LINK_DAYS) || 14,

@@ -108,3 +108,4 @@ details.fold.row[hidden] { display: none; }
 .reply input, .reply select, .reply button { min-height: 36px; padding: 4px 10px; }
 table.compact th, table.compact td { padding: 6px 10px; font-size: .88rem; }
 .top { padding: 10px 16px; }
+.ok-line { color: var(--ok); font-size: .88rem; margin: 2px 0; }

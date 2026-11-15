@@ -7,6 +7,7 @@ import { locationFrom, windowAt } from './shabbos.js';
 import { loadDashboard } from './dashboard.js';
 import { handleInbound } from './inbound.js';
 import { reportRoutes } from './report-routes.js';
+import { intakeRoutes } from './intake-routes.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
@@ -370,6 +371,9 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
     res.json(out[0]);
   });
 
+  // ---- Intake upload + auto-fill (SPEC 5.1a, 5.7b) ----
+  intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClient });
+
   // ---- Progress reports (SPEC 5.6); the parent's /r/:token link is outside /api, so it is not locked ----
   reportRoutes({ app, db, messenger, config, now, HttpError, bad, audit, ownedClient, insertRow })();
 
@@ -379,6 +383,7 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
   app.use((err, req, res, next) => {
     if (err instanceof HttpError) return res.status(err.status).json({ error: err.message, ...err.extra });
     if (err.type === 'entity.parse.failed') return res.status(400).json({ error: 'Invalid JSON' });
+    if (err.type === 'entity.too.large') return res.status(413).json({ error: 'File is too large (10 MB maximum)' });
     if (err.code === '23505' || err.code === '23514' || err.code === '23503' || err.code === '22P02') return res.status(400).json({ error: 'Invalid data' });
     console.error(err);
     res.status(500).json({ error: 'Server error' });

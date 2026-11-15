@@ -68,6 +68,57 @@ function goalCard({ h, api, handle }, g, contacts, reload) {
   return card;
 }
 
+const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
+
+/** Raw-file upload (the API reads the body as the file, name in X-Filename). */
+async function upload(path, file) {
+  const res = await fetch(`/api${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'totty', 'X-Filename': encodeURIComponent(file.name) },
+    body: file,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `${file.name}: upload failed (${res.status})`);
+  return data;
+}
+
+/** Intake paperwork (SPEC 5.1a step 3): returned form auto-fills the client, documents are attached. */
+async function intakeDocsSection({ h, api, handle }, id, reload) {
+  const { documents, conflicts } = await api(`/clients/${id}/intake`);
+  const result = h('div', { role: 'status' });
+  const show = (r) => result.replaceChildren(
+    r.filled?.length ? h('p', { class: 'ok-line' }, `Filled from the form: ${r.filled.join(', ')}.`) : '',
+    r.status_advanced ? h('p', { class: 'ok-line' }, 'Status set to Paperwork received.') : '',
+    ...(r.warnings ?? []).map((w) => h('p', { class: 'warn-line' }, `⚠ ${w}`)));
+  const pick = (label, accept, path, multiple) => {
+    const input = h('input', { type: 'file', accept, multiple, required: true });
+    const msg = h('span', { class: 'error', role: 'alert' });
+    const form = h('form', { class: 'inline-form', onsubmit: async (e) => {
+      e.preventDefault();
+      msg.textContent = '';
+      try {
+        let last = {};
+        for (const f of input.files) { last = await upload(path, f); show(last); }
+        await reload(last);
+      } catch (ex) { msg.textContent = ex.message; }
+    } }, h('label', {}, label, input), h('button', { type: 'submit' }, 'Upload'), msg);
+    return form;
+  };
+  return h('section', {},
+    h('h2', {}, 'Intake documents'),
+    ...conflicts.map((c) => h('div', { class: 'warn-line' }, `⚠ Not filled — ${c.field}: you entered "${c.entered}", the form says "${c.form}". Your value was kept; edit the client to resolve.`)),
+    pick('Returned intake form (.csv or .json)', '.csv,.json', `/clients/${id}/intake/form`, false),
+    pick('Other documents (consent, insurance, assessments)', '.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.txt', `/clients/${id}/documents`, true),
+    result,
+    documents.length
+      ? h('table', { class: 'compact' }, h('tbody', {}, documents.map((d) => h('tr', {},
+          h('td', {}, h('a', { href: `/api/documents/${d.id}` }, d.filename)),
+          h('td', {}, d.kind === 'form' ? 'Intake form' : 'Document'),
+          h('td', {}, fmtSize(d.size_bytes)),
+          h('td', {}, String(d.uploaded_at).slice(0, 10))))))
+      : h('p', { class: 'muted' }, 'No intake documents yet.'));
+}
+
 export async function renderClient(ctx, id) {
   const { h, api, app, logoutBtn, handle } = ctx;
   const c = await api(`/clients/${id}`);
@@ -100,6 +151,12 @@ export async function renderClient(ctx, id) {
   const reinforcementForm = inlineForm(h, [lbl('Preferred reinforcement', h('input', { name: 'name', required: true, placeholder: 'e.g. bubbles' }))],
     'Add', (f) => post('/reinforcements', trimmed(f)));
 
+  const intakeDocs = await intakeDocsSection(ctx, id, async (last) => {
+    await reload();
+    // Re-rendering clears the result line; keep the outcome of the last upload visible.
+    const box = document.querySelector('[role=status]');
+    if (box && (last.filled?.length || last.conflicts?.length)) box.append(h('p', { class: 'ok-line' }, `Last upload filled: ${(last.filled ?? []).join(', ') || 'nothing new'}.`));
+  }).catch((e) => h('p', { class: 'error' }, e.message));
   const reports = await reportsSection(ctx, id);
   const dash = await api('/dashboard');
   const me = dash.clients.find((x) => x.id === id);
@@ -137,6 +194,7 @@ export async function renderClient(ctx, id) {
     h('h2', {}, `${c.first_name} ${c.last_name}`, ' ', h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
     h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
     intakeSection,
+    intakeDocs,
     ...todaySection,
     h('h2', {}, 'Preferred reinforcements'),
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),

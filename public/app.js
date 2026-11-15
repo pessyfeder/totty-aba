@@ -63,6 +63,29 @@ function renderLogin(message = '') {
   app.replaceChildren(form);
 }
 
+/** Creates a client straight from a returned intake form (SPEC 5.1a step 3). */
+function newFromForm() {
+  const input = h('input', { type: 'file', accept: '.csv,.json', required: true });
+  const msg = h('span', { class: 'error', role: 'alert' });
+  const form = h('form', { class: 'inline-form', onsubmit: async (e) => {
+    e.preventDefault();
+    msg.textContent = '';
+    const file = input.files[0];
+    try {
+      const res = await fetch('/api/intake/form', { method: 'POST', body: file,
+        headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'totty', 'X-Filename': encodeURIComponent(file.name) } });
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 409 && data.client_id) { msg.replaceChildren(`${data.error}. `, h('a', { href: `#/client/${data.client_id}` }, 'Open client')); return; }
+      if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
+      alert(`Client created from the form. Their location and timezone were set to yours; edit the client to set the family's.${data.warnings.length ? `
+
+Check: ${data.warnings.join('; ')}` : ''}`);
+      location.hash = `#/client/${data.client_id}`;
+    } catch (ex) { msg.textContent = ex.message; }
+  } }, h('label', {}, 'New client from returned intake form (.csv or .json)', input), h('button', { type: 'submit' }, 'Create client'), msg);
+  return form;
+}
+
 async function renderDashboard() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
@@ -73,6 +96,7 @@ async function renderDashboard() {
       h('h2', {}, 'Clients'),
       h('span', { class: 'spacer' }),
       h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
+    newFromForm(),
     d.clients.length
       ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`))))
       : h('p', { class: 'muted' }, 'No clients yet.'),
