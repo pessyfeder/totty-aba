@@ -164,6 +164,6 @@ a.option:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; 
 .chip-client:hover { border-color: var(--accent); }
 .chips li.chip-client { width: 100%; max-width: 560px; }
 .chip-name { color: var(--text); }
-.chip-attn { margin-left: auto; color: #b45309; font-size: .82rem; font-weight: 600; }
-.chip-view { padding: 4px 12px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .85rem; text-decoration: none; }
+.chip-attn { color: #b45309; font-size: .82rem; font-weight: 600; }
+.chip-view { margin-left: auto; padding: 4px 12px; border-radius: 999px; background: var(--accent); color: var(--on-accent); font-size: .85rem; text-decoration: none; }
 .chip-view:hover { filter: brightness(1.08); }
