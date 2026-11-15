@@ -2,6 +2,7 @@
 import { renderClient as renderClientPage } from './client-page.js';
 import { renderContacts } from './contacts-page.js';
 import { renderReport } from './reports-page.js';
+import { renderSettings } from './settings-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -94,11 +95,13 @@ async function renderDashboard() {
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('div', { class: 'stats' },
       h('h2', {}, 'Clients'),
+      h('span', { class: d.attention.length ? 'bad' : '' }, h('strong', {}, String(d.attention.length)), ' need attention'),
       h('span', { class: 'spacer' }),
-      h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
+      h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived'), h('a', { href: '#/settings' }, 'Settings')),
     newFromForm(),
     d.clients.length
-      ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`))))
+      ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`),
+        ...c.attention.map((a) => h('span', { class: 'warn-line' }, ` ⚠ ${a}`)))))
       : h('p', { class: 'muted' }, 'No clients yet.'),
   ].filter(Boolean));
 }
@@ -172,7 +175,7 @@ async function route() {
   const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
-  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {

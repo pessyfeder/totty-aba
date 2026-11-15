@@ -303,3 +303,20 @@ test('contact details can be edited and cleared; name cannot be blanked', async 
   assert.equal((await call(`/api/contacts/${world.contact.id}`, { method: 'PATCH', cookie, body: { name: '  ' } })).status, 400);
   assert.equal((await call(`/api/contacts/${world.contact.id}`, { method: 'PATCH', cookie, body: { phone: '555-1234' } })).status, 400);
 });
+
+test('settings store, normalise and clear booking links, and reject non-web addresses', async () => {
+  const { cookie } = await login();
+  assert.equal((await call('/api/settings')).status, 401);
+  const put = (body) => call('/api/settings', { method: 'PUT', body, cookie });
+  const ok = await put({ consult_booking_url: ' https://calendar.google.com/book/abc ', checkin_booking_url: 'https://example.test/x' });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.json.consult_booking_url, 'https://calendar.google.com/book/abc');
+  assert.equal((await call('/api/settings', { cookie })).json.checkin_booking_url, 'https://example.test/x');
+  assert.equal((await put({ consult_booking_url: 'javascript:alert(1)' })).status, 400);
+  assert.equal((await put({ consult_booking_url: 'not a url' })).status, 400);
+  const cleared = await put({ checkin_booking_url: '' });
+  assert.equal(cleared.json.checkin_booking_url, '');
+  assert.equal(cleared.json.consult_booking_url, 'https://calendar.google.com/book/abc'); // untouched fields stay
+  const { rows: [c] } = await db.query('SELECT settings_json FROM clinician WHERE id = $1', [world.clinician.id]);
+  assert.equal(c.settings_json.deferred_prompt_policy, 'send_latest_only'); // other settings survive
+});

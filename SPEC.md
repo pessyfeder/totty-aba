@@ -49,11 +49,11 @@ How a new client gets from first contact to active prompts. Two tracks lead into
 4. **Consultation**: the family books a consultation on Totty's Google Calendar. The meeting happens, where Totty and the family discuss goals and reinforcements.
 5. **Enter meeting outcomes**: the goals and preferred reinforcements (5.2, 5.6a) agreed in the meeting are entered into the app, either manually by Totty or automatically (e.g., from meeting notes), always with Totty's review before saving.
 6. **Go**: Totty presses a **Go** (activate) button on the client. From then on the app takes over: prompts are scheduled and sent per the goals' schedules, subject to the Shabbos/quiet-hours rules and each contact's recorded consent. Until Go is pressed, no prompt is sent to the family.
-7. **Ongoing meetings**: a booking link, from a ready-made scheduling tool such as Google Calendar appointment schedules, lets the family schedule meetings with Totty. The link is embedded in the one-time check-in text (5.7a) and also sent in a bi-weekly scheduling text (every 14 days, 5.7b), so families can always book the next meeting. It is the same `CHECKIN_BOOKING_URL`.
+7. **Ongoing meetings**: a booking link, from a ready-made scheduling tool such as Google Calendar appointment schedules, lets the family schedule meetings with Totty. The link is embedded in the bi-weekly check-in text (every 14 days, 5.7a), so families can always book the next meeting. It is `CHECKIN_BOOKING_URL`.
 
 Notes:
 - A client has an intake status: `inquiry`, `paperwork_sent`, `paperwork_received`, `consult_scheduled`, `ready` (awaiting Go), `active`. Only `active` clients receive prompts.
-- **Decisions**: the intake form and document upload are hosted in an **external tool**, not built into the app; the app receives submissions and pre-fills the client (step 3). Booking links (consultation and ongoing meetings) come from a ready-made scheduling tool such as Google Calendar; the app does not create bookings or links itself, it stores the URLs in Settings (e.g., `INTAKE_FORM_URL`, `CONSULT_BOOKING_URL`, `CHECKIN_BOOKING_URL`) and includes them in messages.
+- **Decisions**: the intake form and document upload are hosted in an **external tool**, not built into the app; the app receives submissions and pre-fills the client (step 3). Booking links (consultation and ongoing meetings) come from a ready-made scheduling tool such as Google Calendar; the app does not create bookings or links itself, it stores the URLs in Settings (`CONSULT_BOOKING_URL`, `CHECKIN_BOOKING_URL`; the intake form link is not stored in Settings) and includes them in messages.
 - Intake data and documents are PHI and follow the same privacy rules as section 8. Documents are stored encrypted and are not included in SMS.
 
 ### 5.2 Goals
@@ -142,10 +142,10 @@ Each goal has:
 - A notice with the reopen time while a Shabbos / Yom Tov window is in effect. No notice about upcoming windows.
 - Everything else lives on the client page: attention flags, today's prompts and their status (scheduled, sent, answered with the actual reply, no response), preferred reinforcements, goals, and progress charts.
 
-### 5.7a Parent check-in prompt
-- Seven days (one week) after a parent first receives messages from the app, they get a one-time text prompting them to set up a **check-in appointment with Yisroel Feder, BCBA, LBA**.
-- The seven days are counted from the first prompt actually sent to that contact (`first_message_at`), not from when the contact was created. The check-in text goes out at the next permitted time after day 7 and follows every send rule: never during Shabbos/Yom Tov, never in quiet hours, only to active contacts with recorded consent. If it cannot go out in a blocked window it is sent after the window ends (it is not dropped).
-- It is sent once per contact (`checkin_prompt_sent_at`), and is not repeated if the contact is paused and resumed. It is logged in the message log like any other message.
+### 5.7a Parent check-in prompt (bi-weekly)
+- Seven days (one week) after a parent first receives messages from the app, they get a text prompting them to set up a **check-in appointment with Yisroel Feder, BCBA, LBA**, and the same text repeats **every 14 days** after that, so families can always book the next meeting.
+- The seven days are counted from the first prompt actually sent to that contact (`first_message_at`), not from when the contact was created. Each check-in text goes out at the next permitted time after it is due and follows every send rule: never during Shabbos/Yom Tov, never in quiet hours, only to active contacts with recorded consent. If it cannot go out in a blocked window it is sent after the window ends (it is not dropped).
+- The 14 days are counted from the last check-in text sent to that contact (`checkin_last_sent_at`). Only active clients and active contacts receive it; a paused contact gets none and, when resumed, gets the next one at the next permitted time rather than a backlog. It is logged in the message log like any other message.
 - The text contains no progress details, only the child's first name and the invitation to schedule.
 - **The text includes a link to book the appointment** (a scheduling link, stored in Settings as `CHECKIN_BOOKING_URL`) **and a payment reminder**: payment is due up to 48 hours before the appointment. Example: "Time to schedule a check-in for <first name> with Yisroel Feder, BCBA, LBA: <link>. Please remember payment is due 48 hours before your appointment."
 
@@ -157,7 +157,7 @@ How they arise:
 - **Manual, Totty emails the docs**: Totty sends the family an email with the intake form and document request (5.1a step 2), from his own email. The email is sent outside the app; the app does not send it. Totty then sets the client's status to **intake documents sent** (the `paperwork_sent` intake status). Nothing else is recorded.
 - **Client responds**: the family returns the form and documents, and Totty uploads them to the client in the app (the upload is the manual part). On upload, the app **automatically** sets the status to `paperwork_received` and **fills in the client's info fields** from the submitted form (name, DOB, gender, location, contacts, language, preferred channel, notes). The documents are attached to the client. Intake info is normally filled **only** automatically; Totty does not enter it by hand. If he has entered some fields anyway, the app fills only the empty ones, and where the form's value conflicts with one he entered, the app leaves his value in place and shows an error message naming the field and both values, for Totty to resolve. The form is the external tool's export of one submission as **CSV or JSON**; documents (pdf, images, doc/docx, txt, up to 10 MB) are stored encrypted (`DOCUMENT_KEY`). A form never records parent consent to text/call.
 - **Automatic, initial consult email**: once intake paperwork is received (status `paperwork_received`), the app emails the family the consultation booking link (`CONSULT_BOOKING_URL`). Totty reviews/approves the first send; the email carries no clinical detail (child's first name only).
-- **Automatic, bi-weekly scheduling text**: every 14 days the parent gets the "schedule an appointment" text with the booking link (`CHECKIN_BOOKING_URL`) (5.1a step 7). Active clients only; all send rules (Shabbos, quiet hours, consent) apply.
+- **Automatic, bi-weekly check-in text**: see 5.7a; it carries the booking link (`CHECKIN_BOOKING_URL`) (5.1a step 7).
 
 Visibility for Totty:
 - The dashboard shows an **Upcoming appointments** list: date/time, client name, appointment type.
@@ -172,7 +172,7 @@ Visibility for Totty:
 - `client(id, clinician_id, first_name, last_name, gender, age, dob, admission_date, notes, location, timezone, status, intake_status, activated_at)`
 - `appointment(id, client_id, type, starts_at, status, source, notes, created_at)`
 - `reinforcement(id, client_id, name, note)`
-- `contact(id, client_id, name, relationship, phone, email, preferred_channel, language, first_message_at, checkin_prompt_sent_at)`
+- `contact(id, client_id, name, relationship, phone, email, preferred_channel, language, first_message_at, checkin_last_sent_at)`
 - `goal(id, client_id, contact_id, title, description, response_type, channel, schedule_json, date_added, start_date, end_date, status, target_json)`
 - `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason, followups_sent, last_followup_at)`
 - `response(id, prompt_id, received_at, value_bool, value_minutes, raw_text, source, parse_status)`
@@ -210,7 +210,7 @@ Visibility for Totty:
 9. During the Shabbos window, logging in or performing any action as Totty is refused with a notice showing when the app reopens, and a parent's reply received then is still recorded.
 10. Replying "20" to a duration prompt stores 20 minutes and the chart updates; replying "abc" is treated as unparseable.
 10a. On a voice call, saying "yes" or pressing 1 records true; saying "twenty minutes" or keying 20# records 20 minutes. Three unusable inputs in one call end the call, leave the prompt open, and send a try-again text. Hanging up after answering the first of three goals keeps that answer and leaves the other two open.
-11. A contact whose first prompt was sent 7 days ago receives the check-in text with Yisroel Feder, BCBA, LBA once, at a permitted time (not during Shabbos or quiet hours), and never again.
+11. A contact whose first prompt was sent 7 days ago receives the check-in text with Yisroel Feder, BCBA, LBA at a permitted time (not during Shabbos or quiet hours), and again every 14 days after the last one.
 
 ## 10. Milestones
 1. **MVP**: login, clients, contacts, goals, SMS yes/no + duration prompts, scheduler with Shabbos guard, per-goal charts.
@@ -221,12 +221,12 @@ Visibility for Totty:
 6. **Cross-device app (later stage)**: Totty's app runs on both phone and computer. One responsive web app (installable to the phone home screen as a PWA) with a layout that adapts from phone to desktop, covering every Totty-facing screen: dashboard, clients, goals, charts, and report create/preview/edit. No separate native apps unless a later need (e.g. push notifications on iOS) requires it. The Shabbos lock applies the same on every device.
 
 ## 11. Open questions
-0. **Intake (5.1a)**: partly resolved. Decided: external form tool; booking links from a ready-made scheduler such as Google Calendar (the app stores URLs, does not create bookings); the booking link is embedded in the check-in text (5.7a) and also in the bi-weekly scheduling text (every 14 days). Submissions reach the app when **Totty uploads the returned form and documents**; the app then sets `paperwork_received` and fills the client's info fields automatically (5.7b). An automatic webhook/email feed that skips the upload is a possible later step. **Still open**: which external form tool is used, and whether meeting notes are entered by hand only or captured automatically.
+0. **Intake (5.1a)**: partly resolved. Decided: external form tool; booking links from a ready-made scheduler such as Google Calendar (the app stores URLs, does not create bookings); the booking link is embedded in the bi-weekly check-in text (5.7a, every 14 days). Submissions reach the app when **Totty uploads the returned form and documents**; the app then sets `paperwork_received` and fills the client's info fields automatically (5.7b). An automatic webhook/email feed that skips the upload is a possible later step. **Still open**: which external form tool is used, and whether meeting notes are entered by hand only or captured automatically.
 1. **Prompt volume**: how many clients and goals per client? This affects Twilio costs and the combined-message design.
 2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
 4. **Voice calls**: automated robot voice only, or could Totty ever want to be called in too?5. **Languages**: English only, or also Hebrew/Yiddish prompts?
 6. **Parents on tablets and computers**: texts reach phones only. Do any parents need prompts on a tablet or computer? Options: (a) prompts also sent by email with a private link to a one-tap answer page that works on any device, no login (recommended; texts stay the default so basic and kosher phones keep working); (b) an installable parent web app with push notifications (needs a parent login, does not work on basic phones); (c) WhatsApp (needs a WhatsApp Business setup and approved message templates). Not built; waiting on Totty.
 7. **Follow-up calls**: follow-ups are texts today. For parents who prefer calls, should a follow-up be a call, and should it fall back to a text? (Needs the voice milestone.)
-8. **Check-in booking**: the text carries a booking link; which scheduling tool does the link point to, and how and where does the parent pay (in the link, or separately)? Is it only the one text, or a reminder if they do not respond?
-9. **Appointments (5.7b)**: *Decided:* booked appointments reach the app through a read-only Google Calendar sync, not manual entry. Still open: how a calendar event is matched to a client (e.g., by the booker's email against contact emails), and what is the full list of appointment types, and is the bi-weekly scheduling text (every 14 days) sent to every active client each time, or only those with no appointment already booked?
+8. **Check-in booking**: the text carries a booking link; which scheduling tool does the link point to, and how and where does the parent pay (in the link, or separately)? Is there a reminder if they do not respond?
+9. **Appointments (5.7b)**: *Decided:* booked appointments reach the app through a read-only Google Calendar sync, not manual entry. Still open: how a calendar event is matched to a client (e.g., by the booker's email against contact emails), and what is the full list of appointment types, and is the bi-weekly check-in text (every 14 days) sent to every active client each time, or only those with no appointment already booked?

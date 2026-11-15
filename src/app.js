@@ -14,6 +14,8 @@ const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_da
 const CONTACT_FIELDS = ['name', 'relationship', 'phone', 'email', 'preferred_channel', 'language', 'status', 'consent_given_at', 'consent_note'];
 const GOAL_FIELDS = ['contact_id', 'title', 'description', 'question_text', 'response_type', 'channel', 'schedule_json', 'date_added', 'start_date', 'end_date', 'status', 'target_json'];
 const REINFORCEMENT_FIELDS = ['name', 'note'];
+// Booking links to external tools (SPEC 5.1a, 5.7b): the app stores them and puts them in messages; it never creates bookings.
+const LINK_SETTINGS = ['consult_booking_url', 'checkin_booking_url'];
 
 class HttpError extends Error {
   constructor(status, message, extra = {}) {
@@ -161,6 +163,25 @@ export function createApp({ db, messenger, config, now = () => new Date() }) {
   const viaClient = 'client_id IN (SELECT id FROM client WHERE clinician_id = $2)';
 
   app.get('/api/dashboard', async (req, res) => res.json(await loadDashboard(db, req.clinician, now())));
+
+  // ---- Settings: booking and intake links (SPEC 5.1a). Empty string clears a link. ----
+  app.get('/api/settings', (req, res) => {
+    res.json(Object.fromEntries(LINK_SETTINGS.map((k) => [k, req.clinician.settings_json?.[k] ?? ''])));
+  });
+  app.put('/api/settings', async (req, res) => {
+    const next = { ...req.clinician.settings_json };
+    for (const [k, raw] of Object.entries(pick(req.body, LINK_SETTINGS))) {
+      const v = typeof raw === 'string' ? raw.trim() : raw;
+      if (v === '' || v == null) { delete next[k]; continue; }
+      let u;
+      try { u = new URL(v); } catch { throw bad(`${k} must be a full web address (https://...)`); }
+      if (u.protocol !== 'https:' && u.protocol !== 'http:') throw bad(`${k} must start with https://`);
+      next[k] = u.href;
+    }
+    await db.query('UPDATE clinician SET settings_json = $2 WHERE id = $1', [req.clinician.id, JSON.stringify(next)]);
+    await audit(req, 'update', 'settings', req.clinician.id, { fields: Object.keys(pick(req.body, LINK_SETTINGS)) });
+    res.json(Object.fromEntries(LINK_SETTINGS.map((k) => [k, next[k] ?? ''])));
+  });
 
   // ---- Clients ----
   app.get('/api/clients', async (req, res) => {
