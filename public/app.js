@@ -95,7 +95,7 @@ const ICONS = {
 
 const backToDashboard = () => h('p', {}, h('a', { href: '#/' }, '← Dashboard'));
 
-/** Dashboard home: three big options, like a "choose an option" page. */
+/** Dashboard home: three big options under a "Dashboard" heading. */
 async function renderDashboard() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
