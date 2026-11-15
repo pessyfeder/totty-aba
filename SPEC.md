@@ -244,6 +244,11 @@ Visibility for Totty:
 0. **Intake (5.1a)**: partly resolved. Decided: external form tool; booking links from a ready-made scheduler such as Google Calendar (the app stores URLs, does not create bookings); the booking link is embedded in the bi-weekly check-in text (5.7a, every 14 days). Submissions reach the app when **Totty uploads the returned form and documents**; the app then sets `paperwork_received` and fills the client's info fields automatically (5.7b). An automatic webhook/email feed that skips the upload is a possible later step. **Still open**: which external form tool is used, and whether meeting notes are entered by hand only or captured automatically.
 1. **Prompt volume**: *Working estimate:* about 40 prompts a day. A rough number is enough; it only affects cost and the combined-message design. At that volume, with every follow-up sent (4 outbound texts per prompt), the README estimates roughly $40 a month on Telnyx (about $60 on Twilio), before two-segment prompts and replies. Real usage should be lower, since a reply stops follow-ups.
 1a. **Text-sending platform and costs**: *Decided: Telnyx* (SMS and voice), switched from Twilio. SMS is built against it. *Still open:* confirm Telnyx will sign a BAA and what it covers, US 10DLC registration and number approval, and the voice API (TeXML or Call Control) before milestone 4. Costs to confirm: per-segment price, two-segment prompts, follow-up multiplier, per-call price.
+   *Open items before going live on Telnyx:*
+   - [ ] Create the Telnyx messaging profile and number, and register for US 10DLC.
+   - [ ] Copy the webhook public key from the Telnyx portal into `TELNYX_PUBLIC_KEY`.
+   - [ ] Point the profile's webhook at `PUBLIC_URL/webhooks/telnyx/sms`.
+   - [ ] Confirm Telnyx will sign a BAA (children's health data), and what it covers.
 2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
 4. **Voice calls**: *Decided:* the app places automated calls and parents answer by keypad or speech, and the sending is automatic (no staff texting by hand). *Still open:* automated robot voice only, or could Totty ever want to be called in too? Scope in 5.4a.
