@@ -150,3 +150,49 @@ test('creating from a form refuses duplicates and forms without a name', async (
   assert.equal((await upload('/api/intake/form', 'n.json', JSON.stringify({ first_name: 'Only' }))).status, 400);
   assert.equal((await fetch(base + '/api/intake/form', { method: 'POST', headers: { 'X-Requested-With': 'totty' }, body: 'x' })).status, 401);
 });
+
+// ---- Fillable PDF (the standard intake form) ----
+import { PDFDocument } from 'pdf-lib';
+
+async function filledPdf(values) {
+  const doc = await PDFDocument.load(await (await get('/api/intake/blank-form.pdf')).arrayBuffer());
+  const form = doc.getForm();
+  for (const [k, v] of Object.entries(values)) {
+    const f = form.getField(k);
+    if (f.constructor.name === 'PDFDropdown') f.select(v); else f.setText(v);
+  }
+  return Buffer.from(await doc.save());
+}
+
+const PDF_VALUES = {
+  first_name: 'Dovid', last_name: 'Katz', dob: '5/2/2018', gender: 'Male', location: 'Monsey',
+  parent1_name: 'Chana Katz', parent1_relationship: 'Mother', parent1_phone: '(845) 555-0100', parent1_email: 'chana@example.test',
+  parent1_language: 'Yiddish', parent1_preferred_channel: 'Phone call', notes: 'Afraid of dogs',
+};
+
+test('the blank PDF form downloads and is fillable', async () => {
+  const res = await get('/api/intake/blank-form.pdf');
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get('content-type'), 'application/pdf');
+  assert.ok((await PDFDocument.load(await res.arrayBuffer())).getForm().getFields().length > 15);
+});
+
+test('a filled PDF creates a pre-filled client', async () => {
+  const res = await upload('/api/intake/form', 'intake-form.pdf', await filledPdf(PDF_VALUES));
+  assert.equal(res.status, 201, await res.clone().text());
+  const out = await res.json();
+  assert.deepEqual(out.warnings, []);
+  const { rows: [c] } = await db.query('SELECT first_name, last_name, dob::text AS dob, gender, location_name, notes, intake_status FROM client WHERE id = $1', [out.client_id]);
+  assert.deepEqual(c, { first_name: 'Dovid', last_name: 'Katz', dob: '2018-05-02', gender: 'Male', location_name: 'Monsey', notes: 'Afraid of dogs', intake_status: 'paperwork_received' });
+  const { rows: [p] } = await db.query('SELECT name, relationship, phone, email, language, preferred_channel FROM contact WHERE client_id = $1', [out.client_id]);
+  assert.deepEqual(p, { name: 'Chana Katz', relationship: 'Mother', phone: '+18455550100', email: 'chana@example.test', language: 'yi', preferred_channel: 'call' });
+});
+
+test('a PDF with no fillable fields, or not a PDF, is rejected with a clear message', async () => {
+  const flat = await PDFDocument.create(); flat.addPage();
+  const r1 = await upload('/api/intake/parse', 'scan.pdf', Buffer.from(await flat.save()));
+  assert.equal(r1.status, 400);
+  assert.match((await r1.json()).error, /no fillable fields/);
+  const r2 = await upload('/api/intake/parse', 'bad.pdf', Buffer.from('not a pdf'));
+  assert.equal(r2.status, 400);
+});

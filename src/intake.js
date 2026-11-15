@@ -1,8 +1,9 @@
 // Intake upload and auto-fill (SPEC 5.1a step 3, 5.7b).
-// The family's form comes from an external tool, exported as JSON or CSV (one submission). Its answers fill
+// The family's form is a fillable PDF (src/intake-pdf.js); a JSON or CSV export of one submission also works. Its answers fill
 // the client's EMPTY fields only; where the form disagrees with a value Totty already entered, his value stays
 // and the disagreement is reported (field plus both values) for him to resolve.
 import crypto from 'node:crypto';
+import { readPdfFields } from './intake-pdf.js';
 
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 export const ALLOWED_EXT = { pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif',
@@ -174,6 +175,12 @@ export function parseForm(filename, buffer) {
   }
   out.contacts = out.contacts.filter((c) => !c.skip);
   return out;
+}
+
+/** parseForm for any accepted form file: the fillable PDF (the standard), or a .json/.csv export. */
+export async function parseFormFile(filename, buffer) {
+  if (extOf(filename) !== 'pdf') return parseForm(filename, buffer);
+  return parseForm('form.json', Buffer.from(JSON.stringify(await readPdfFields(buffer))));
 }
 
 // ---- Auto-fill ----

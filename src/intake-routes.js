@@ -3,7 +3,8 @@
 import crypto from 'node:crypto';
 import express from 'express';
 import { ensureDraft } from './consult-email.js';
-import { ALLOWED_EXT, MAX_UPLOAD_BYTES, applyFill, decrypt, encrypt, extOf, parseForm, planFill, safeFilename } from './intake.js';
+import { ALLOWED_EXT, MAX_UPLOAD_BYTES, applyFill, decrypt, encrypt, extOf, parseFormFile, planFill, safeFilename } from './intake.js';
+import { buildIntakeFormPdf } from './intake-pdf.js';
 
 export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClient }) {
   const secret = config.documentKey ?? config.sessionSecret;
@@ -44,11 +45,11 @@ export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClie
     return { client, contacts };
   };
 
-  const readForm = (req) => {
+  const readForm = async (req) => {
     const f = fileOf(req);
-    if (!['json', 'csv'].includes(extOf(f.filename))) throw bad('The intake form must be a .json or .csv export');
+    if (!['pdf', 'json', 'csv'].includes(extOf(f.filename))) throw bad('The intake form must be the filled-in PDF (or a .json / .csv export)');
     let form;
-    try { form = parseForm(f.filename, f.buffer); } catch (e) { throw bad(e.message); }
+    try { form = await parseFormFile(f.filename, f.buffer); } catch (e) { throw bad(e.message); }
     if (!Object.keys(form.client).length && !form.contacts.length) throw bad('No intake fields were recognised in this form file');
     return { f, form };
   };
@@ -64,17 +65,23 @@ export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClie
     return { client_id: clientId, document_id: documentId, filled, conflicts, warnings: form.warnings, status_advanced: advanced };
   };
 
+  // The blank fillable intake form Totty attaches to his intake email (SPEC 5.1a step 2).
+  app.get('/api/intake/blank-form.pdf', async (req, res) => {
+    res.set({ 'Content-Type': 'application/pdf', 'Content-Disposition': 'attachment; filename="intake-form.pdf"', 'Cache-Control': 'no-store' })
+      .send(await buildIntakeFormPdf());
+  });
+
   // The returned intake form for an existing client: stored encrypted, then its answers fill the empty fields.
   app.post('/api/clients/:id/intake/form', raw, async (req, res) => {
     await ownedClient(req, req.params.id);
-    const { f, form } = readForm(req);
+    const { f, form } = await readForm(req);
     res.status(201).json(await ingestForm(req, req.params.id, f, form));
   });
 
   // Reads a returned intake form and gives back its answers without saving anything, so the Add client page can
   // pre-fill its fields. Nothing is stored until Totty clicks Create client.
   app.post('/api/intake/parse', raw, async (req, res) => {
-    const { form } = readForm(req);
+    const { form } = await readForm(req);
     res.json(form);
   });
 
@@ -82,7 +89,7 @@ export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClie
   // The form has no coordinates or timezone, so the new client starts with Totty's own (they drive the Shabbos
   // window, SPEC 5.3); the response flags this so he can set the family's real location.
   app.post('/api/intake/form', raw, async (req, res) => {
-    const { f, form } = readForm(req);
+    const { f, form } = await readForm(req);
     const { first_name, last_name } = form.client;
     if (!first_name || !last_name) throw bad("The form needs the child's first and last name to create a client");
     const me = req.clinician;
@@ -120,7 +127,7 @@ export function intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClie
       `SELECT id, filename, data FROM client_document WHERE client_id = $1 AND kind = 'form' ORDER BY uploaded_at DESC LIMIT 1`, [req.params.id]);
     if (latest) {
       const { client, contacts } = await loadWorld(req.params.id);
-      conflicts = planFill(client, contacts, parseForm(latest.filename, decrypt(secret, latest.id, latest.data))).conflicts;
+      try { conflicts = planFill(client, contacts, await parseFormFile(latest.filename, decrypt(secret, latest.id, latest.data))).conflicts; } catch { /* stored form unreadable: no conflicts to show */ }
     }
     await audit(req, 'view', 'client_document', null, { client_id: req.params.id, list: true });
     res.json({ documents, conflicts });
