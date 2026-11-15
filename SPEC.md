@@ -143,7 +143,7 @@ Each goal has:
 - Everything else lives on the client page: attention flags, today's prompts and their status (scheduled, sent, answered with the actual reply, no response), preferred reinforcements, goals, and progress charts.
 
 ### 5.7a Parent check-in prompt (bi-weekly)
-- Seven days (one week) after a parent first receives messages from the app, they get a text prompting them to set up a **check-in appointment with Yisroel Feder, BCBA, LBA**, and the same text repeats **every 14 days** after that, so families can always book the next meeting.
+- Fourteen days (two weeks) after a parent first receives messages from the app, they get a text prompting them to set up a **check-in appointment with Yisroel Feder, BCBA, LBA**, and the same text repeats **every 14 days** after that, so families can always book the next meeting.
 - The seven days are counted from the first prompt actually sent to that contact (`first_message_at`), not from when the contact was created. Each check-in text goes out at the next permitted time after it is due and follows every send rule: never during Shabbos/Yom Tov, never in quiet hours, only to active contacts with recorded consent. If it cannot go out in a blocked window it is sent after the window ends (it is not dropped).
 - The 14 days are counted from the last check-in text sent to that contact (`checkin_last_sent_at`). Only active clients and active contacts receive it; a paused contact gets none and, when resumed, gets the next one at the next permitted time rather than a backlog. It is logged in the message log like any other message.
 - The text contains no progress details, only the child's first name and the invitation to schedule.
@@ -210,7 +210,7 @@ Visibility for Totty:
 9. During the Shabbos window, logging in or performing any action as Totty is refused with a notice showing when the app reopens, and a parent's reply received then is still recorded.
 10. Replying "20" to a duration prompt stores 20 minutes and the chart updates; replying "abc" is treated as unparseable.
 10a. On a voice call, saying "yes" or pressing 1 records true; saying "twenty minutes" or keying 20# records 20 minutes. Three unusable inputs in one call end the call, leave the prompt open, and send a try-again text. Hanging up after answering the first of three goals keeps that answer and leaves the other two open.
-11. A contact whose first prompt was sent 7 days ago receives the check-in text with Yisroel Feder, BCBA, LBA at a permitted time (not during Shabbos or quiet hours), and again every 14 days after the last one.
+11. A contact whose first prompt was sent 14 days ago receives the check-in text with Yisroel Feder, BCBA, LBA at a permitted time (not during Shabbos or quiet hours), and again every 14 days after the last one.
 
 ## 10. Milestones
 1. **MVP**: login, clients, contacts, goals, SMS yes/no + duration prompts, scheduler with Shabbos guard, per-goal charts.
