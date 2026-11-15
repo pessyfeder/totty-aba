@@ -165,9 +165,8 @@ test('AC9: a parent reply arriving during Shabbos is still recorded through the 
   await world.one(`INSERT INTO prompt (goal_id, scheduled_for, prompt_date, short_code, sent_at, channel, status) VALUES ($1, '2026-11-06T20:00:00Z', '2026-11-06', 1, '2026-11-06T20:00:00Z', 'sms', 'sent') RETURNING id`, [goal.id]);
   env.at('2026-11-07T15:00:00Z');
   try {
-    const r = await call('/webhooks/twilio/sms', { method: 'POST', form: { From: '+15555550100', Body: 'Y', MessageSid: 'SMxyz' } });
+    const r = await call('/webhooks/telnyx/sms', { method: 'POST', body: { data: { event_type: 'message.received', payload: { id: 'msg-xyz', direction: 'inbound', from: { phone_number: '+15555550100' }, text: 'Y' } } } });
     assert.equal(r.status, 200);
-    assert.equal(r.text, '<Response/>');
     const { rows } = await db.query(`SELECT r.value_bool FROM response r JOIN prompt p ON p.id = r.prompt_id WHERE p.goal_id = $1`, [goal.id]);
     assert.deepEqual(rows, [{ value_bool: true }]);
   } finally {
@@ -176,10 +175,10 @@ test('AC9: a parent reply arriving during Shabbos is still recorded through the 
 });
 
 test('webhook refuses unsigned requests in production', async () => {
-  const app = createApp({ db, messenger: env.messenger, now: env.now, config: { sessionSecret: SECRET, production: true, twilio: null } });
+  const app = createApp({ db, messenger: env.messenger, now: env.now, config: { sessionSecret: SECRET, production: true, telnyx: null } });
   const s = app.listen(0);
   try {
-    const res = await fetch(`http://127.0.0.1:${s.address().port}/webhooks/twilio/sms`, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'From=%2B15555550100&Body=Y' });
+    const res = await fetch(`http://127.0.0.1:${s.address().port}/webhooks/telnyx/sms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
     assert.equal(res.status, 503);
   } finally {
     s.close();

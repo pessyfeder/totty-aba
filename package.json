@@ -15,8 +15,7 @@
     "luxon": "^1.28.1",
     "nodemailer": "^10.5.0",
     "pdfkit": "^0.15.0",
-    "pg": "^8.13.0",
-    "twilio": "^6.2.0"
+    "pg": "^8.13.0"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.2.17"

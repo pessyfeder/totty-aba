@@ -167,7 +167,7 @@ CREATE TABLE message_log (
     direction     text NOT NULL CHECK (direction IN ('outbound', 'inbound')),
     to_from       text NOT NULL,
     body          text,
-    provider_id   text,                           -- Twilio SID
+    provider_id   text,                           -- provider message id (Telnyx)
     status        text NOT NULL,                  -- queued, sent, delivered, failed, received, refused
     refusal_reason text,                          -- logged when the Shabbos guard blocks a send (9.8)
     prompt_id     uuid REFERENCES prompt(id) ON DELETE SET NULL,

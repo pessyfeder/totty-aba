@@ -110,7 +110,7 @@ Each goal has:
 ### 5.4a Voice calls: implementation scope (milestone 4)
 *Status: not built. Today the scheduler handles `channel = 'sms'` only, so a goal set to `call` is never prompted. The database already allows `'call'` in `contact.preferred_channel`, `goal.channel`, `prompt.channel` and `response.source`, so no schema change is expected beyond retry bookkeeping.*
 
-**Reused as is**: reply parsing (`parse.js`, including the 1440-minute limit), the Shabbos/Yom Tov guard and `message_log`, Twilio signature checking, and the rule that webhooks are never locked during Shabbos.
+**Reused as is**: reply parsing (`parse.js`, including the 1440-minute limit), the Shabbos/Yom Tov guard and `message_log`, the webhook signature check (Telnyx Ed25519, `verifyTelnyxSignature`), and the rule that webhooks are never locked during Shabbos.
 
 **To build**
 1. **Dialer**: `placeCall({ to, promptIds })`, the call counterpart of the messenger. It goes through the same Shabbos refusal and logging (a refused call is logged, never placed), and has a console provider for development.
@@ -122,7 +122,7 @@ Each goal has:
 7. **Fallback texts**: the try-again text after 3 unusable inputs and the text for an unanswered call are sent only when permitted (not in a Shabbos/Yom Tov window, not in quiet hours).
 8. **Tests**: run against the console dialer and simulated webhook posts, in the style of the existing flow tests, covering acceptance criterion 10a.
 
-**Cannot be verified locally**: audio quality and speech recognition accuracy. These need real test calls on Twilio before launch.
+**Cannot be verified locally**: audio quality and speech recognition accuracy. These need real test calls on Telnyx before launch. Voice webhooks are built against Telnyx's TeXML (TwiML-style) or its Call Control API; confirm which fits speech and keypad `Gather` and answering-machine detection.
 
 **Compliance**: recorded consent (`consent_given_at`) must cover automated calls and not only texts; written parent consent is already required in section 8.
 
@@ -205,14 +205,14 @@ Visibility for Totty:
 - **Backend**: Node.js (Express) or Python (FastAPI), REST/JSON API.
 - **Database**: PostgreSQL. This is a production setup: managed hosting, automated backups, environment separation (staging and production), and monitoring.
 - **Scheduler**: a persistent job queue (e.g., a database-backed queue or cron-style worker) that runs every minute, picks due prompts, checks the Shabbos guard, and sends.
-- **Messaging**: Twilio (SMS + Voice) with inbound webhooks and delivery-status webhooks.
+- **Messaging**: Telnyx (SMS + Voice) with inbound webhooks (Ed25519-signed) and delivery-status webhooks. SMS is built (`POST /webhooks/telnyx/sms`, `telnyxProvider`); voice is milestone 4.
 - **Zmanim**: a library such as KosherZmanim, using lat/long and timezone.
 - **PDF**: server-side HTML-to-PDF.
 - **Auth**: session or JWT login for Totty; webhooks verified with provider signatures.
 - **Hosting**: any small HTTPS host; secrets in environment variables.
 
 ## 8. Non-functional requirements
-- **Privacy / compliance**: this is health-related information about children. Treat as PHI. Encrypt in transit and at rest, minimize PHI in SMS (first name or initials only, no diagnosis), keep audit logs, and obtain written parent consent to text/call. HIPAA applicability and a BAA with vendors (Twilio offers one) need confirmation.
+- **Privacy / compliance**: this is health-related information about children. Treat as PHI. Encrypt in transit and at rest, minimize PHI in SMS (first name or initials only, no diagnosis), keep audit logs, and obtain written parent consent to text/call. HIPAA applicability and a BAA with vendors (Telnyx; confirm it will sign one and what it covers) need confirmation.
 - **Reliability**: no prompt is sent twice; sends are idempotent. The queue survives restarts.
 - **Correctness of Shabbos rule**: unit tests with fixed dates across DST changes, long and short Fridays, and different locations.
 - **Accessibility**: keyboard-navigable, readable chart colors, mobile-friendly (Totty will likely use a phone).
@@ -242,8 +242,8 @@ Visibility for Totty:
 
 ## 11. Open questions
 0. **Intake (5.1a)**: partly resolved. Decided: external form tool; booking links from a ready-made scheduler such as Google Calendar (the app stores URLs, does not create bookings); the booking link is embedded in the bi-weekly check-in text (5.7a, every 14 days). Submissions reach the app when **Totty uploads the returned form and documents**; the app then sets `paperwork_received` and fills the client's info fields automatically (5.7b). An automatic webhook/email feed that skips the upload is a possible later step. **Still open**: which external form tool is used, and whether meeting notes are entered by hand only or captured automatically.
-1. **Prompt volume**: *Working estimate:* about 40 prompts a day. A rough number is enough; it only affects cost and the combined-message design. At that volume, with every follow-up sent (4 outbound texts per prompt), the README estimates roughly $60 a month on Twilio (about $40 on Telnyx), before two-segment prompts and replies. Real usage should be lower, since a reply stops follow-ups.
-1a. **Text-sending platform and costs**: *Still open.* Twilio (assumed in section 7) or another provider such as Telnyx? Texts touch only `messaging.js` and the inbound webhook, so switching is cheap for SMS; voice differs per platform, so decide before building voice (milestone 4). *Recommendation:* stay on Twilio, because SMS is already wired to it and it offers a BAA; switching to Telnyx would mean redoing the voice work (5.4a items 2 to 5) against its API. Costs to confirm: per-segment price, two-segment prompts, follow-up multiplier, per-call price, and the BAA.
+1. **Prompt volume**: *Working estimate:* about 40 prompts a day. A rough number is enough; it only affects cost and the combined-message design. At that volume, with every follow-up sent (4 outbound texts per prompt), the README estimates roughly $40 a month on Telnyx (about $60 on Twilio), before two-segment prompts and replies. Real usage should be lower, since a reply stops follow-ups.
+1a. **Text-sending platform and costs**: *Decided: Telnyx* (SMS and voice), switched from Twilio. SMS is built against it. *Still open:* confirm Telnyx will sign a BAA and what it covers, US 10DLC registration and number approval, and the voice API (TeXML or Call Control) before milestone 4. Costs to confirm: per-segment price, two-segment prompts, follow-up multiplier, per-call price.
 2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
 4. **Voice calls**: *Decided:* the app places automated calls and parents answer by keypad or speech, and the sending is automatic (no staff texting by hand). *Still open:* automated robot voice only, or could Totty ever want to be called in too? Scope in 5.4a.

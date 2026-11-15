@@ -2,7 +2,7 @@
 // Config is all environment variables; see .env.example.
 import pg from 'pg';
 import { createApp } from './app.js';
-import { createMessenger, consoleProvider, twilioProvider } from './messaging.js';
+import { createMessenger, consoleProvider, telnyxProvider } from './messaging.js';
 import { createScheduler } from './scheduler.js';
 import { consoleMailer, sendApproved, smtpMailer, unconfiguredMailer } from './consult-email.js';
 import { syncAll, httpFetchText } from './calendar.js';
@@ -26,13 +26,13 @@ if (production && (env.DOCUMENT_KEY ?? '').length < 32) {
 }
 
 const db = new pg.Pool({ connectionString: env.DATABASE_URL });
-const twilioConfigured = env.TWILIO_ACCOUNT_SID && env.TWILIO_AUTH_TOKEN && env.TWILIO_FROM_NUMBER;
-if (production && !twilioConfigured) {
-  console.error('Twilio credentials are required in production');
+const telnyxConfigured = env.TELNYX_API_KEY && env.TELNYX_FROM_NUMBER && env.TELNYX_PUBLIC_KEY;
+if (production && !telnyxConfigured) {
+  console.error('Telnyx credentials (TELNYX_API_KEY, TELNYX_FROM_NUMBER, TELNYX_PUBLIC_KEY) are required in production');
   process.exit(1);
 }
-const provider = twilioConfigured
-  ? await twilioProvider({ accountSid: env.TWILIO_ACCOUNT_SID, authToken: env.TWILIO_AUTH_TOKEN, from: env.TWILIO_FROM_NUMBER })
+const provider = telnyxConfigured
+  ? telnyxProvider({ apiKey: env.TELNYX_API_KEY, from: env.TELNYX_FROM_NUMBER, messagingProfileId: env.TELNYX_MESSAGING_PROFILE_ID || undefined })
   : consoleProvider();
 
 const messenger = createMessenger({ db, provider });
@@ -55,7 +55,7 @@ const app = createApp({
     publicUrl: env.PUBLIC_URL ?? '',
     reportsDir: env.REPORTS_DIR || undefined,
     reportLinkDays: Number(env.REPORT_LINK_DAYS) || 14,
-    twilio: twilioConfigured ? { authToken: env.TWILIO_AUTH_TOKEN } : null,
+    telnyx: telnyxConfigured ? { publicKey: env.TELNYX_PUBLIC_KEY } : null,
   },
 });
 
@@ -74,7 +74,7 @@ setInterval(async () => {
 }, 60_000);
 
 const port = Number(env.PORT ?? 3000);
-app.listen(port, () => console.log(`totty-aba listening on :${port}${twilioConfigured ? '' : ' (SMS to console)'}`));
+app.listen(port, () => console.log(`totty-aba listening on :${port}${telnyxConfigured ? '' : ' (SMS to console)'}`));
 
 // Read-only Google Calendar sync (SPEC 5.7b): every 10 minutes for clinicians who connected a calendar.
 let syncing = false;

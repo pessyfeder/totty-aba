@@ -1,11 +1,12 @@
 // HTTP API for Totty's web app. Every /api route except /api/status is locked during Shabbos / Yom Tov
-// (SPEC 5.3): the server refuses, not just the buttons. Twilio webhooks are never locked.
+// (SPEC 5.3): the server refuses, not just the buttons. Telnyx webhooks are never locked.
 import express from 'express';
 import { fileURLToPath } from 'node:url';
 import { COOKIE, createSession, readSession, parseCookies, verifyPassword } from './auth.js';
 import { locationFrom, windowAt } from './shabbos.js';
 import { loadDashboard } from './dashboard.js';
 import { handleInbound } from './inbound.js';
+import { verifyTelnyxSignature } from './messaging.js';
 import { reportRoutes } from './report-routes.js';
 import { intakeRoutes } from './intake-routes.js';
 import { ensureDraft } from './consult-email.js';
@@ -62,22 +63,33 @@ function checkGoal(f, { partial }) {
 export function createApp({ db, messenger, mailer, config, now = () => new Date(), fetchCalendar }) {
   const app = express();
   app.disable('x-powered-by');
-  app.use(express.json({ limit: '100kb' }));
+  // Keep the raw body: Telnyx signs the exact bytes it sent.
+  app.use(express.json({ limit: '100kb', verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
   app.use(express.urlencoded({ extended: false }));
 
   app.param('id', (req, res, next, id) => (UUID.test(id) ? next() : next(new HttpError(404, 'Not found'))));
 
-  // ---- Twilio inbound webhook: always accepted, never locked ----
-  app.post('/webhooks/twilio/sms', async (req, res) => {
-    if (config.twilio?.authToken) {
-      const { default: twilio } = await import('twilio');
-      const ok = twilio.validateRequest(config.twilio.authToken, req.get('X-Twilio-Signature') ?? '', `${config.publicUrl}/webhooks/twilio/sms`, req.body);
+  // ---- Telnyx inbound webhook: always accepted, never locked ----
+  app.post('/webhooks/telnyx/sms', async (req, res) => {
+    if (config.telnyx?.publicKey) {
+      const ok = verifyTelnyxSignature({
+        publicKey: config.telnyx.publicKey,
+        signature: req.get('telnyx-signature-ed25519'),
+        timestamp: req.get('telnyx-timestamp'),
+        rawBody: req.rawBody,
+        now: now(),
+      });
       if (!ok) return res.status(403).end();
     } else if (config.production) {
       return res.status(503).end(); // refuse unsigned webhooks in production
     }
-    await handleInbound({ db, messenger, from: req.body.From, body: req.body.Body ?? '', providerId: req.body.MessageSid ?? null, now: now() });
-    res.type('text/xml').send('<Response/>');
+    const event = req.body?.data;
+    const p = event?.payload;
+    // Only inbound texts matter; delivery-status events are acknowledged and ignored.
+    if (event?.event_type === 'message.received' && p?.direction !== 'outbound' && p?.from?.phone_number) {
+      await handleInbound({ db, messenger, from: p.from.phone_number, body: p.text ?? '', providerId: p.id ?? null, now: now() });
+    }
+    res.status(200).end();
   });
 
   // ---- Session + Shabbos lock ----
