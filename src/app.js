@@ -225,11 +225,14 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     res.json(result);
   });
   app.get('/api/appointments', async (req, res) => {
+    // Optional ?from=&to= (ISO) lets the Schedule calendar page through months, past ones included.
+    const parse = (v) => { const d = typeof v === 'string' ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d : null; };
+    const from = parse(req.query.from), to = parse(req.query.to);
     const { rows } = await db.query(
       `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, c.first_name, c.last_name
          FROM appointment a LEFT JOIN client c ON c.id = a.client_id
-        WHERE a.clinician_id = $1 AND a.status = 'scheduled' AND a.starts_at >= $2
-        ORDER BY a.starts_at`, [req.clinician.id, now()]);
+        WHERE a.clinician_id = $1 AND a.status = 'scheduled' AND a.starts_at >= $2 AND a.starts_at < $3
+        ORDER BY a.starts_at`, [req.clinician.id, from ?? now(), to ?? new Date('9999-12-31T00:00:00Z')]);
     res.json(rows);
   });
 

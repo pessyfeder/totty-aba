@@ -108,7 +108,7 @@ async function renderDashboard() {
     h('h2', { class: 'options-heading' }, 'Choose an option'),
     h('div', { class: 'options' },
       option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View, add and manage your clients.` : 'View, add and manage your clients.'),
-      option('#/appointments', 'appointments', 'Appointments', `${d.appointments.length} upcoming. See who is scheduled and when.`),
+      option('#/appointments', 'appointments', 'Schedule', 'View upcoming scheduled appointments.'),
       option('#/settings', 'settings', 'Settings', 'Booking links and check-in text.')),
   ].filter(Boolean));
 }
@@ -135,19 +135,67 @@ async function renderClients() {
   ].filter(Boolean));
 }
 
+const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+let scheduleMonth = null; // first day of the month being viewed
+
+/** Schedule: month calendar of appointments. Chips show first name and time; clicking one opens the full details. */
 async function renderAppointments() {
-  const d = await api('/dashboard');
+  const today = new Date();
+  scheduleMonth ??= new Date(today.getFullYear(), today.getMonth(), 1);
+  const first = scheduleMonth;
+  const next = new Date(first.getFullYear(), first.getMonth() + 1, 1);
+  const list = await api(`/appointments?from=${encodeURIComponent(first.toISOString())}&to=${encodeURIComponent(next.toISOString())}`);
   logoutBtn.hidden = false;
-  app.replaceChildren(...[
+
+  const byDay = new Map();
+  for (const a of list) {
+    const k = new Date(a.starts_at).getDate();
+    byDay.set(k, [...(byDay.get(k) ?? []), a]);
+  }
+  const go = (delta) => { scheduleMonth = delta === 0 ? null : new Date(first.getFullYear(), first.getMonth() + delta, 1); renderAppointments(); };
+
+  const dialog = h('dialog', { class: 'appt-dialog' });
+  const showDetails = (a) => {
+    const end = a.ends_at ? ` – ${fmtTimeShort(a.ends_at)}` : '';
+    dialog.replaceChildren(
+      h('h3', {}, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unmatched client'),
+      h('dl', {},
+        h('dt', {}, 'When'), h('dd', {}, `${fmtDateTime(a.starts_at)}${end}`),
+        h('dt', {}, 'Type'), h('dd', {}, a.type ?? ''),
+        a.title && h('dt', {}, 'Calendar title'), a.title && h('dd', {}, a.title)),
+      h('div', { class: 'appt-actions' },
+        a.client_id && h('a', { href: `#/client/${a.client_id}`, class: 'button' }, 'Open client'),
+        h('button', { type: 'button', onclick: () => dialog.close() }, 'Close')));
+    dialog.showModal();
+  };
+
+  const lead = first.getDay();
+  const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const cells = [];
+  for (let i = 0; i < lead; i++) cells.push(h('div', { class: 'cal-cell cal-empty' }));
+  for (let d = 1; d <= days; d++) {
+    const isToday = d === today.getDate() && first.getMonth() === today.getMonth() && first.getFullYear() === today.getFullYear();
+    cells.push(h('div', { class: `cal-cell${isToday ? ' cal-today' : ''}` },
+      h('span', { class: 'cal-day' }, String(d)),
+      (byDay.get(d) ?? []).map((a) => h('button', { type: 'button', class: 'appt-chip', onclick: () => showDetails(a),
+        'aria-label': `${a.client_id ? a.first_name : 'Unmatched client'} ${fmtTimeShort(a.starts_at)}: show details` },
+        `${a.client_id ? a.first_name : 'Unmatched'} ${fmtTimeShort(a.starts_at)}`))));
+  }
+
+  app.replaceChildren(
     backToDashboard(),
-    h('h2', {}, 'Upcoming appointments'),
-    d.appointments.length
-      ? h('table', { class: 'compact appts' }, h('tbody', {}, d.appointments.map((a) => h('tr', {},
-          h('td', {}, fmtDateTime(a.starts_at)),
-          h('td', {}, a.client_id ? h('a', { href: `#/client/${a.client_id}` }, `${a.first_name} ${a.last_name}`) : h('span', { class: 'muted' }, 'Unmatched client')),
-          h('td', {}, a.type)))))
-      : h('p', { class: 'muted' }, 'No upcoming appointments.'),
-  ].filter(Boolean));
+    h('div', { class: 'cal-head' },
+      h('h2', {}, first.toLocaleDateString([], { month: 'long', year: 'numeric' })),
+      h('span', { class: 'spacer' }),
+      h('div', { class: 'range' },
+        h('button', { type: 'button', onclick: () => go(-1), 'aria-label': 'Previous month' }, '‹'),
+        h('button', { type: 'button', onclick: () => go(0) }, 'Today'),
+        h('button', { type: 'button', onclick: () => go(1), 'aria-label': 'Next month' }, '›'))),
+    h('div', { class: 'cal' },
+      ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((n) => h('div', { class: 'cal-dow' }, n)),
+      cells),
+    list.length ? null : h('p', { class: 'muted' }, 'Nothing scheduled this month.'),
+    dialog);
 }
 
 const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);

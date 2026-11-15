@@ -20,7 +20,7 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
     } catch (ex) { calMsg.className = 'error'; calMsg.textContent = ex.message; }
   } }, 'Sync now');
   const disconnectBtn = h('button', { type: 'button', onclick: async () => {
-    if (!confirm('Disconnect the calendar? Existing appointments stay, but no new ones are synced.')) return;
+    if (!confirm('Disconnect the calendar? Existing schedule entries stay, but no new ones are synced.')) return;
     try {
       await api('/settings', { method: 'PUT', body: { calendar_ics_url: '' } });
       cal.placeholder = 'https://calendar.google.com/calendar/ical/.../basic.ics';

@@ -1,13 +1,13 @@
 # BTB - Behavior Treating Behavior: Product Spec (v0.1 draft)
 
 ## 1. Overview
-A web app for Totty, a BCBA, to track client progress on behavioral goals. Parents report on each goal by one of three methods: SMS or phone call at scheduled times, or a once-a-day email listing all goals (see 5.4b). Their answers feed per-goal charts, and Totty can create a progress report for any client on demand. Nothing is sent during Shabbos (see 5.3).
+A web app for Totty, a BCBA, to track client progress on behavioral goals. Parents report on each goal by one of two methods: SMS at scheduled times, or a once-a-day email listing all goals (see 5.4b). Their answers feed per-goal charts, and Totty can create a progress report for any client on demand. Nothing is sent during Shabbos (see 5.3).
 
 ## 2. Users
 | Role | Description | Access |
 |---|---|---|
 | Totty (BCBA, admin) | Manages clients, goals, schedules, and reports | Full web app, password login |
-| Parent / caregiver | Answers prompts and receives bi-weekly reports | SMS, voice, or the daily email (5.4b); no login in v1 |
+| Parent / caregiver | Answers prompts and receives bi-weekly reports | SMS or the daily email (5.4b); no login in v1 |
 
 Single-clinician in v1. Design the data model with a `clinician_id` so multi-user can be added later.
 
@@ -23,7 +23,7 @@ Single-clinician in v1. Design the data model with a `clinician_id` so multi-use
 
 ## 4. Core concepts
 - **Client**: the child being served.
-- **Contact**: a parent/caregiver for a client; has a phone number and a preferred channel (SMS or call).
+- **Contact**: a parent/caregiver for a client; has a phone number and an email, and logs by SMS or the daily email (5.4b).
 - **Goal**: a target behavior for a client, with a response type and a schedule.
 - **Prompt**: one scheduled ask for a goal on a given date/time.
 - **Response**: a parent's answer to a prompt.
@@ -32,7 +32,7 @@ Single-clinician in v1. Design the data model with a `clinician_id` so multi-use
 
 ### 5.1 Client management
 - Create, edit, and archive clients.
-- **Contacts pane**: parent/guardian contact details are added and edited on a separate **Contacts** page (client page > Edit contacts), not inline with goals. Editable: name, relationship, mobile (international format), email, preferred channel, language, status (active, paused, ended), consent to texts/calls, and a consent note. The consent date is recorded when consent is first ticked and kept while it stays ticked. Pausing or ending a contact stops all prompts to that person. Contacts are not deleted.
+- **Contacts pane**: parent/guardian contact details are added and edited on a separate **Contacts** page (client page > Edit contacts), not inline with goals. Editable: name, relationship, mobile (international format), email, preferred channel, language, status (active, paused, ended), consent to texts/email, and a consent note. The consent date is recorded when consent is first ticked and kept while it stays ticked. Pausing or ending a contact stops all prompts to that person. Contacts are not deleted.
 - **Editing**: the client page has an **Edit** button that opens the same form used to create a client, pre-filled. Every client field is editable, including name, gender, DOB, admission date, location, timezone, Israel/Yom Tov setting, candle-lighting offset, and notes. Optional fields can be cleared. Required fields (name, admission date, location, timezone) cannot be left blank. Each edit is recorded in the audit log (which fields changed).
 - A location or timezone change takes effect for the Shabbos window immediately: every send is checked against the client's current location when it is due, including prompts already scheduled. Send times of prompts already created keep their original instant; newly created prompts use the new timezone.
 - **Archiving**: **Archive client** (on the edit page, after confirmation) stops all prompts for the client and removes them from the dashboard and client list. History and charts are kept. The dashboard links to an **Archived clients** list; opening a client there leads to its edit page, where **Restore client** is offered. An archived client can be restored, which resumes prompts from the next scheduled slot (missed slots are not backfilled).
@@ -63,14 +63,14 @@ Each goal has:
   - `yes_no`: parent replies Y or N.
   - `duration`: parent replies with a number of minutes (e.g., `15`), meaning how long the behavior lasted or the activity took. The reply is a plain number only.
 - **Schedule**: days of week and a time of day (client's local timezone). Can be daily, specific days, or weekly.
-- **Contact** to prompt, and **channel** (SMS or voice call). Default to the contact's preference.
+- **Contact** to prompt. Prompts go by SMS, or by the daily email if the contact uses that method (5.4b).
 - **Date added**: the date the goal was added to the client's plan. Defaults to today on creation (Totty may set it when adding the goal) and is shown on the goal and its chart.
 - Start date (first prompt date, may differ from date added), optional end date, status (active, paused, archived).
 - **Goals are add-and-archive only.** Once added, a goal's title, question, schedule, contact, type, dates and target cannot be edited, so its chart and history always mean what they said when the data was collected. To change a goal, Totty archives it and adds a new one. The only changes allowed on an existing goal are **Pause/Resume** (prompts stop while paused) and **Archive**. Archiving asks for confirmation, stops all prompts, cannot be undone, and keeps the goal's history and chart, which appear under "Archived goals" on the client page. Chart notes (5.5) can still be added to active goals.
 - Optional target criterion (e.g., "80% Y over 2 weeks", or "average at least 4") used for the chart target line and an "achieved" suggestion.
 
 ### 5.3 Shabbos / no-send rule
-- No SMS or call is ever sent from Friday at candle lighting until Saturday nightfall (tzeis hakochavim).
+- No SMS or email is ever sent from Friday at candle lighting until Saturday nightfall (tzeis hakochavim).
 - **Per-client location**: the window is computed separately for each recipient from that client's own location (city or lat/long, plus timezone), not from a single global setting. Each client record stores a location. For Totty's own app lock, the window is computed from Totty's location.
 - Use a zmanim library or API. Candle lighting is 18 minutes before sunset by default (adjustable per location, since some communities use a different custom, e.g. 40 minutes in Jerusalem).
 - **Nightfall follows the most stringent opinion (Rabbeinu Tam)**: 72 minutes after sunset. This is the default, set in Settings, and applies to all clients.
@@ -95,36 +95,9 @@ Each goal has:
 - If several prompts are open for a contact, each message includes a short code (e.g., "Goal 2") and replies are matched to the most recent open prompt unless a code is given. A single combined message listing multiple goals is a later option.
 - No opt-out feature in the app. A parent who wants prompts to stop speaks to Totty directly, and Totty pauses or ends the goal (or the contact) himself.
 
-**Voice call**
-- Automated call (text-to-speech): read the question, then accept either **keypad** or **spoken** input. Keypad: 1 = yes, 2 = no; or digits followed by # for minutes on a duration goal. Spoken: the parent says "yes" or "no", or a number of minutes ("fifteen", "15 minutes"), recognised with speech recognition in English only (no Hebrew or Yiddish recognition, for voice or text, since replies carry no comments). The prompt says both ways ("Press 1 or say yes; press 2 or say no").
-- Spoken replies follow the same rules as SMS: only a yes/no or a number of minutes is kept, any extra words are ignored, `0` is valid, and values above the sanity limit (default 1440) are unusable. A reply is accepted immediately; the app reads back what it heard ("Got it, yes") and ends the goal's question.
-- **Unusable input** (unrecognised speech, a key other than 1/2, or minutes above the limit): the call says it could not understand and asks again, up to 3 times in the same call. If still unusable, the call ends politely and the prompt stays open. A text follow-up ("Please reply Y or N" / "Please reply with a number of minutes, e.g. 15") is sent right away if the contact has a mobile number and it is permitted time, in line with the SMS rule that an unusable reply always gets a try-again follow-up. No input at all (silence) is repeated once, then treated as no answer.
-- **Several open goals for one contact**: one call asks the goals one after another, in order, each by name ("Goal 1 of 3: Did Dovid use a spoon at dinner today?"). Each answer is recorded as soon as it is given, so hanging up part-way keeps the answered goals and leaves the rest open. Unanswered goals follow the retry policy below.
-- **No answer / voicemail**: never leave a voicemail with PHI; if a machine answers, hang up and treat it as no answer. Retry per the retry policy (see below), then fall back to SMS if configured.
-
 **Reminders and retries**
 - **Follow-ups**: if there is no reply 2 hours after the prompt (`followup_after_minutes`, default 120), send one follow-up text ("Reminder: ..." with the same question). If there is still no reply, send one catch-up text the next morning, when quiet hours end (`followup_catchup_morning`, default on), for at most **2 follow-ups** (`max_followups`). A reply at any point stops them. Follow-ups are never sent in quiet hours or a Shabbos/Yom Tov window, and a follow-up that could not be sent is dropped, not queued. The prompt becomes `no_response` once the catch-up has gone out, or at the end of the next local day if it could not be sent.
-- Follow-up by **voice call** (for contacts whose preferred channel is a call) arrives with voice prompts in milestone 4 (see 5.4a): the same timing and limit will apply, with the call replacing the text. Each follow-up call asks only the goals still open. An unanswered call counts as that follow-up; it does not add extra attempts beyond the 2 follow-ups. If the contact has a mobile number, a call follow-up that goes unanswered is also sent as a text, to avoid a silent miss. Calls obey the same Shabbos/Yom Tov and quiet-hours rules as texts, and a call that could not be placed is dropped, not queued. Spoken or keypad answers received on a late call are attached to the original prompt's date, like late text replies.
 - Late replies (up to 24h) are still accepted and attached to the original prompt's date.
-
-### 5.4a Voice calls: implementation scope (milestone 4)
-*Status: not built. Today the scheduler handles `channel = 'sms'` only, so a goal set to `call` is never prompted. The database already allows `'call'` in `contact.preferred_channel`, `goal.channel`, `prompt.channel` and `response.source`, so no schema change is expected beyond retry bookkeeping.*
-
-**Reused as is**: reply parsing (`parse.js`, including the 1440-minute limit), the Shabbos/Yom Tov guard and `message_log`, the webhook signature check (Telnyx Ed25519, `verifyTelnyxSignature`), and the rule that webhooks are never locked during Shabbos.
-
-**To build**
-1. **Dialer**: `placeCall({ to, promptIds })`, the call counterpart of the messenger. It goes through the same Shabbos refusal and logging (a refused call is logged, never placed), and has a console provider for development.
-2. **Voice webhooks** returning TwiML, signature-verified and never locked: call answered, a keypad or spoken answer received, and call status (no-answer, busy, failed, completed). Per-call state (goals still open, try counter, silence counter) travels in the webhook URL, so no server session is needed.
-3. **Call script** as in 5.4: each goal asked by name, `Gather` accepting keypad and English speech, read-back ("Got it, yes"), up to 3 unusable inputs, silence repeated once.
-4. **Answer mapping**: keypad 1 = yes, 2 = no, digits then `#` = minutes; speech is turned into yes/no or a number (words such as "fifteen" included) and then goes through the same parsing as SMS. Each answer is saved the moment it is given, with `source = 'call'`.
-5. **Machine detection**: if an answering machine is detected, hang up with no message and count it as no answer.
-6. **Scheduler**: generate and send prompts for `channel = 'call'`. One call per contact covers all of that contact's open goals; call prompts due within about 10 minutes of each other are grouped into one call. Follow-up calls ask only the goals still open. An unanswered call counts as that follow-up, and if the contact has a mobile number a text goes out as well (on by default).
-7. **Fallback texts**: the try-again text after 3 unusable inputs and the text for an unanswered call are sent only when permitted (not in a Shabbos/Yom Tov window, not in quiet hours).
-8. **Tests**: run against the console dialer and simulated webhook posts, in the style of the existing flow tests, covering acceptance criterion 10a.
-
-**Cannot be verified locally**: audio quality and speech recognition accuracy. These need real test calls on Telnyx before launch. Voice webhooks are built against Telnyx's TeXML (TwiML-style) or its Call Control API; confirm which fits speech and keypad `Gather` and answering-machine detection.
-
-**Compliance**: recorded consent (`consent_given_at`) must cover automated calls and not only texts; written parent consent is already required in section 8.
 
 ### 5.4b Parent logging methods
 Each contact logs goal data by **one** method, chosen by Totty on the Contacts page (`logging_method`). Both methods feed the same `response` records, charts and reports.
@@ -189,7 +162,7 @@ Appointments are booked, and paid for, in the website's scheduling portal (the b
 How they arise:
 - **Manual, when a client reaches out**: Totty adds the client by hand (5.1a step 1) and sets the status to **reached out** (the `inquiry` intake status). Nothing else is recorded at this point: no appointment is booked or entered.
 - **Manual, Totty emails the docs**: Totty sends the family an email with the intake form and document request (5.1a step 2), from his own email. The email is sent outside the app; the app does not send it. Totty then sets the client's status to **intake documents sent** (the `paperwork_sent` intake status). Nothing else is recorded.
-- **Client responds**: the family returns the form and documents, and Totty uploads them to the client in the app (the upload is the manual part). On upload, the app **automatically** sets the status to `paperwork_received` and **fills in the client's info fields** from the submitted form (name, DOB, gender, location, contacts, language, preferred channel, notes). The documents are attached to the client. Intake info is normally filled **only** automatically; Totty does not enter it by hand. If he has entered some fields anyway, the app fills only the empty ones, and where the form's value conflicts with one he entered, the app leaves his value in place and shows an error message naming the field and both values, for Totty to resolve. The form is a **fillable PDF** (5.1a); the family returns the filled PDF and the app reads its form fields (one submission per file; a flattened, scanned or printed copy has no fields and is rejected with a clear message). Fixed field names in Totty's own PDF replace the guessing of question wording that a third-party form tool needed; documents (pdf, images, doc/docx, txt, up to 10 MB) are stored encrypted (`DOCUMENT_KEY`). A form never records parent consent to text/call.
+- **Client responds**: the family returns the form and documents, and Totty uploads them to the client in the app (the upload is the manual part). On upload, the app **automatically** sets the status to `paperwork_received` and **fills in the client's info fields** from the submitted form (name, DOB, gender, location, contacts, language, preferred channel, notes). The documents are attached to the client. Intake info is normally filled **only** automatically; Totty does not enter it by hand. If he has entered some fields anyway, the app fills only the empty ones, and where the form's value conflicts with one he entered, the app leaves his value in place and shows an error message naming the field and both values, for Totty to resolve. The form is a **fillable PDF** (5.1a); the family returns the filled PDF and the app reads its form fields (one submission per file; a flattened, scanned or printed copy has no fields and is rejected with a clear message). Fixed field names in Totty's own PDF replace the guessing of question wording that a third-party form tool needed; documents (pdf, images, doc/docx, txt, up to 10 MB) are stored encrypted (`DOCUMENT_KEY`). A form never records parent consent to text or email.
 - **Automatic, initial consult email**: once intake paperwork is received (status `paperwork_received`), the app emails the family the consultation booking link (`CONSULT_BOOKING_URL`). Totty reviews/approves the first send; the email carries no clinical detail (child's first name only). *Built:* reaching `paperwork_received` (by upload or by Totty setting the status) drafts one email per client, addressed to the first active contact with an email address. The client page shows the exact text with **Approve and send** / **Decline**, and the dashboard lists drafts awaiting approval. Approval needs `CONSULT_BOOKING_URL` and a contact email. An approved email goes out at once, except during the recipient's Shabbos / Yom Tov window, when the scheduler tick sends it after nightfall. It is dropped if the client has moved past `paperwork_received`, and a failing send is retried up to 3 times before showing the error. Email goes through SMTP (`SMTP_URL`, `EMAIL_FROM`); in development it prints to the console.
 - **Automatic, bi-weekly check-in text**: see 5.7a; it carries the booking link (`CHECKIN_BOOKING_URL`) (5.1a step 7).
 
@@ -220,14 +193,14 @@ Visibility for Totty:
 - **Backend**: Node.js (Express) or Python (FastAPI), REST/JSON API.
 - **Database**: PostgreSQL. This is a production setup: managed hosting, automated backups, environment separation (staging and production), and monitoring.
 - **Scheduler**: a persistent job queue (e.g., a database-backed queue or cron-style worker) that runs every minute, picks due prompts, checks the Shabbos guard, and sends.
-- **Messaging**: Telnyx (SMS + Voice) with inbound webhooks (Ed25519-signed) and delivery-status webhooks. SMS is built (`POST /webhooks/telnyx/sms`, `telnyxProvider`); voice is milestone 4.
+- **Messaging**: Telnyx (SMS) with inbound webhooks (Ed25519-signed) and delivery-status webhooks. SMS is built (`POST /webhooks/telnyx/sms`, `telnyxProvider`). Voice calls are not part of the product.
 - **Zmanim**: a library such as KosherZmanim, using lat/long and timezone.
 - **PDF**: server-side HTML-to-PDF.
 - **Auth**: session or JWT login for Totty; webhooks verified with provider signatures.
 - **Hosting**: any small HTTPS host; secrets in environment variables.
 
 ## 8. Non-functional requirements
-- **Privacy / compliance**: this is health-related information about children. Treat as PHI. Encrypt in transit and at rest, minimize PHI in SMS (first name or initials only, no diagnosis), keep audit logs, and obtain written parent consent to text/call. HIPAA applicability and a BAA with vendors (Telnyx; confirm it will sign one and what it covers) need confirmation.
+- **Privacy / compliance**: this is health-related information about children. Treat as PHI. Encrypt in transit and at rest, minimize PHI in SMS (first name or initials only, no diagnosis), keep audit logs, and obtain written parent consent to text or email. HIPAA applicability and a BAA with vendors (Telnyx; confirm it will sign one and what it covers) need confirmation.
 - **Reliability**: no prompt is sent twice; sends are idempotent. The queue survives restarts.
 - **Correctness of Shabbos rule**: unit tests with fixed dates across DST changes, long and short Fridays, and different locations.
 - **Accessibility**: keyboard-navigable, readable chart colors, mobile-friendly (Totty will likely use a phone).
@@ -244,21 +217,20 @@ Visibility for Totty:
 8. Calling the send function directly during Shabbos fails with a logged refusal.
 9. During the Shabbos window, logging in or performing any action as Totty is refused with a notice showing when the app reopens, and a parent's reply received then is still recorded.
 10. Replying "20" to a duration prompt stores 20 minutes and the chart updates; replying "abc" is treated as unparseable.
-10a. On a voice call, saying "yes" or pressing 1 records true; saying "twenty minutes" or keying 20# records 20 minutes. Three unusable inputs in one call end the call, leave the prompt open, and send a try-again text. Hanging up after answering the first of three goals keeps that answer and leaves the other two open.
 11. A contact whose first prompt was sent 14 days ago receives the check-in text with Yisroel Feder, BCBA, LBA at a permitted time (not during Shabbos or quiet hours), and again every 14 days after the last one.
 
 ## 10. Milestones
 1. **MVP**: login, clients, contacts, goals, SMS yes/no + duration prompts, scheduler with Shabbos guard, per-goal charts.
 2. **Client intake (5.1a)**: intake status and the **Go** button (no prompts until a client is active), manually importing external intake-form submissions and documents into a pre-filled new client, consultation and ongoing-meeting booking links (external scheduler URLs in Settings), entering goals and reinforcements from the meeting (by hand until the meeting-notes question is settled).
 3. On-demand PDF reports (create, preview, edit, send).
-4. Voice-call prompts, reminders and retries, dashboard. Scope in 5.4a.
+4. Reminders and retries, dashboard, and daily email logging (5.4b).
 5. Annotations, manual data entry, Yom Tov calendar, multi-clinician support.
 6. **Cross-device app (later stage)**: Totty's app runs on both phone and computer. One responsive web app (installable to the phone home screen as a PWA) with a layout that adapts from phone to desktop, covering every Totty-facing screen: dashboard, clients, goals, charts, and report create/preview/edit. No separate native apps unless a later need (e.g. push notifications on iOS) requires it. The Shabbos lock applies the same on every device.
 
 ## 11. Open questions
 0. **Intake (5.1a)**: partly resolved. Decided: the intake form is a **fillable PDF** (no form-hosting tool);  booking links to the website's scheduling portal, which handles appointments and payment (the app stores URLs, does not create bookings); the booking link is embedded in the bi-weekly check-in text (5.7a, every 14 days). Submissions reach the app when **Totty uploads the returned form and documents**; the app then sets `paperwork_received` and fills the client's info fields automatically (5.7b). An automatic webhook/email feed that skips the upload is a possible later step. **Still open**: whether meeting notes are entered by hand only or captured automatically.
 1. **Prompt volume**: *Working estimate:* about 40 prompts a day. A rough number is enough; it only affects cost and the combined-message design. At that volume, with every follow-up sent (3 outbound texts per prompt), the README estimates roughly $40 a month on Telnyx (about $60 on Twilio), before two-segment prompts and replies. Real usage should be lower, since a reply stops follow-ups.
-1a. **Text-sending platform and costs**: *Decided: Telnyx* (SMS and voice), switched from Twilio. SMS is built against it. *Still open:* confirm Telnyx will sign a BAA and what it covers, US 10DLC registration and number approval, and the voice API (TeXML or Call Control) before milestone 4. Costs to confirm: per-segment price, two-segment prompts, follow-up multiplier, per-call price.
+1a. **Text-sending platform and costs**: *Decided: Telnyx* (SMS only), switched from Twilio. SMS is built against it. *Still open:* confirm Telnyx will sign a BAA and what it covers, US 10DLC registration and number approval. Costs to confirm: per-segment price, two-segment prompts, follow-up multiplier.
    *Open items before going live on Telnyx:*
    - [ ] Create the Telnyx messaging profile and number, and register for US 10DLC.
    - [ ] Copy the webhook public key from the Telnyx portal into `TELNYX_PUBLIC_KEY`.
@@ -266,10 +238,10 @@ Visibility for Totty:
    - [ ] Confirm Telnyx will sign a BAA (children's health data), and what it covers.
 2. **Response type**: Y/N or minutes? Is the type chosen by Totty per goal, or should a goal ever allow both?
 3. **Consent and HIPAA**: does Totty already have a parent consent process, and does he want the app built to HIPAA standard from day one?
-4. **Voice calls**: *Decided:* the app places automated calls and parents answer by keypad or speech, and the sending is automatic (no staff texting by hand). *Still open:* automated robot voice only, or could Totty ever want to be called in too? Scope in 5.4a.
+4. **Voice calls**: *Decided:* not part of the product; the app never places calls.
 5. **Languages**: English only, or also Hebrew/Yiddish prompts?
 6. **Parents on tablets and computers**: texts reach phones only. Do any parents need prompts on a tablet or computer? Options: (a) prompts also sent by email with a private link to a one-tap answer page that works on any device, no login (recommended; texts stay the default so basic and kosher phones keep working); (b) an installable parent web app with push notifications (needs a parent login, does not work on basic phones); (c) WhatsApp (needs a WhatsApp Business setup and approved message templates). Not built; waiting on Totty.
-7. **Follow-up calls**: follow-ups are texts today. For parents who prefer calls, should a follow-up be a call, and should it fall back to a text? *Proposed (5.4a):* yes to both, with the text fallback on by default for contacts that have a mobile number. Needs the voice milestone.
+7. ~~Follow-up calls~~: dropped with voice calls (question 4).
 8. **Check-in booking**: *Decided:* the text carries a link to the website's scheduling portal, which handles appointments and payment. Still open: is there a reminder if they do not respond?
 9. **Appointments (5.7b)**: *Decided:* Google Calendar is not used. Still open: how a booking is matched to a client (e.g., by the booker's email against contact emails), and what is the full list of appointment types. *Decided:* the bi-weekly check-in text is skipped for clients who already have a future appointment booked (5.7a).
 10. **Booking app**: *Largely superseded:* the website's scheduling portal provides the booking links and handles payment. Still open: how the website's bookings reach the app (Google Calendar is not used). Options include a webhook or API from the website, an email notification the app reads, or Totty entering bookings by hand. The app only stores the links (`CONSULT_BOOKING_URL`, `CHECKIN_BOOKING_URL`), so this does not affect the rest of the build.
