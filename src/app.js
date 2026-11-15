@@ -12,7 +12,12 @@ import { intakeRoutes } from './intake-routes.js';
 import { ensureDraft } from './consult-email.js';
 import * as consultEmail from './consult-email.js';
 import { buildCheckinBody } from './scheduler.js';
-import { normalizeFeedUrl, syncCalendar } from './calendar.js';
+import { appointmentKind, normalizeFeedUrl, syncCalendar } from './calendar.js';
+
+// Check-ins this client already had before an appointment: tells the first (baseline) check-in from later bi-weekly ones.
+const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
+  AND p.status = 'scheduled' AND p.starts_at < a.starts_at) AS earlier_checkins`;
+const withKind = ({ earlier_checkins, ...a }) => ({ ...a, kind: appointmentKind(a.type, earlier_checkins) });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
@@ -229,11 +234,37 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     const parse = (v) => { const d = typeof v === 'string' ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d : null; };
     const from = parse(req.query.from), to = parse(req.query.to);
     const { rows } = await db.query(
-      `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, c.first_name, c.last_name
+      `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, c.first_name, c.last_name, ${EARLIER_CHECKINS}
          FROM appointment a LEFT JOIN client c ON c.id = a.client_id
         WHERE a.clinician_id = $1 AND a.status = 'scheduled' AND a.starts_at >= $2 AND a.starts_at < $3
         ORDER BY a.starts_at`, [req.clinician.id, from ?? now(), to ?? new Date('9999-12-31T00:00:00Z')]);
-    res.json(rows);
+    res.json(rows.map(withKind));
+  });
+  // One appointment's page: which kind it is, its client's goals and reinforcements, and the clinician's notes.
+  app.get('/api/appointments/:id', async (req, res) => {
+    const { rows } = await db.query(
+      `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, a.notes, c.first_name, c.last_name, ${EARLIER_CHECKINS}
+         FROM appointment a LEFT JOIN client c ON c.id = a.client_id
+        WHERE a.id = $1 AND a.clinician_id = $2`, [req.params.id, req.clinician.id]);
+    if (!rows.length) throw new HttpError(404, 'Not found');
+    const appt = withKind(rows[0]);
+    let goals = [], reinforcements = [];
+    if (appt.client_id) {
+      [goals, reinforcements] = await Promise.all(['goal', 'reinforcement'].map((t) =>
+        db.query(`SELECT * FROM ${t} WHERE client_id = $1 ORDER BY 1`, [appt.client_id]).then((r) => r.rows)));
+    }
+    await audit(req, 'view', 'appointment', appt.id);
+    res.json({ ...appt, goals, reinforcements });
+  });
+  app.patch('/api/appointments/:id', async (req, res) => {
+    const notes = req.body?.notes;
+    if (typeof notes !== 'string' || notes.length > 20000) throw bad('notes must be text (up to 20,000 characters)');
+    const { rows } = await db.query(
+      `UPDATE appointment SET notes = $3, updated_at = $4 WHERE id = $1 AND clinician_id = $2 RETURNING id, notes`,
+      [req.params.id, req.clinician.id, notes.trim() || null, now()]);
+    if (!rows.length) throw new HttpError(404, 'Not found');
+    await audit(req, 'update', 'appointment', rows[0].id, { fields: ['notes'] });
+    res.json(rows[0]);
   });
 
   // ---- Clients ----

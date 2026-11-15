@@ -94,3 +94,20 @@ test('sync matches by contact email, updates changes, cancels removed events, is
   const dash = await (await call('GET', '/api/dashboard')).json();
   assert.equal(dash.appointments.length, 1);
 });
+
+test('appointment page: kind (consultation / first / later check-in) and notes', async () => {
+  const mk = (ext, type, at) => db.query(
+    `INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at) SELECT clinician_id, id, $1, $2, $3 FROM client WHERE id = $4 RETURNING id`,
+    [ext, type, at, world.client.id]).then((r) => r.rows[0].id);
+  const c = await mk('k-consult', 'consultation', '2027-01-05T15:00:00Z');
+  const first = await mk('k-first', 'check-in', '2027-01-12T15:00:00Z');
+  const later = await mk('k-later', 'check-in', '2027-01-26T15:00:00Z');
+  const kind = async (id) => (await (await call('GET', `/api/appointments/${id}`)).json()).kind;
+  assert.equal(await kind(c), 'initial_consultation');
+  assert.equal(await kind(first), 'first_checkin');
+  assert.equal(await kind(later), 'biweekly_checkin');
+  assert.equal((await call('PATCH', `/api/appointments/${first}`, { notes: ' Reviewed baseline ' })).status, 200);
+  assert.equal((await (await call('GET', `/api/appointments/${first}`)).json()).notes, 'Reviewed baseline');
+  assert.equal((await call('PATCH', `/api/appointments/${first}`, { notes: 5 })).status, 400);
+  assert.equal((await call('GET', '/api/appointments/00000000-0000-0000-0000-000000000000')).status, 404);
+});

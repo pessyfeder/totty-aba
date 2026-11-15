@@ -3,6 +3,7 @@ import { renderClient as renderClientPage } from './client-page.js';
 import { renderContacts } from './contacts-page.js';
 import { renderReport } from './reports-page.js';
 import { renderSettings } from './settings-page.js';
+import { renderAppointment } from './appointment-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -137,8 +138,9 @@ async function renderClients() {
 
 const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 let scheduleMonth = null; // first day of the month being viewed
+const KIND_LABEL = { initial_consultation: 'Initial Consultation', first_checkin: 'First check-in (Baseline)', biweekly_checkin: 'Bi-weekly check-in' };
 
-/** Schedule: month calendar of appointments. Chips show first name and time; clicking one opens the full details. */
+/** Schedule: month calendar of appointments. Chips show first name and time; clicking one opens that appointment's page. */
 async function renderAppointments() {
   const today = new Date();
   scheduleMonth ??= new Date(today.getFullYear(), today.getMonth(), 1);
@@ -154,21 +156,6 @@ async function renderAppointments() {
   }
   const go = (delta) => { scheduleMonth = delta === 0 ? null : new Date(first.getFullYear(), first.getMonth() + delta, 1); renderAppointments(); };
 
-  const dialog = h('dialog', { class: 'appt-dialog' });
-  const showDetails = (a) => {
-    const end = a.ends_at ? ` – ${fmtTimeShort(a.ends_at)}` : '';
-    dialog.replaceChildren(
-      h('h3', {}, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unmatched client'),
-      h('dl', {},
-        h('dt', {}, 'When'), h('dd', {}, `${fmtDateTime(a.starts_at)}${end}`),
-        h('dt', {}, 'Type'), h('dd', {}, a.type ?? ''),
-        a.title && h('dt', {}, 'Calendar title'), a.title && h('dd', {}, a.title)),
-      h('div', { class: 'appt-actions' },
-        a.client_id && h('a', { href: `#/client/${a.client_id}`, class: 'button' }, 'Open client'),
-        h('button', { type: 'button', onclick: () => dialog.close() }, 'Close')));
-    dialog.showModal();
-  };
-
   const lead = first.getDay();
   const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
   const cells = [];
@@ -177,8 +164,8 @@ async function renderAppointments() {
     const isToday = d === today.getDate() && first.getMonth() === today.getMonth() && first.getFullYear() === today.getFullYear();
     cells.push(h('div', { class: `cal-cell${isToday ? ' cal-today' : ''}` },
       h('span', { class: 'cal-day' }, String(d)),
-      (byDay.get(d) ?? []).map((a) => h('button', { type: 'button', class: 'appt-chip', onclick: () => showDetails(a),
-        'aria-label': `${a.client_id ? a.first_name : 'Unmatched client'} ${fmtTimeShort(a.starts_at)}: show details` },
+      (byDay.get(d) ?? []).map((a) => h('a', { href: `#/appointment/${a.id}`, class: 'appt-chip', title: KIND_LABEL[a.kind],
+        'aria-label': `${KIND_LABEL[a.kind]}, ${a.client_id ? a.first_name : 'Unmatched client'} ${fmtTimeShort(a.starts_at)}: open appointment` },
         `${a.client_id ? a.first_name : 'Unmatched'} ${fmtTimeShort(a.starts_at)}`))));
   }
 
@@ -194,8 +181,7 @@ async function renderAppointments() {
     h('div', { class: 'cal' },
       ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((n) => h('div', { class: 'cal-dow' }, n)),
       cells),
-    list.length ? null : h('p', { class: 'muted' }, 'Nothing scheduled this month.'),
-    dialog);
+    list.length ? null : h('p', { class: 'muted' }, 'Nothing scheduled this month.'));
 }
 
 const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);
@@ -294,7 +280,8 @@ async function route() {
   const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
-  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  const apptRoute = /^#\/appointment\/([0-9a-f-]{36})$/i.exec(location.hash);
+  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {

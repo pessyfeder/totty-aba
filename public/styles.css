@@ -179,7 +179,7 @@ a.option:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; 
 .cal-empty { background: var(--bg); }
 .cal-day { font-size: .8rem; color: var(--muted); }
 .cal-today .cal-day { color: var(--on-accent); background: var(--accent); border-radius: 999px; padding: 0 7px; align-self: flex-start; }
-button.appt-chip { background: var(--accent-soft); color: var(--text); border: 0; border-left: 3px solid var(--accent); border-radius: 6px; min-height: 0; padding: 2px 6px; font-size: .78rem; font-weight: 500; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+a.appt-chip, button.appt-chip { display: block; text-decoration: none; background: var(--accent-soft); color: var(--text); border: 0; border-left: 3px solid var(--accent); border-radius: 6px; min-height: 0; padding: 2px 6px; font-size: .78rem; font-weight: 500; text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .appt-dialog { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); color: var(--text); padding: 18px 22px; max-width: 420px; width: calc(100% - 32px); }
 .appt-dialog::backdrop { background: rgba(0,0,0,.4); }
 .appt-dialog h3 { margin: 0 0 8px; }
