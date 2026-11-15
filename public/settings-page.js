@@ -7,6 +7,7 @@ const FIELDS = [
 export async function renderSettings({ h, api, app, logoutBtn }) {
   const s = await api('/settings');
   const msg = h('span', { role: 'status' });
+  const preview = h('blockquote', { class: 'muted', style: 'overflow-wrap:anywhere;margin:.25rem 0 1rem;border-left:3px solid #ccd;padding-left:.75rem' }, s.checkin_text_preview);
   const inputs = FIELDS.map(([k]) => h('input', { name: k, type: 'url', value: s[k], placeholder: 'https://calendar.google.com/...', autocomplete: 'off' }));
   const cal = h('input', { name: 'calendar_ics_url', type: 'url', autocomplete: 'off',
     placeholder: s.calendar_connected ? 'Connected. Paste a new address to replace it.' : 'https://calendar.google.com/calendar/ical/.../basic.ics' });
@@ -34,10 +35,13 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
       if (cal.value.trim()) body.calendar_ics_url = cal.value.trim(); // blank keeps the connected calendar
       await api('/settings', { method: 'PUT', body });
       if (cal.value.trim()) { cal.value = ''; cal.placeholder = 'Connected. Paste a new address to replace it.'; }
+      preview.textContent = (await api('/settings')).checkin_text_preview;
       msg.className = ''; msg.textContent = 'Saved.';
     } catch (ex) { msg.className = 'error'; msg.textContent = ex.message; }
   } },
-    FIELDS.map(([k, label, hint], i) => h('label', {}, label, inputs[i], h('small', { class: 'muted' }, hint))),
+    FIELDS.flatMap(([k, label, hint], i) => [
+      h('label', {}, label, inputs[i], h('small', { class: 'muted' }, hint)),
+      ...(k === 'checkin_booking_url' ? [h('small', {}, 'Preview of the check-in text:'), preview] : [])]),
     h('h3', {}, 'Google Calendar (read-only)'),
     h('label', {}, 'Secret iCal address', cal, h('small', { class: 'muted' }, 'Google Calendar → Settings → your calendar → Integrate calendar → "Secret address in iCal format". The app only reads it and never changes your calendar. Keep it private.')),
     h('p', {}, h('button', { type: 'submit' }, 'Save'), ' ', msg),

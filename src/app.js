@@ -10,6 +10,7 @@ import { reportRoutes } from './report-routes.js';
 import { intakeRoutes } from './intake-routes.js';
 import { ensureDraft } from './consult-email.js';
 import * as consultEmail from './consult-email.js';
+import { buildCheckinBody } from './scheduler.js';
 import { normalizeFeedUrl, syncCalendar } from './calendar.js';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -168,8 +169,11 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   app.get('/api/dashboard', async (req, res) => res.json(await loadDashboard(db, req.clinician, now())));
 
   // ---- Settings: booking and intake links (SPEC 5.1a). Empty string clears a link. ----
+  const checkinPreview = (settings) =>
+    buildCheckinBody({ first_name: "[child's first name]" }, settings?.checkin_booking_url || '[booking link]');
   app.get('/api/settings', (req, res) => {
     res.json({
+      checkin_text_preview: checkinPreview(req.clinician.settings_json),
       ...Object.fromEntries(LINK_SETTINGS.map((k) => [k, req.clinician.settings_json?.[k] ?? ''])),
       calendar_connected: Boolean(req.clinician.settings_json?.calendar_ics_url), // the secret feed address is never returned
     });
