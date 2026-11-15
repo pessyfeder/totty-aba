@@ -19,6 +19,14 @@ export function buildBody(row, { reminder = false } = {}) {
   return `${reminder ? 'Reminder: ' : ''}Hi, ${row.contact_name}. ${code}${question} ${how}`;
 }
 
+const CHECKIN_FIRST_AFTER_DAYS = 14;
+const CHECKIN_EVERY_DAYS = 14;
+
+export function buildCheckinBody(row, link) {
+  return `Time to schedule a check-in for ${row.first_name} with Yisroel Feder, BCBA, LBA: ${link}. ` +
+    'Please remember payment is due 48 hours before your appointment.';
+}
+
 export function createScheduler({ db, messenger, now = () => new Date(), staggerMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   /** Create today's and tomorrow's prompts for every active goal. Idempotent. */
   async function generatePrompts(at) {
@@ -58,7 +66,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     p.id, p.goal_id, p.scheduled_for, p.short_code, p.deferred_reason, p.attempts, p.sent_at,
     g.title, g.question_text, g.response_type,
     g.status AS goal_status, c.status AS contact_status, cl.status AS client_status, cl.intake_status,
-    c.name AS contact_name, c.phone, cl.first_name,
+    c.id AS contact_id, c.name AS contact_name, c.phone, cl.first_name,
     cl.latitude, cl.longitude, cl.timezone, cl.in_israel, cl.candle_lighting_minutes,
     cn.settings_json,
     (SELECT count(*)::int FROM goal g2 WHERE g2.contact_id = g.contact_id AND g2.status = 'active') AS n_goals`;
@@ -118,6 +126,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
       try {
         await messenger.send({ client: r, settings, to: r.phone, body: buildBody(r), promptId: r.id });
         await setStatus(r.id, 'sent', ', sent_at = $3', [at]);
+        await db.query('UPDATE contact SET first_message_at = COALESCE(first_message_at, $2) WHERE id = $1', [r.contact_id, at]);
         if (staggerMs) await sleep(staggerMs);
       } catch (err) {
         if (err instanceof ShabbosRefusal) {
@@ -164,6 +173,48 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     }
   }
 
+  /**
+   * Check-in text (SPEC 5.7a): 14 days after a contact's first message, then every 14 days after the last one,
+   * with the booking link and payment reminder. Same send rules as prompts: active client and contact, recorded
+   * consent, never in a Shabbos/Yom Tov window or quiet hours. A blocked one is sent once the window ends.
+   */
+  async function sendCheckins(at) {
+    const { rows } = await db.query(
+      `SELECT c.id AS contact_id, c.name AS contact_name, c.phone, c.checkin_last_sent_at, cl.first_name,
+              cl.latitude, cl.longitude, cl.timezone, cl.in_israel, cl.candle_lighting_minutes, cn.settings_json
+         FROM contact c
+         JOIN client cl ON cl.id = c.client_id
+         JOIN clinician cn ON cn.id = cl.clinician_id
+        WHERE c.status = 'active' AND c.phone IS NOT NULL AND c.consent_given_at IS NOT NULL
+          AND cl.status = 'active' AND cl.intake_status = 'active'
+          AND c.first_message_at IS NOT NULL
+          AND COALESCE(c.checkin_last_sent_at + make_interval(days => $2), c.first_message_at + make_interval(days => $3)) <= $1
+        ORDER BY c.first_message_at, c.id`,
+      [at, CHECKIN_EVERY_DAYS, CHECKIN_FIRST_AFTER_DAYS],
+    );
+    for (const r of rows) {
+      const settings = r.settings_json;
+      const link = settings.checkin_booking_url;
+      if (!link) continue; // nothing to book with; sent once Totty sets the link
+      if (windowAt(at, locationFrom(r, settings))) continue;
+      const q = settings.quiet_hours;
+      const hhmm = DateTime.fromJSDate(at, { zone: r.timezone }).toFormat('HH:mm');
+      if (q && (hhmm < q.start || hhmm >= q.end)) continue;
+      const { rows: claimed } = await db.query(
+        `UPDATE contact SET checkin_last_sent_at = $2 WHERE id = $1 AND checkin_last_sent_at IS NOT DISTINCT FROM $3 RETURNING id`,
+        [r.contact_id, at, r.checkin_last_sent_at],
+      );
+      if (!claimed.length) continue;
+      try {
+        await messenger.send({ client: r, settings, to: r.phone, body: buildCheckinBody(r, link) });
+        if (staggerMs) await sleep(staggerMs);
+      } catch (err) {
+        await db.query('UPDATE contact SET checkin_last_sent_at = $2 WHERE id = $1', [r.contact_id, r.checkin_last_sent_at]);
+        if (!(err instanceof ShabbosRefusal)) console.error(`check-in for contact ${r.contact_id} failed:`, err.message);
+      }
+    }
+  }
+
   /** At the end of the client's local day an unanswered prompt becomes no_response (never an N). */
   async function markNoResponse(at) {
     await db.query(
@@ -180,8 +231,9 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     await generatePrompts(at);
     await sendDue(at);
     await sendFollowUps(at);
+    await sendCheckins(at);
     await markNoResponse(at);
   }
 
-  return { tick, generatePrompts, sendDue, sendFollowUps, markNoResponse };
+  return { tick, generatePrompts, sendDue, sendFollowUps, sendCheckins, markNoResponse };
 }
