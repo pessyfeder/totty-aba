@@ -123,6 +123,8 @@ details.fold.row[hidden] { display: none; }
 .reply input, .reply select, .reply button { min-height: 36px; padding: 4px 10px; }
 table.compact th, table.compact td { padding: 6px 10px; font-size: .88rem; }
 .inline-form label { min-width: 0; max-width: 100%; }
+.inline-form label:has(.note-input) { flex: 1 1 280px; }
+.inline-form .note-input { width: 100%; min-width: 260px; }
 .inline-form input[type=file] { max-width: 100%; }
 /* Narrow screens: each appointment becomes a small stacked card instead of a wide table row */
 @media (max-width: 520px) {

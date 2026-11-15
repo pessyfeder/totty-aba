@@ -47,7 +47,7 @@ function goalCard({ h, api, handle }, g, contacts, reload) {
 
   const note = inlineForm(h, [
     lbl('Date', h('input', { name: 'date', type: 'date', value: today(), required: true })),
-    lbl('Note on the chart', h('input', { name: 'text', placeholder: 'e.g. new intervention started', required: true })),
+    lbl('Note on the chart', h('input', { name: 'text', placeholder: 'e.g. new intervention started', required: true, class: 'note-input' })),
   ], 'Add note', async (f) => { await api(`/goals/${g.id}/annotations`, { method: 'POST', body: trimmed(f) }); await draw(); });
 
   const owner = contacts.find((c) => c.id === g.contact_id);
