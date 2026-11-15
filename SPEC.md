@@ -1,13 +1,13 @@
 # BTB - Behavior Treating Behavior: Product Spec (v0.1 draft)
 
 ## 1. Overview
-A web app for Totty, a BCBA, to track client progress on behavioral goals. Parents report on each goal by SMS or phone call at scheduled times. Their answers feed per-goal charts, and Totty can create a progress report for any client on demand. Nothing is sent during Shabbos (see 5.3).
+A web app for Totty, a BCBA, to track client progress on behavioral goals. Parents report on each goal by one of three methods: SMS or phone call at scheduled times, or a once-a-day email listing all goals (see 5.4b). Their answers feed per-goal charts, and Totty can create a progress report for any client on demand. Nothing is sent during Shabbos (see 5.3).
 
 ## 2. Users
 | Role | Description | Access |
 |---|---|---|
 | Totty (BCBA, admin) | Manages clients, goals, schedules, and reports | Full web app, password login |
-| Parent / caregiver | Answers prompts and receives bi-weekly reports | SMS/voice only, no login in v1 |
+| Parent / caregiver | Answers prompts and receives bi-weekly reports | SMS, voice, or the daily email (5.4b); no login in v1 |
 
 Single-clinician in v1. Design the data model with a `clinician_id` so multi-user can be added later.
 
@@ -126,6 +126,20 @@ Each goal has:
 
 **Compliance**: recorded consent (`consent_given_at`) must cover automated calls and not only texts; written parent consent is already required in section 8.
 
+### 5.4b Parent logging methods
+Each contact logs goal data by **one** method, chosen by Totty on the Contacts page (`logging_method`). Both methods feed the same `response` records, charts and reports.
+
+**A) SMS messages** (as in 5.4): one text per goal at its scheduled time, answered Y/N or minutes, with follow-ups. This is the default.
+
+**B) One email per day, all goals, answered at once**
+- The contact gets **one email per day** (at a daily send time, default 7pm local, set in Settings) that lists **every goal due that day** for the client, each with its question, plus a **link** to a single private answer page. Only goals scheduled for that day are included; if none are due, no email is sent.
+- **The parent responds to all goals at once**: the answer page shows every goal with a Yes/No choice or a minutes box, and one **Submit** records all answers together. Goals may be left blank and answered later from the same link. The link needs no login; it is unguessable, specific to that contact and day, and stays open for 24 hours after the email, like late replies in 5.4.
+- **Responses upload to the app automatically** on submit: each answer is saved as a response on that goal's prompt for that day (`source = 'email'`), using the same value rules as SMS (yes/no, or whole minutes, `0` valid, limit 1440). A re-submit before the link expires replaces the earlier answer for that goal. Totty does nothing to import them.
+- The email carries the child's first name and the goal questions only, with no other PHI, no diagnosis and no progress data. Requires a contact email and recorded consent that covers email.
+- **Reminders**: one reminder email the next morning (quiet hours end) for goals still unanswered, then none. Unanswered goals become `no_response` when the link expires.
+- Obeys the same rules as texts: never sent in a Shabbos/Yom Tov window or quiet hours (queued and sent at the next permitted time), only to active contacts and active clients, logged in the message log. An email that bounces is flagged on the contact.
+- Email delivery uses a transactional email provider that will sign a BAA (open question 12). The provider's inbound email is not used: answers come only through the answer page.
+
 ### 5.5 Charts and progress
 - Per goal, a chart over a selectable range (1 week, 1 month, 3 months, all):
   - `yes_no`: percent met per week plus a daily dot strip (Y/N/no response).
@@ -185,14 +199,15 @@ Visibility for Totty:
 - Appointment details are PHI (section 8) and never appear in SMS.
 
 ### 5.8 Settings
-- Location and timezone, Shabbos/Yom Tov rules, quiet hours (e.g., no messages before 8am or after 9pm), sender number, report options, follow-up timing and limit (defaults 2 hours, then a next-morning catch-up; 2 follow-ups).
+- Location and timezone, Shabbos/Yom Tov rules, quiet hours (e.g., no messages before 8am or after 9pm), daily email send time (5.4b), sender number, report options, follow-up timing and limit (defaults 2 hours, then a next-morning catch-up; 2 follow-ups).
 
 ## 6. Data model (draft)
 - `clinician(id, name, email, password_hash, timezone, location, settings_json)`
 - `client(id, clinician_id, first_name, last_name, gender, age, dob, admission_date, notes, location, timezone, status, intake_status, activated_at)`
 - `appointment(id, client_id, type, starts_at, status, source, notes, created_at)`
 - `reinforcement(id, client_id, name, note)`
-- `contact(id, client_id, name, relationship, phone, email, preferred_channel, language, first_message_at, checkin_last_sent_at)`
+- `contact(id, client_id, name, relationship, phone, email, preferred_channel, logging_method ('sms' | 'email'), language, first_message_at, checkin_last_sent_at)`
+- `daily_email(id, contact_id, local_date, token_hash, sent_at, expires_at, submitted_at)` (one per contact per day; its prompts are linked to it)
 - `goal(id, client_id, contact_id, title, description, response_type, channel, schedule_json, date_added, start_date, end_date, status, target_json)`
 - `prompt(id, goal_id, scheduled_for, sent_at, channel, status, attempts, deferred_reason, followups_sent, last_followup_at)`
 - `response(id, prompt_id, received_at, value_bool, value_minutes, raw_text, source, parse_status)`
@@ -259,3 +274,5 @@ Visibility for Totty:
 9. **Appointments (5.7b)**: *Decided:* Google Calendar is not used. Still open: how a booking is matched to a client (e.g., by the booker's email against contact emails), and what is the full list of appointment types. *Decided:* the bi-weekly check-in text is skipped for clients who already have a future appointment booked (5.7a).
 10. **Booking app**: *Largely superseded:* the website's scheduling portal provides the booking links and handles payment. Still open: how the website's bookings reach the app (Google Calendar is not used). Options include a webhook or API from the website, an email notification the app reads, or Totty entering bookings by hand. The app only stores the links (`CONSULT_BOOKING_URL`, `CHECKIN_BOOKING_URL`), so this does not affect the rest of the build.
 11. **Clients with no access to the website**: how do clients who cannot use the website scheduling portal (no internet or smartphone, or they are not comfortable with it) schedule and pay for appointments? Possibilities: they call or text Totty, who books for them; Totty enters the appointment by hand in the app; payment is taken separately. Needs deciding, along with how such appointments are recorded and whether the check-in text still goes to them.
+
+12. **Daily email logging (5.4b)**: which email provider (it must sign a BAA, see question 3)? Is the answer-page link acceptable for PHI, or should the page ask for a second check (e.g., the child's birth year)? Does "uploads to app" mean parents submit on the answer page (as specced), or should Totty also be able to upload or paste responses by hand? Do parents on the email method also get the bi-weekly check-in as an email instead of a text? Can one contact use both methods?
