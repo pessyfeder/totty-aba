@@ -105,7 +105,7 @@ async function renderDashboard() {
   const n = d.attention.length;
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
-    h('h2', { class: 'options-heading' }, 'Choose an option'),
+    h('h2', { class: 'options-heading' }, 'Dashboard'),
     h('div', { class: 'options' },
       option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View, add and manage your clients.` : 'View, add and manage your clients.'),
       option('#/appointments', 'appointments', 'Schedule', 'View upcoming scheduled appointments.'),
