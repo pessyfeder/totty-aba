@@ -87,20 +87,70 @@ Check: ${data.warnings.join('; ')}` : ''}`);
   return form;
 }
 
+const SVG_NS = 'http://www.w3.org/2000/svg';
+/** Builds a 24x24 stroke icon from SVG path data (static strings only). */
+function icon(...paths) {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  for (const d of paths) {
+    const p = document.createElementNS(SVG_NS, 'path');
+    p.setAttribute('d', d);
+    svg.append(p);
+  }
+  return svg;
+}
+const ICONS = {
+  clients: () => icon('M16 20v-1.5a3.5 3.5 0 0 0-3.5-3.5h-5A3.5 3.5 0 0 0 4 18.5V20', 'M10 11a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7z', 'M20 20v-1.5a3.5 3.5 0 0 0-2.5-3.35', 'M14.5 4.2a3.5 3.5 0 0 1 0 6.6'),
+  appointments: () => icon('M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z', 'M4 10h16', 'M8 3v4', 'M16 3v4'),
+  settings: () => icon('M4 7h9', 'M17 7h3', 'M15 5v4', 'M4 17h3', 'M11 17h9', 'M9 15v4', 'M4 12h16'),
+};
+
+const backToDashboard = () => h('p', {}, h('a', { href: '#/' }, '← Dashboard'));
+
+/** Dashboard home: three big options, like a "choose an option" page. */
 async function renderDashboard() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
   const sh = d.shabbos;
+  const option = (href, key, title, text) => h('a', { href, class: 'option' },
+    h('span', { class: 'option-icon' }, ICONS[key]()), h('span', { class: 'option-title' }, title), h('span', { class: 'option-text' }, text));
+  const n = d.attention.length;
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
+    h('h2', { class: 'options-heading' }, 'Choose an option'),
+    h('div', { class: 'options' },
+      option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View, add and manage your clients.` : 'View, add and manage your clients.'),
+      option('#/appointments', 'appointments', 'Appointments', `${d.appointments.length} upcoming. See who is scheduled and when.`),
+      option('#/settings', 'settings', 'Settings', 'Booking links and check-in text.')),
+  ].filter(Boolean));
+}
+
+async function renderClients() {
+  const d = await api('/dashboard');
+  logoutBtn.hidden = false;
+  app.replaceChildren(...[
+    backToDashboard(),
     h('div', { class: 'stats' },
       h('h2', {}, 'Clients'),
       h('span', { class: d.attention.length ? 'bad' : '' }, h('strong', {}, String(d.attention.length)), ' need attention'),
       h('span', { class: 'spacer' }),
-      h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived'), h('a', { href: '#/settings' }, 'Settings')),
+      h('a', { href: '#/client/new', class: 'button' }, '+ Add client'), h('a', { href: '#/archived' }, 'Archived')),
     newFromForm(),
     ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ Consultation email for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
+    d.clients.length
+      ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`),
+        ...c.attention.map((a) => h('span', { class: 'warn-line' }, ` ⚠ ${a}`)))))
+      : h('p', { class: 'muted' }, 'No clients yet.'),
+  ].filter(Boolean));
+}
+
+async function renderAppointments() {
+  const d = await api('/dashboard');
+  logoutBtn.hidden = false;
+  app.replaceChildren(...[
+    backToDashboard(),
     h('h2', {}, 'Upcoming appointments'),
     d.appointments.length
       ? h('table', { class: 'compact appts' }, h('tbody', {}, d.appointments.map((a) => h('tr', {},
@@ -108,10 +158,6 @@ async function renderDashboard() {
           h('td', {}, a.client_id ? h('a', { href: `#/client/${a.client_id}` }, `${a.first_name} ${a.last_name}`) : h('span', { class: 'muted' }, 'Unmatched client')),
           h('td', {}, a.type)))))
       : h('p', { class: 'muted' }, 'No upcoming appointments.'),
-    d.clients.length
-      ? h('ul', { class: 'list' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'name' }, `${c.first_name} ${c.last_name}`),
-        ...c.attention.map((a) => h('span', { class: 'warn-line' }, ` ⚠ ${a}`)))))
-      : h('p', { class: 'muted' }, 'No clients yet.'),
   ].filter(Boolean));
 }
 
@@ -184,7 +230,7 @@ async function route() {
   const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
-  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {
