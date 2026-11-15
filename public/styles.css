@@ -108,4 +108,14 @@ details.fold.row[hidden] { display: none; }
 .reply input, .reply select, .reply button { min-height: 36px; padding: 4px 10px; }
 table.compact th, table.compact td { padding: 6px 10px; font-size: .88rem; }
 .top { padding: 10px 16px; }
+.inline-form label { min-width: 0; max-width: 100%; }
+.inline-form input[type=file] { max-width: 100%; }
+/* Narrow screens: each appointment becomes a small stacked card instead of a wide table row */
+@media (max-width: 520px) {
+  table.appts, table.appts tbody, table.appts tr, table.appts td { display: block; width: 100%; }
+  table.appts tr { padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  table.appts tr:last-child { border-bottom: 0; }
+  table.appts td { padding: 1px 0; border: 0; }
+  table.appts td:first-child { font-weight: 600; }
+}
 .ok-line { color: var(--ok); font-size: .88rem; margin: 2px 0; }

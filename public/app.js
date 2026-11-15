@@ -103,7 +103,7 @@ async function renderDashboard() {
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
     h('h2', {}, 'Upcoming appointments'),
     d.appointments.length
-      ? h('table', { class: 'compact' }, h('tbody', {}, d.appointments.map((a) => h('tr', {},
+      ? h('table', { class: 'compact appts' }, h('tbody', {}, d.appointments.map((a) => h('tr', {},
           h('td', {}, fmtDateTime(a.starts_at)),
           h('td', {}, a.client_id ? h('a', { href: `#/client/${a.client_id}` }, `${a.first_name} ${a.last_name}`) : h('span', { class: 'muted' }, 'Unmatched client')),
           h('td', {}, a.type)))))
