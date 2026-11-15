@@ -33,7 +33,7 @@ endobj
 endobj
 4 0 obj
 <<
-/Length 4648
+/Length 4445
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
@@ -70,7 +70,7 @@ BT /F1 10 Tf 12 TL ET
 BT 1 0 0 1 336.395 37.44 Tm (ehavior) Tj T* ET
 BT /F1 10.5 Tf 12.6 TL ET
 .133333 .133333 .133333 rg
-BT 1 0 0 1 57.6 650.4 Tm (Today, during your first session, we work together to set up four things:) Tj T* ET
+BT 1 0 0 1 57.6 650.4 Tm (Today, during your first session, we work together to set up three things:) Tj T* ET
 .784314 .196078 .168627 rg
 BT /F2 12 Tf 14.4 TL ET
 BT 1 0 0 1 57.6 626.4 Tm (1) Tj T* ET
@@ -91,22 +91,19 @@ BT /F1 10.5 Tf 12.6 TL ET
 BT 1 0 0 1 79.6 590.4 Tm (accurate starting point.) Tj T* ET
 .784314 .196078 .168627 rg
 BT /F2 12 Tf 14.4 TL ET
+.133333 .133333 .133333 rg
+BT /F2 10.5 Tf 12.6 TL ET
+BT /F1 10.5 Tf 12.6 TL ET
+.784314 .196078 .168627 rg
+BT /F2 12 Tf 14.4 TL ET
 BT 1 0 0 1 57.6 568.4 Tm (3) Tj T* ET
 .133333 .133333 .133333 rg
 BT /F2 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 79.6 568.4 Tm (Preference Assessment \227) Tj T* ET
+BT 1 0 0 1 79.6 568.4 Tm (Simple Tracking \227) Tj T* ET
 BT /F1 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 214.987 568.4 Tm (we find out what truly motivates your child, so the plan works.) Tj T* ET
-.784314 .196078 .168627 rg
-BT /F2 12 Tf 14.4 TL ET
-BT 1 0 0 1 57.6 546.4 Tm (4) Tj T* ET
-.133333 .133333 .133333 rg
-BT /F2 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 79.6 546.4 Tm (Simple Tracking \227) Tj T* ET
+BT 1 0 0 1 177.0505 568.4 Tm (while collecting baseline, just make one dot, check, or X each time it happens.) Tj T* ET
 BT /F1 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 177.0505 546.4 Tm (while collecting baseline, just make one dot, check, or X each time it happens.) Tj T* ET
-BT /F1 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 79.6 532.4 Tm (Keep it simple.) Tj T* ET
+BT 1 0 0 1 79.6 554.4 Tm (Keep it simple.) Tj T* ET
 BT /F2 10.5 Tf 12.6 TL ET
 .133333 .133333 .133333 rg
 BT 1 0 0 1 57.6 506.4 Tm (While collecting baseline data, do not react to the behavior \227 just record it.) Tj T* ET
@@ -544,7 +541,7 @@ endstream
 endobj
 15 0 obj
 <<
-/Contents 16 0 R
+/Contents 19 0 R
 /MediaBox [ 0 0 612 792 ]
 /Resources <<
 /Font 5 0 R
@@ -644,7 +641,7 @@ endobj
 endobj
 18 0 obj
 <<
-/Length 4445
+/Length 4448
 >>
 stream
 1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
@@ -697,9 +694,9 @@ BT 1 0 0 1 57.6 604.4 Tm (2) Tj T* ET
 BT /F2 10.5 Tf 12.6 TL ET
 BT 1 0 0 1 79.6 604.4 Tm (Baseline Data \227) Tj T* ET
 BT /F1 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 164.797 604.4 Tm (we track this behavior for at least 7 days before guidance begins, so we have an) Tj T* ET
+BT 1 0 0 1 164.797 604.4 Tm (we track this behavior in the app for at least 7 days before guidance begins,) Tj T* ET
 BT /F1 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 79.6 590.4 Tm (accurate starting point.) Tj T* ET
+BT 1 0 0 1 79.6 590.4 Tm (so we have an accurate starting point.) Tj T* ET
 .784314 .196078 .168627 rg
 BT /F2 12 Tf 14.4 TL ET
 .133333 .133333 .133333 rg
@@ -712,7 +709,7 @@ BT 1 0 0 1 57.6 568.4 Tm (3) Tj T* ET
 BT /F2 10.5 Tf 12.6 TL ET
 BT 1 0 0 1 79.6 568.4 Tm (Simple Tracking \227) Tj T* ET
 BT /F1 10.5 Tf 12.6 TL ET
-BT 1 0 0 1 177.0505 568.4 Tm (while collecting baseline, just make one dot, check, or X each time it happens.) Tj T* ET
+BT 1 0 0 1 177.0505 568.4 Tm (while collecting baseline, just log it in the app each time it happens.) Tj T* ET
 BT /F1 10.5 Tf 12.6 TL ET
 BT 1 0 0 1 79.6 554.4 Tm (Keep it simple.) Tj T* ET
 BT /F2 10.5 Tf 12.6 TL ET
@@ -757,33 +754,111 @@ BT 1 0 0 1 210.3385 314.4 Tm (\223Hop in \227 only when there\222s H.O.P.\224) T
 
 endstream
 endobj
+19 0 obj
+<<
+/Length 2993
+>>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+q
+50.4 0 0 50.4 280.8 712.8 cm
+/FormXob.c7e3ebaeba22161f09c8862044fa00cc Do
+Q
+.184314 .290196 .270588 RG
+2.5 w
+n 57.6 698.4 m 554.4 698.4 l S
+.066667 .066667 .066667 rg
+BT /F2 17 Tf 20.4 TL ET
+BT 1 0 0 1 187.4505 672.4 Tm (What Happens After Baseline) Tj T* ET
+BT /F1 9.5 Tf 11.4 TL ET
+.466667 .466667 .466667 rg
+BT 1 0 0 1 239.994 657.4 Tm (Your next sessions, at a glance) Tj T* ET
+BT /F1 7.5 Tf 9 TL ET
+.466667 .466667 .466667 rg
+BT 1 0 0 1 83.76375 56.16 Tm (\251 2026 The BTB Method. Confidential \227 for use by families enrolled with The BTB Method. Not for reproduction or distribution.  4 of 4) Tj T* ET
+.784314 .196078 .168627 rg
+BT /F2 12 Tf 14.4 TL ET
+BT 1 0 0 1 242.815 37.44 Tm (B) Tj T* ET
+.121569 .227451 .431373 rg
+BT /F1 10 Tf 12 TL ET
+BT 1 0 0 1 251.479 37.44 Tm (ehavior ) Tj T* ET
+.784314 .196078 .168627 rg
+BT /F2 12 Tf 14.4 TL ET
+BT 1 0 0 1 287.049 37.44 Tm (T) Tj T* ET
+.121569 .227451 .431373 rg
+BT /F1 10 Tf 12 TL ET
+BT 1 0 0 1 294.381 37.44 Tm (reating ) Tj T* ET
+.784314 .196078 .168627 rg
+BT /F2 12 Tf 14.4 TL ET
+BT 1 0 0 1 327.731 37.44 Tm (B) Tj T* ET
+.121569 .227451 .431373 rg
+BT /F1 10 Tf 12 TL ET
+BT 1 0 0 1 336.395 37.44 Tm (ehavior) Tj T* ET
+BT /F2 11.5 Tf 13.8 TL ET
+.784314 .196078 .168627 rg
+BT 1 0 0 1 57.6 635.4 Tm (1) Tj T* ET
+.133333 .133333 .133333 rg
+BT /F1 11.5 Tf 13.8 TL ET
+BT 1 0 0 1 79.6 635.4 Tm (Review Session \227 we look at your data together and identify patterns: when, where, and) Tj T* ET
+BT 1 0 0 1 79.6 620.4 Tm (how often the behavior happens.) Tj T* ET
+BT /F2 11.5 Tf 13.8 TL ET
+.784314 .196078 .168627 rg
+BT 1 0 0 1 57.6 591.4 Tm (2) Tj T* ET
+.133333 .133333 .133333 rg
+BT /F1 11.5 Tf 13.8 TL ET
+BT 1 0 0 1 79.6 591.4 Tm (Build the Plan \227 we design specific, simple strategies for you to use, built around your) Tj T* ET
+BT 1 0 0 1 79.6 576.4 Tm (child\222s priority goal and preferences.) Tj T* ET
+BT /F2 11.5 Tf 13.8 TL ET
+.784314 .196078 .168627 rg
+BT 1 0 0 1 57.6 547.4 Tm (3) Tj T* ET
+.133333 .133333 .133333 rg
+BT /F1 11.5 Tf 13.8 TL ET
+BT 1 0 0 1 79.6 547.4 Tm (Guidance Begins \227 you start applying the plan, with our support and adjustments each) Tj T* ET
+BT 1 0 0 1 79.6 532.4 Tm (session. Think of it like a weekly therapy visit or a prescribed medication: the plan works) Tj T* ET
+BT 1 0 0 1 79.6 517.4 Tm (through consistency, so how precisely and steadily it\222s followed each week is what makes) Tj T* ET
+BT 1 0 0 1 79.6 502.4 Tm (the difference.) Tj T* ET
+BT /F2 11.5 Tf 13.8 TL ET
+.784314 .196078 .168627 rg
+BT 1 0 0 1 57.6 473.4 Tm (4) Tj T* ET
+.133333 .133333 .133333 rg
+BT /F1 11.5 Tf 13.8 TL ET
+BT 1 0 0 1 79.6 473.4 Tm (Ongoing Tracking \227 we continue simple tracking in the app so we can) Tj T* ET
+BT 1 0 0 1 79.6 458.4 Tm (see what\222s working and adjust as needed.) Tj T* ET
+BT /F2 11.5 Tf 13.8 TL ET
+.184314 .290196 .270588 rg
+BT 1 0 0 1 57.6 423.4 Tm (Baseline isn\222t wasted time \227 it\222s what makes the plan actually fit your child.) Tj T* ET
+ 
+
+endstream
+endobj
 xref
-0 19
+0 20
 0000000000 65535 f 
 0000000015 00000 n 
 0000000064 00000 n 
 0000000144 00000 n 
 0000000397 00000 n 
-0000005097 00000 n 
-0000005148 00000 n 
-0000005255 00000 n 
-0000005367 00000 n 
-0000005486 00000 n 
-0000033704 00000 n 
-0000036629 00000 n 
-0000036883 00000 n 
-0000041223 00000 n 
-0000041477 00000 n 
-0000047509 00000 n 
-0000047763 00000 n 
-0000050830 00000 n 
-0000050870 00000 n 
+0000004894 00000 n 
+0000004945 00000 n 
+0000005052 00000 n 
+0000005164 00000 n 
+0000005283 00000 n 
+0000033501 00000 n 
+0000036426 00000 n 
+0000036680 00000 n 
+0000041020 00000 n 
+0000041274 00000 n 
+0000047306 00000 n 
+0000047560 00000 n 
+0000050627 00000 n 
+0000050667 00000 n 
+0000055168 00000 n 
 trailer
 <<
-/Size 19
+/Size 20
 /Root 1 0 R
 /Info 17 0 R
 >>
 startxref
-55368
+58214
 %%EOF
