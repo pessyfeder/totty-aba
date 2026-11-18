@@ -13,7 +13,7 @@ import { ensureDraft } from './consult-email.js';
 import * as consultEmail from './consult-email.js';
 import * as inquiryEmail from './inquiry-email.js';
 import { buildCheckinBody } from './scheduler.js';
-import { appointmentKind, normalizeFeedUrl, syncCalendar } from './calendar.js';
+import { appointmentKind } from './calendar.js';
 
 // Check-ins this client already had before an appointment: tells the first (baseline) check-in from later bi-weekly ones.
 const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
@@ -66,7 +66,7 @@ function checkGoal(f, { partial }) {
   }
 }
 
-export function createApp({ db, messenger, mailer, config, now = () => new Date(), fetchCalendar }) {
+export function createApp({ db, messenger, mailer, config, now = () => new Date() }) {
   const app = express();
   app.disable('x-powered-by');
   // Keep the raw body: Telnyx signs the exact bytes it sent.
@@ -193,7 +193,6 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     res.json({
       checkin_text_preview: checkinPreview(req.clinician.settings_json),
       ...Object.fromEntries(LINK_SETTINGS.map((k) => [k, req.clinician.settings_json?.[k] ?? ''])),
-      calendar_connected: Boolean(req.clinician.settings_json?.calendar_ics_url), // the secret feed address is never returned
     });
   });
   app.put('/api/settings', async (req, res) => {
@@ -206,30 +205,12 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       if (u.protocol !== 'https:' && u.protocol !== 'http:') throw bad(`${k} must start with https://`);
       next[k] = u.href;
     }
-    if (req.body && 'calendar_ics_url' in req.body) {
-      const raw = String(req.body.calendar_ics_url ?? '').trim();
-      if (!raw) delete next.calendar_ics_url;
-      else {
-        const url = normalizeFeedUrl(raw);
-        if (!url) throw bad('calendar_ics_url must be the secret iCal address from Google Calendar (https://calendar.google.com/...)');
-        next.calendar_ics_url = url;
-      }
-    }
     await db.query('UPDATE clinician SET settings_json = $2 WHERE id = $1', [req.clinician.id, JSON.stringify(next)]);
-    await audit(req, 'update', 'settings', req.clinician.id, { fields: Object.keys(req.body ?? {}).filter((k) => LINK_SETTINGS.includes(k) || k === 'calendar_ics_url') });
-    res.json({ ...Object.fromEntries(LINK_SETTINGS.map((k) => [k, next[k] ?? ''])), calendar_connected: Boolean(next.calendar_ics_url) });
+    await audit(req, 'update', 'settings', req.clinician.id, { fields: Object.keys(req.body ?? {}).filter((k) => LINK_SETTINGS.includes(k)) });
+    res.json(Object.fromEntries(LINK_SETTINGS.map((k) => [k, next[k] ?? ''])));
   });
 
-  // ---- Appointments (SPEC 5.7b): read-only mirror of Google Calendar ----
-  app.post('/api/calendar/sync', async (req, res) => {
-    if (!req.clinician.settings_json?.calendar_ics_url) throw bad('Connect your calendar in Settings first');
-    if (!fetchCalendar) throw new HttpError(503, 'Calendar sync is not available');
-    let result;
-    try { result = await syncCalendar({ db, clinician: req.clinician, fetchText: fetchCalendar, now }); }
-    catch { throw new HttpError(502, 'Could not read the calendar feed'); }
-    await audit(req, 'sync', 'calendar', req.clinician.id, result);
-    res.json(result);
-  });
+  // ---- Appointments (SPEC 5.7b) ----
   app.get('/api/appointments', async (req, res) => {
     // Optional ?from=&to= (ISO) lets the Schedule calendar page through months, past ones included.
     const parse = (v) => { const d = typeof v === 'string' ? new Date(v) : null; return d && !Number.isNaN(d.getTime()) ? d : null; };

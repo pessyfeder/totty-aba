@@ -6,7 +6,6 @@ import { createMessenger, consoleProvider, telnyxProvider } from './messaging.js
 import { createScheduler } from './scheduler.js';
 import { consoleMailer, sendApproved, smtpMailer, unconfiguredMailer } from './consult-email.js';
 import { sendApproved as sendApprovedInquiry } from './inquiry-email.js';
-import { syncAll, httpFetchText } from './calendar.js';
 
 const env = process.env;
 const production = env.NODE_ENV === 'production';
@@ -48,7 +47,6 @@ const app = createApp({
   db,
   messenger,
   mailer,
-  fetchCalendar: httpFetchText,
   config: {
     production,
     sessionSecret: env.SESSION_SECRET,
@@ -77,13 +75,3 @@ setInterval(async () => {
 
 const port = Number(env.PORT ?? 3000);
 app.listen(port, () => console.log(`totty-aba listening on :${port}${telnyxConfigured ? '' : ' (SMS to console)'}`));
-
-// Read-only Google Calendar sync (SPEC 5.7b): every 10 minutes for clinicians who connected a calendar.
-let syncing = false;
-const syncCalendars = async () => {
-  if (syncing) return;
-  syncing = true;
-  try { await syncAll({ db, fetchText: httpFetchText }); } finally { syncing = false; }
-};
-setInterval(syncCalendars, 10 * 60_000);
-syncCalendars();
