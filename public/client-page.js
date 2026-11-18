@@ -61,11 +61,11 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
   const owner = contacts.find((c) => c.id === g.contact_id);
   const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`);
   const card = progress
-    ? h('article', { class: 'card goal-card' }, h('h3', {}, g.title), meta, summary, rangeBar, body, g.status === 'archived' ? '' : note)
+    ? h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`), meta, summary, rangeBar, body, g.status === 'archived' ? '' : note)
     : goalListCard();
   function goalListCard() {
     if (g.status === 'archived') {
-      return h('article', { class: 'card goal-card' }, h('h3', {}, g.title, ' ', h('span', { class: 'badge' }, g.status)), meta,
+      return h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: 'badge' }, g.status)), meta,
         h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.'));
     }
     // The pencil reveals the edit panel in place; Pause/Resume and Archive live there.
@@ -81,7 +81,7 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
     const pencil = h('button', { type: 'button', class: 'acc-act', title: 'Edit goal', 'aria-label': `Edit goal: ${g.title}`, onclick: () => { panel.hidden = !panel.hidden; } });
     pencil.innerHTML = ICON.edit;
     return h('article', { class: 'card goal-card' },
-      h('h3', {}, g.title, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status), ' ', pencil), meta, panel);
+      h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status), ' ', pencil), meta, panel);
   }
   if (progress) draw().catch(handle);
   return card;
@@ -169,13 +169,12 @@ export async function renderClient(ctx, id, tab = 'profile') {
 
   const goalForm = inlineForm(h, [
     lbl('Goal', h('input', { name: 'title', required: true, placeholder: 'e.g. Used words to ask for help' })),
-    lbl('Question texted to parent (optional)', h('input', { name: 'question_text' })),
     lbl('Ask', h('select', { name: 'contact_id', required: true }, c.contacts.map((p) => h('option', { value: p.id }, p.name)))),
     lbl('Answer type', h('select', { name: 'response_type' }, h('option', { value: 'yes_no' }, 'Yes / No'), h('option', { value: 'duration' }, 'Minutes'))),
     lbl('Time', h('input', { name: 'time', type: 'time', value: '18:30', required: true })),
     lbl('Start date', h('input', { name: 'start_date', type: 'date', value: today(), required: true })),
     lbl('Target (% yes or average minutes, optional)', h('input', { name: 'target', type: 'number', min: 0, step: 'any' })),
-    h('fieldset', {}, h('legend', {}, 'Days'), DAYS.map((d, i) => h('label', {}, h('input', { name: 'day', type: 'checkbox', value: i, checked: true }), ` ${d}`))),
+    h('fieldset', {}, h('legend', {}, 'Days'), DAYS.slice(0, 6).map((d, i) => h('label', {}, h('input', { name: 'day', type: 'checkbox', value: i, checked: true }), ` ${d}`))),
   ], 'Add goal', async (f) => {
     const days = f.getAll('day').map(Number);
     const body = trimmed(f);
@@ -185,6 +184,10 @@ export async function renderClient(ctx, id, tab = 'profile') {
     await post('/goals', { ...body, channel: 'sms', schedule_json: { days, time: f.get('time') } });
   });
 
+  // Goal numbers follow creation order across all goals (archived ones keep theirs).
+  c.goals.forEach((g, i) => { g.number = i + 1; });
+  goalForm.hidden = true;
+  const addGoalBtn = h('button', { type: 'button', onclick: () => { goalForm.hidden = !goalForm.hidden; } }, 'Add a goal');
   const liveGoals = c.goals.filter((g) => g.status !== 'archived');
   const archivedGoals = c.goals.filter((g) => g.status === 'archived');
 
@@ -381,7 +384,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const goalsTab = [
     h('h2', { class: 'first' }, 'Goals'),
     ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals')) : [h('p', { class: 'muted' }, 'No goals yet.')]),
-    c.contacts.length ? h('details', {}, h('summary', {}, 'Add a goal'), goalForm) : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
+    c.contacts.length ? h('div', {}, addGoalBtn, goalForm) : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals'))) : '',
   ];
   const progressTab = [
