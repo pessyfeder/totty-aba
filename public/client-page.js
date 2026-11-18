@@ -320,7 +320,9 @@ export async function renderClient(ctx, id, tab = 'profile') {
     ? h('div', { class: 'acc-list' }, c.contacts.map((p) => h('div', { class: 'acc-row' },
       h('strong', {}, p.name), p.relationship ? h('span', { class: 'muted' }, ` · ${p.relationship}`) : '',
       h('div', {}, [p.phone ?? 'No phone', p.email].filter(Boolean).join(' · ')),
-      h('div', { class: 'muted' }, `${p.preferred_channel === 'call' ? 'Prefers calls' : 'Prefers texts'} · ${p.consent_given_at ? 'consent recorded' : 'no consent recorded'} · ${p.status}`))))
+      h('div', { class: 'muted' }, p.preferred_channel === 'call' ? 'Prefers calls' : 'Prefers texts'),
+      h('div', { class: 'muted' }, p.consent_given_at ? 'Consent recorded' : 'No consent recorded'),
+      h('div', { class: 'muted' }, p.status.charAt(0).toUpperCase() + p.status.slice(1)))))
     : h('p', { class: 'muted' }, 'No contacts yet.');
   const reinfBody = h('div', {},
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
