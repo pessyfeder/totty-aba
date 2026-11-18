@@ -251,3 +251,27 @@ button.danger { color: #b00020; border-color: #b00020; }
 
 .client-actions { float: right; }
 button.danger { color: #b00020; border-color: #b00020; }
+
+/* Client profile: stacked compact expandable chips */
+.acc-stack { display: grid; gap: 8px; margin-top: 16px; max-width: 760px; }
+details.acc { background: var(--card); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); transition: border-color .15s; }
+details.acc[open] { border-radius: var(--radius); border-color: var(--accent); }
+details.acc > summary { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 8px 6px 18px; cursor: pointer; list-style: none; }
+details.acc > summary::-webkit-details-marker { display: none; }
+details.acc > summary::after { content: none; }
+details.acc > summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; border-radius: 999px; }
+.acc-title { font-weight: 650; white-space: nowrap; }
+.acc-sum { color: var(--muted); font-size: .88rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+details.acc > summary > .badge:last-child, details.acc > summary > .acc-title:last-child { margin-left: auto; }
+details.acc > summary > .badge { margin-left: auto; }
+details.acc > summary > .acc-sum + .badge { margin-left: 0; }
+.acc-act { display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; margin-left: auto; padding: 0; min-height: 0; border-radius: 50%; background: var(--accent-soft); color: var(--accent); border: 0; text-decoration: none; }
+.acc-act:hover { background: var(--accent); color: var(--on-accent); filter: none; }
+.acc-sum + .acc-act, .badge + .acc-act { margin-left: 4px; }
+.badge + .acc-act { margin-left: 4px; }
+.acc-body { padding: 4px 18px 16px; display: grid; gap: 8px; }
+.acc-body h2 { display: none; }
+.acc-body .intake .client-actions { float: none; display: block; margin-bottom: 8px; }
+.acc-body .chips { margin: 0; }
+.acc-list { display: grid; gap: 10px; }
+.acc-row { padding: 8px 12px; background: var(--bg); border-radius: 10px; }

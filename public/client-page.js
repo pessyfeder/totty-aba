@@ -111,8 +111,7 @@ async function intakeDocsSection({ h, api, handle }, id, reload) {
     } }, h('label', {}, label, input), h('button', { type: 'submit' }, 'Upload'), msg);
     return form;
   };
-  return h('section', {},
-    h('h2', {}, 'Documents'),
+  const node = h('div', {},
     ...conflicts.map((c) => h('div', { class: 'warn-line' }, `⚠ Not filled — ${c.field}: you entered "${c.entered}", the form says "${c.form}". Your value was kept; edit the client to resolve.`)),
     pick('Documents (consent, insurance, assessments)', '.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.txt', `/clients/${id}/documents`, true),
     result,
@@ -123,6 +122,7 @@ async function intakeDocsSection({ h, api, handle }, id, reload) {
           h('td', {}, fmtSize(d.size_bytes)),
           h('td', {}, String(d.uploaded_at).slice(0, 10))))))
       : h('p', { class: 'muted' }, 'No documents yet.'));
+  return { badge: documents.length ? String(documents.length) : 'None', node, input: node.querySelector('input[type=file]') };
 }
 
 /** Initial consultation email (SPEC 5.7b): Totty reads the exact text and approves or declines the first send. */
@@ -136,13 +136,13 @@ const inquiryEmailSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
 async function emailSection({ h, api, handle }, id, reload, { path, title, name, hint }) {
   const e = await api(`/clients/${id}/${path}`);
   const cap = name[0].toUpperCase() + name.slice(1);
-  if (!e || e.status === 'cancelled') return e ? h('p', { class: 'muted' }, `${cap}: not sent (you declined it).`) : '';
+  if (!e) return null;
+  if (e.status === 'cancelled') return { badge: 'Declined', node: h('p', { class: 'muted' }, `${cap}: not sent (you declined it).`) };
   const act = (p) => api(`/clients/${id}/${path}/${p}`, { method: 'POST' }).then(reload, handle);
-  if (e.status === 'sent') return h('p', { class: 'ok-line' }, `✉ ${cap} sent to ${e.to} on ${String(e.sent_at).slice(0, 10)}.`);
-  if (e.status === 'failed') return h('p', { class: 'warn-line' }, `⚠ The ${name} could not be sent: ${e.last_error ?? 'unknown error'}`);
+  if (e.status === 'sent') return { badge: 'Sent', cls: 'ok', node: h('p', { class: 'ok-line' }, `✉ ${cap} sent to ${e.to} on ${String(e.sent_at).slice(0, 10)}.`) };
+  if (e.status === 'failed') return { badge: 'Failed', cls: 'bad', node: h('p', { class: 'warn-line' }, `⚠ The ${name} could not be sent: ${e.last_error ?? 'unknown error'}`) };
   const approved = e.status !== 'pending_approval';
-  return h('section', {},
-    h('h2', {}, title),
+  const node = h('div', {},
     approved
       ? h('p', { class: 'ok-line' }, '✉ Approved. It goes out as soon as it can (not during Shabbos or Yom Tov).')
       : h('p', { class: 'muted' }, hint),
@@ -151,6 +151,29 @@ async function emailSection({ h, api, handle }, id, reload, { path, title, name,
     e.text ? h('div', { class: 'card' }, h('div', { class: 'muted' }, `To: ${e.to}`), h('strong', {}, e.subject), h('pre', { style: 'white-space: pre-wrap; font: inherit' }, e.text)) : '',
     h('button', { type: 'button', disabled: approved || e.problems.length > 0, onclick: () => act('approve') }, 'Approve and send'), ' ',
     h('button', { type: 'button', class: 'link', onclick: () => { if (confirm(`Don't send the ${name}?`)) act('cancel'); } }, approved ? 'Cancel' : 'Decline'));
+  return { badge: approved ? 'Approved' : 'Needs approval', cls: approved ? 'ok' : 'bad', node };
+}
+
+const ICON = {
+  edit: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  add: '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+};
+const openChips = new Set(); // which chips are expanded; survives the page re-render after a save
+
+/** Compact expandable chip: title + short summary, optional pencil/plus on the far right. */
+function chip(h, key, title, summary, body, { badge, cls, action } = {}) {
+  const d = h('details', { class: 'acc' });
+  d.open = openChips.has(key);
+  d.addEventListener('toggle', () => { d.open ? openChips.add(key) : openChips.delete(key); });
+  const act = action && (() => {
+    const el = h(action.href ? 'a' : 'button', { class: 'acc-act', type: action.href ? undefined : 'button', href: action.href, title: action.label, 'aria-label': action.label,
+      onclick: action.href ? undefined : (e) => { e.preventDefault(); e.stopPropagation(); d.open = true; action.onclick?.(); } });
+    el.innerHTML = ICON[action.icon];
+    return el;
+  })();
+  d.append(h('summary', {}, h('span', { class: 'acc-title' }, title), summary ? h('span', { class: 'acc-sum' }, summary) : '',
+    badge ? h('span', { class: `badge ${cls ?? ''}` }, badge) : '', act ?? ''), h('div', { class: 'acc-body' }, body));
+  return d;
 }
 
 const TABS = [['profile', 'Profile'], ['goals', 'Goals'], ['progress', 'Progress'], ['appointments', 'Appointments']];
@@ -192,9 +215,9 @@ export async function renderClient(ctx, id, tab = 'profile') {
     // Re-rendering clears the result line; keep the outcome of the last upload visible.
     const box = document.querySelector('[role=status]');
     if (box && (last.filled?.length || last.conflicts?.length)) box.append(h('p', { class: 'ok-line' }, `Last upload filled: ${(last.filled ?? []).join(', ') || 'nothing new'}.`));
-  }).catch((e) => h('p', { class: 'error' }, e.message));
-  const consultEmail = await consultEmailSection(ctx, id, reload).catch((e) => h('p', { class: 'error' }, e.message));
-  const inquiryEmail = await inquiryEmailSection(ctx, id, reload).catch((e) => h('p', { class: 'error' }, e.message));
+  }).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
+  const consultEmail = await consultEmailSection(ctx, id, reload).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
+  const inquiryEmail = await inquiryEmailSection(ctx, id, reload).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
   const reports = await reportsSection(ctx, id);
   const responseLog = await responseLogSection(ctx, id);
   const dash = await api('/dashboard');
@@ -291,26 +314,29 @@ export async function renderClient(ctx, id, tab = 'profile') {
     c.appointments.length ? '' : h('p', { class: 'muted' }, 'No appointments yet.'),
     h('details', { open: c.appointments.length === 0 }, h('summary', {}, 'Add an appointment'), addAppt),
   ];
-  const contactsSection = [
-    h('h2', {}, 'Contact info'),
-    c.contacts.length
-      ? h('div', { class: 'contact-grid' }, c.contacts.map((p) => h('article', { class: 'card' },
-        h('h3', {}, p.name, p.relationship ? h('span', { class: 'muted' }, ` · ${p.relationship}`) : ''),
-        h('div', {}, p.phone ?? 'No phone'),
-        p.email ? h('div', {}, p.email) : '',
-        h('div', { class: 'muted' }, `${p.preferred_channel === 'call' ? 'Prefers calls' : 'Prefers texts'} · ${p.consent_given_at ? 'consent recorded' : 'no consent recorded'} · ${p.status}`))))
-      : h('p', { class: 'muted' }, 'No contacts yet.'),
-    h('p', {}, h('a', { href: `#/client/${id}/contacts`, class: 'button' }, 'Edit contacts')),
-  ];
-  const reinforcementSection = [
-    h('h2', {}, 'Preferred reinforcements'),
+  const noPhone = c.contacts.filter((p) => !p.consent_given_at).length;
+  const contactsBody = c.contacts.length
+    ? h('div', { class: 'acc-list' }, c.contacts.map((p) => h('div', { class: 'acc-row' },
+      h('strong', {}, p.name), p.relationship ? h('span', { class: 'muted' }, ` · ${p.relationship}`) : '',
+      h('div', {}, [p.phone ?? 'No phone', p.email].filter(Boolean).join(' · ')),
+      h('div', { class: 'muted' }, `${p.preferred_channel === 'call' ? 'Prefers calls' : 'Prefers texts'} · ${p.consent_given_at ? 'consent recorded' : 'no consent recorded'} · ${p.status}`))))
+    : h('p', { class: 'muted' }, 'No contacts yet.');
+  const reinfBody = h('div', {},
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
-    reinforcementForm,
-  ];
+    reinforcementForm);
+  const detailsBody = h('div', {}, h('div', {}, `Admitted ${String(c.admission_date).slice(0, 10)}`), h('div', {}, c.location_name ?? ''), h('div', { class: 'muted' }, c.timezone));
+  const statusLabel = isArchived ? 'Archived' : (INTAKE[c.intake_status] ?? c.intake_status);
   const profileTab = [
-    h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
-    intakeSection, inquiryEmail, consultEmail,
-    ...contactsSection, ...reinforcementSection, intakeDocs,
+    h('div', { class: 'acc-stack' },
+      chip(h, 'status', 'Client status', '', intakeSection, { badge: statusLabel, cls: isActive && !isArchived ? 'ok' : '' }),
+      chip(h, 'details', 'Client details', `${c.location_name ?? ''} · ${c.timezone}`, detailsBody, { action: { icon: 'edit', label: 'Edit client details', href: `#/client/${id}/edit` } }),
+      inquiryEmail ? chip(h, 'inquiry', 'Profile page email', '', inquiryEmail.node, inquiryEmail) : '',
+      consultEmail ? chip(h, 'consult', 'Initial consultation email', '', consultEmail.node, consultEmail) : '',
+      chip(h, 'contacts', 'Contact info', `${c.contacts.length} ${c.contacts.length === 1 ? 'contact' : 'contacts'}${noPhone ? ` · ${noPhone} without consent` : ''}`, contactsBody, { action: { icon: 'edit', label: 'Edit contacts', href: `#/client/${id}/contacts` } }),
+      chip(h, 'reinf', 'Preferred reinforcements', c.reinforcements.map((i) => i.name).join(', '), reinfBody,
+        { action: { icon: 'add', label: 'Add reinforcement', onclick: () => setTimeout(() => reinfBody.querySelector('input')?.focus(), 0) } }),
+      chip(h, 'docs', 'Documents', '', intakeDocs.node, { badge: intakeDocs.badge, cls: intakeDocs.cls,
+        action: { icon: 'add', label: 'Upload documents', onclick: () => setTimeout(() => intakeDocs.input?.focus(), 0) } })),
   ];
   const goalsTab = [
     h('h2', { class: 'first' }, 'Goals'),
