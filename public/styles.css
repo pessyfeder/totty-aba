@@ -280,7 +280,9 @@ details.acc > summary > .acc-sum + .badge { margin-left: 0; }
 .acc-list { display: grid; gap: 10px; }
 .acc-row { padding: 8px 12px; background: var(--bg); border-radius: 10px; }
 
-.acc-flat-row { display: flex; align-items: center; gap: 10px; padding: 14px 18px; }
+div.acc-flat { background: var(--card); border: 1px solid var(--line); border-radius: 999px; box-shadow: var(--shadow); }
+div.acc-flat:has(.acc-flat-panel:not(:empty) .intake:not([hidden])) { border-radius: var(--radius); border-color: var(--accent); }
+.acc-flat-row { display: flex; align-items: center; gap: 10px; min-height: 48px; padding: 6px 8px 6px 18px; }
 .acc-right { display: inline-flex; gap: 8px; margin-left: auto; flex: none; }
 details.acc > summary.acc-first > .acc-title { margin-left: 0; }
 details.acc > summary.acc-first > .badge:last-child { margin-left: 0; }
