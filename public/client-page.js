@@ -330,11 +330,19 @@ export async function renderClient(ctx, id, tab = 'profile') {
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
     reinforcementPick);
   const day10 = (v) => (v ? String(v).slice(0, 10) : '');
+  const ageOf = (v) => {
+    if (!v) return '';
+    const [y, m, d] = String(v).slice(0, 10).split('-').map(Number);
+    const t = new Date();
+    const a = t.getFullYear() - y - (t.getMonth() + 1 < m || (t.getMonth() + 1 === m && t.getDate() < d) ? 1 : 0);
+    return a >= 0 ? a : '';
+  };
   const detailsView = h('div', { class: 'acc-list' }, [
     ['Name', `${c.first_name} ${c.last_name}`],
-    ['Gender', c.gender],
     ['Date of birth', day10(c.dob)],
     ['Admission date', day10(c.admission_date)],
+    ['Age', ageOf(c.dob)],
+    ['Gender', c.gender],
     ['Location', [c.street_address, c.city, [c.state, c.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ') || c.location_name],
     ['Candle lighting', c.candle_lighting_minutes != null ? `${c.candle_lighting_minutes} min before sunset` : ''],
     ['Notes', c.notes],
