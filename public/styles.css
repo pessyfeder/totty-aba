@@ -288,4 +288,5 @@ details.acc > summary.acc-first > .acc-title { margin-left: 0; }
 details.acc > summary.acc-first > .badge:last-child { margin-left: 0; }
 .acc-right button { padding: 4px 12px; min-height: 0; font-size: .85rem; }
 .acc-flat-panel { padding: 0 18px 12px; }
+.acc-flat-panel:not(:has(.intake:not([hidden]))) { display: none; }
 .acc-flat-panel .intake > div:first-child { margin-bottom: 6px; }
