@@ -263,8 +263,10 @@ function handle(err) {
 }
 
 async function route() {
-  app.className = '';
   const m = /^#\/client\/([0-9a-f-]{36})(?:\/(profile|goals|progress|appointments))?$/i.exec(location.hash);
+  // Client pages set 'wide' themselves; resetting it here would squeeze the old page narrower
+  // while the next tab loads, then widen it again (the flicker). Reset only for other pages.
+  if (!m) app.className = '';
   const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
