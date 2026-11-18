@@ -15,9 +15,18 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
 
   // First reply to a new inquiry: the email text, the client information link, and a Send for one waiting client.
   const emailBox = h('div', { class: 'card' });
-  const showEmail = (e) => emailBox.replaceChildren(
-    e.to ? h('div', { class: 'muted' }, `To: ${e.to}`) : '',
-    h('strong', {}, e.subject), h('pre', { style: 'white-space: pre-wrap; font: inherit' }, e.text));
+  // The link field sits inside the email body, on the line where the link appears.
+  const linkInput = inputs[FIELDS.findIndex(([k]) => k === 'client_info_url')];
+  linkInput.style.width = '100%';
+  const showEmail = (e) => {
+    const lines = e.text.split('\n');
+    const at = lines.findIndex((l) => /^(https?:\/\/\S+|\[client information page link\])$/.test(l));
+    const pre = (t) => h('pre', { style: 'white-space: pre-wrap; font: inherit; margin:0' }, t);
+    emailBox.replaceChildren(
+      e.to ? h('div', { class: 'muted' }, `To: ${e.to}`) : '',
+      h('strong', {}, e.subject),
+      ...(at < 0 ? [pre(e.text)] : [pre(lines.slice(0, at).join('\n')), linkInput, pre(lines.slice(at + 1).join('\n'))]));
+  };
   const showTemplate = (t) => showEmail({ ...t, to: '' });
   showTemplate(s.first_reply_template);
   const problems = h('div', {});
@@ -61,8 +70,9 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
     FIELDS.flatMap(([k, label, hint], i) => [
       ...(k === 'client_info_url' ? [h('h3', {}, 'Intake')] : []),
       ...(k === 'consult_booking_url' ? [h('h3', {}, 'Booking links')] : []),
-      h('label', {}, label, inputs[i], h('small', { class: 'muted' }, hint)),
-      ...(k === 'client_info_url' ? firstReply : []),
+      ...(k === 'client_info_url'
+        ? [h('small', { class: 'muted' }, hint), ...firstReply]
+        : [h('label', {}, label, inputs[i], h('small', { class: 'muted' }, hint))]),
       ...(k === 'checkin_booking_url' ? [h('small', {}, 'Preview of the check-in text:'), preview] : [])]),
     h('p', {}, h('button', { type: 'submit' }, 'Save'), ' ', msg));
   logoutBtn.hidden = false;
