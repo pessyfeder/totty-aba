@@ -160,7 +160,7 @@
 <nav aria-label="Main" class="nav">
 <a href="#about">About</a>
 <a href="#contact">Contact</a>
-<a class="cta" href="#contact">Schedule Consultation</a>
+<a class="cta" data-booking href="#contact">Schedule Consultation</a>
 </nav>
 </header>
 <main>
@@ -173,7 +173,7 @@
 <div class="actions">
 <a class="btn primary" href="#contact">Get in touch</a>
 <a class="btn ghost" href="#how">How it works</a>
-<a class="btn ghost" href="#contact">Schedule Consultation</a>
+<a class="btn ghost" data-booking href="#contact">Schedule Consultation</a>
 </div>
 </div>
 
@@ -280,6 +280,13 @@
 </div>
 <script>
   (function () {
+    // Both "Schedule Consultation" buttons use this one link. It must be the same URL as the Settings
+    // "Consultation booking link" (CONSULT_BOOKING_URL) in the app. TODO: URL not supplied yet (SPEC open question 16);
+    // until it is set, the buttons fall back to #contact.
+    var BOOKING_URL = '';
+    if (BOOKING_URL) {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-booking]'), function (a) { a.href = BOOKING_URL; });
+    }
     Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (btn) {
       btn.addEventListener('click', function () {
         var el = document.getElementById(btn.getAttribute('data-copy'));
