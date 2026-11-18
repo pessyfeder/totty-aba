@@ -135,8 +135,9 @@ function clientSearch(clients) {
     list.replaceChildren(...shown.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'client-chip' },
       h('span', { class: 'avatar avatar-lg' }, `${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase()),
       h('span', { class: 'client-chip-text' },
-        h('span', { class: 'client-chip-name' }, `${c.first_name} ${c.last_name}`),
-        h('span', { class: `badge client-chip-status ${c.intake_status === 'active' ? 'ok' : ''}` }, CLIENT_STATUS[c.intake_status] ?? c.intake_status),
+        h('span', { class: 'client-chip-head' },
+          h('span', { class: 'client-chip-name' }, `${c.first_name} ${c.last_name}`),
+          h('span', { class: `badge client-chip-status ${c.intake_status === 'active' ? 'ok' : ''}` }, CLIENT_STATUS[c.intake_status] ?? c.intake_status)),
         c.attention.length ? h('span', { class: 'chip-attn', title: c.attention.join('; ') }, `⚠ ${c.attention.join('; ')}`) : null),
       h('span', { class: 'client-chip-arrow', 'aria-hidden': 'true' }, '›')))));
     empty.hidden = shown.length > 0;

@@ -195,7 +195,7 @@ a.appt-chip, button.appt-chip { display: block; text-decoration: none; backgroun
 }
 
 /* Clients list: large clickable chips */
-.client-chips { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 16px; margin: 8px 0 0; padding: 0; list-style: none; }
+.client-chips { display: grid; grid-template-columns: 1fr; gap: 16px; margin: 8px 0 0; padding: 0; list-style: none; }
 a.client-chip { display: flex; align-items: center; gap: 16px; padding: 22px; min-height: 96px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); text-decoration: none; color: var(--text); transition: border-color .15s, transform .1s; }
 a.client-chip:hover { border-color: var(--accent); transform: translateY(-1px); }
 .client-chip-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
@@ -203,8 +203,9 @@ a.client-chip:hover { border-color: var(--accent); transform: translateY(-1px); 
 .client-search-bar { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
 .client-search, .client-filter { box-sizing: border-box; height: 42px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 15px; line-height: 1.2; }
 .client-search { flex: 0 1 260px; min-width: 160px; }
-.client-filter { flex: 0 0 auto; padding-right: 10px; }
-.client-chip-status { justify-self: start; }
+.client-filter { flex: 0 0 auto; appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23777' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.client-chip-head { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.client-chip-status { flex: none; }
 .client-chip-arrow { font-size: 1.8rem; color: var(--accent); line-height: 1; }
 .avatar { display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: .8rem; }
 .avatar-lg { width: 56px; height: 56px; font-size: 1.1rem; }
