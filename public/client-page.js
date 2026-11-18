@@ -176,8 +176,8 @@ export async function renderClient(ctx, id, tab = 'profile') {
     lbl('Answer type', h('select', { name: 'response_type' }, h('option', { value: 'yes_no' }, 'Yes / No'), h('option', { value: 'duration' }, 'Minutes'))),
     lbl('Time', h('input', { name: 'time', type: 'time', value: '18:30', required: true })),
     lbl('Start date', h('input', { name: 'start_date', type: 'date', value: today(), required: true })),
-    lbl('Target (% yes or average minutes, optional)', h('input', { name: 'target', type: 'number', min: 0, step: 'any' })),
     h('div', { class: 'days-field' }, 'Days', h('details', { class: 'days-pick' }, h('summary', {}, 'Select days'), h('div', { class: 'days-list' }, DAYS.map((d, i) => h('label', { class: 'day-opt' }, h('input', { name: 'day', type: 'checkbox', value: i, checked: true }), ` ${d}`))))),
+    lbl('Target (% yes or average minutes, optional)', h('input', { name: 'target', type: 'number', min: 0, step: 'any' })),
   ], 'Add goal', async (f) => {
     const days = f.getAll('day').map(Number);
     const body = trimmed(f);
@@ -281,7 +281,8 @@ export async function renderClient(ctx, id, tab = 'profile') {
   });
   const groupOrder = ['to_be_scheduled', 'scheduled', 'missed', 'completed', 'cancelled'];
   const apptTab = [
-    h('h2', { class: 'first' }, 'Appointments'),
+    h('div', { class: 'tab-head' }, h('h2', { class: 'first' }, 'Appointments')),
+    addAppt,
     h('p', { class: 'muted' }, 'Appointments booked on the calendar appear here automatically. Add one that still needs booking, and mark each as completed or missed afterwards.'),
     h('div', { class: 'appt-counts' }, groupOrder.slice(0, 4).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
     ...groupOrder.map((s) => {
@@ -289,7 +290,6 @@ export async function renderClient(ctx, id, tab = 'profile') {
       return list.length ? h('section', {}, h('h3', {}, APPT[s]), h('table', { class: 'compact' }, h('tbody', {}, list.map(apptRow)))) : '';
     }),
     c.appointments.length ? '' : h('p', { class: 'muted' }, 'No appointments yet.'),
-    h('details', { open: c.appointments.length === 0 }, h('summary', {}, 'Add an appointment'), addAppt),
   ];
   const noPhone = c.contacts.filter((p) => !p.consent_given_at).length;
   const contactsView = c.contacts.length

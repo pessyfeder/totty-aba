@@ -240,6 +240,8 @@ a.tab:hover { color: var(--text); }
 a.tab.current { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-body h2 { color: var(--accent); }
 .tab-body h2.first { margin-top: 20px; }
+.tab-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
+.tab-head h2 { margin-bottom: 0; }
 .contact-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 @media (max-width: 760px) {
   .client-layout { grid-template-columns: 1fr; gap: 12px; }
