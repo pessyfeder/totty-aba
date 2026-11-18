@@ -22,7 +22,7 @@ const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id 
 const withKind = ({ earlier_checkins, ...a }) => ({ ...a, kind: appointmentKind(a.type, earlier_checkins) });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
+const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'street_address', 'city', 'state', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
 const CONTACT_FIELDS = ['name', 'relationship', 'phone', 'email', 'preferred_channel', 'language', 'status', 'consent_given_at', 'consent_note'];
 const GOAL_FIELDS = ['contact_id', 'title', 'description', 'question_text', 'response_type', 'channel', 'schedule_json', 'date_added', 'start_date', 'end_date', 'status', 'target_json'];
 const REINFORCEMENT_FIELDS = ['name', 'note'];
@@ -53,6 +53,7 @@ function checkClient(f, { partial }) {
   if (!partial) for (const k of ['first_name', 'last_name', 'admission_date', 'latitude', 'longitude', 'timezone']) {
     if (f[k] == null || f[k] === '') throw bad(`${k} is required`);
   }
+  if (f.state != null && !['NY', 'NJ'].includes(f.state)) throw bad('state must be NY or NJ');
   if ('timezone' in f && !validTimezone(f.timezone)) throw bad('timezone is not a valid IANA zone');
   if ('latitude' in f && !(Math.abs(f.latitude) <= 90)) throw bad('latitude out of range');
   if ('longitude' in f && !(Math.abs(f.longitude) <= 180)) throw bad('longitude out of range');

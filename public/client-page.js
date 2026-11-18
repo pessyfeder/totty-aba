@@ -335,14 +335,14 @@ export async function renderClient(ctx, id, tab = 'profile') {
     ['Gender', c.gender],
     ['Date of birth', day10(c.dob)],
     ['Admission date', day10(c.admission_date)],
-    ['Address', c.location_name],
+    ['Location', [c.street_address, c.city, c.state].filter(Boolean).join(', ') || c.location_name],
     ['Candle lighting', c.candle_lighting_minutes != null ? `${c.candle_lighting_minutes} min before sunset` : ''],
     ['Notes', c.notes],
   ].filter(([, v]) => v != null && v !== '').map(([k, v]) => h('div', { class: 'acc-row' }, h('strong', {}, `${k}: `), String(v))));
   const detailsMsg = h('p', { class: 'error', role: 'alert' });
   const dv = (k) => (c[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
   const dfield = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, value: dv(name), ...attrs }));
-  const DETAIL_OPTIONAL = ['gender', 'dob', 'location_name', 'candle_lighting_minutes', 'notes'];
+  const DETAIL_OPTIONAL = ['gender', 'dob', 'location_name', 'street_address', 'city', 'state', 'candle_lighting_minutes', 'notes'];
   const detailsForm = h('form', { class: 'contact-form', onsubmit: async (e) => {
     e.preventDefault();
     detailsMsg.textContent = '';
@@ -361,6 +361,9 @@ export async function renderClient(ctx, id, tab = 'profile') {
     dfield('Gender', 'gender'),
     dfield('Date of birth', 'dob', { type: 'date' }),
     dfield('Admission date', 'admission_date', { type: 'date', required: true }),
+    dfield('Street address', 'street_address', { placeholder: 'e.g. 123 Main St' }),
+    dfield('City', 'city'),
+    h('label', {}, 'State', h('select', { name: 'state' }, h('option', { value: '' }, '—'), ...['NY', 'NJ'].map((s) => h('option', { value: s, selected: c.state === s }, s)))),
     dfield('Location name', 'location_name', { placeholder: 'e.g. Brooklyn, NY' }),
     dfield('Latitude', 'latitude', { type: 'number', step: 'any', min: -90, max: 90, required: true }),
     dfield('Longitude', 'longitude', { type: 'number', step: 'any', min: -180, max: 180, required: true }),

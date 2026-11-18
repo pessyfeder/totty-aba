@@ -207,7 +207,7 @@ function renderClientForm(c = null) {
   const msg = h('p', { class: 'error', role: 'alert' });
   const v = (k) => (c?.[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
   const field = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, value: v(name), ...attrs }));
-  const OPTIONAL = ['gender', 'dob', 'location_name', 'candle_lighting_minutes', 'notes'];
+  const OPTIONAL = ['gender', 'dob', 'location_name', 'street_address', 'city', 'state', 'candle_lighting_minutes', 'notes'];
   const form = h('form', { class: 'login', onsubmit: async (e) => {
     e.preventDefault();
     msg.textContent = '';
@@ -229,6 +229,9 @@ function renderClientForm(c = null) {
     field('Gender', 'gender'),
     field('Date of birth', 'dob', { type: 'date' }),
     field('Admission date', 'admission_date', { type: 'date', required: true }),
+    field('Street address', 'street_address', { placeholder: 'e.g. 123 Main St' }),
+    field('City', 'city'),
+    h('label', {}, 'State', h('select', { name: 'state' }, h('option', { value: '' }, '—'), ...['NY', 'NJ'].map((s) => h('option', { value: s, selected: c?.state === s }, s)))),
     field('Location name', 'location_name', { placeholder: 'e.g. Brooklyn, NY' }),
     field('Latitude', 'latitude', { type: 'number', step: 'any', min: -90, max: 90, required: true }),
     field('Longitude', 'longitude', { type: 'number', step: 'any', min: -180, max: 180, required: true }),
