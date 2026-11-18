@@ -325,7 +325,19 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const reinfBody = h('div', {},
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
     reinforcementForm);
-  const detailsView = h('div', {}, h('div', {}, `Admitted ${String(c.admission_date).slice(0, 10)}`), h('div', {}, c.location_name ?? ''), h('div', { class: 'muted' }, c.timezone));
+  const day10 = (v) => (v ? String(v).slice(0, 10) : '');
+  const detailsView = h('div', { class: 'acc-list' }, [
+    ['Name', `${c.first_name} ${c.last_name}`],
+    ['Gender', c.gender],
+    ['Date of birth', day10(c.dob)],
+    ['Admission date', day10(c.admission_date)],
+    ['Location', c.location_name],
+    ['Coordinates', c.latitude != null && c.longitude != null ? `${c.latitude}, ${c.longitude}` : ''],
+    ['Timezone', c.timezone],
+    ['Lives in Israel', c.in_israel ? 'Yes' : 'No'],
+    ['Candle lighting', c.candle_lighting_minutes != null ? `${c.candle_lighting_minutes} min before sunset` : ''],
+    ['Notes', c.notes],
+  ].filter(([, v]) => v != null && v !== '').map(([k, v]) => h('div', { class: 'acc-row' }, h('strong', {}, `${k}: `), String(v))));
   const detailsMsg = h('p', { class: 'error', role: 'alert' });
   const dv = (k) => (c[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
   const dfield = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, value: dv(name), ...attrs }));
