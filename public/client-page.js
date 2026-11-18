@@ -400,8 +400,12 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const everyone = [...dash.clients.filter((x) => x.id !== id), { id, first_name: c.first_name, last_name: c.last_name, attention: me?.attention ?? [] }]
     .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
   const initials = (x) => `${x.first_name[0] ?? ''}${x.last_name[0] ?? ''}`.toUpperCase();
-  const sideItems = everyone.map((x) => h('a', { href: `#/client/${x.id}/${tab}`, class: `side-item${x.id === id ? ' current' : ''}`, 'data-name': `${x.first_name} ${x.last_name}`.toLowerCase(), 'aria-current': x.id === id ? 'page' : false },
-    h('span', { class: 'avatar' }, initials(x)), h('span', { class: 'side-name' }, `${x.first_name} ${x.last_name}`), x.attention.length ? h('span', { class: 'side-attn', title: x.attention.join('; ') }, '⚠') : ''));
+  const TAB_ICONS = { profile: '👤', goals: '🎯', progress: '📈', appointments: '📅' };
+  const sideItems = everyone.map((x) => h('div', { class: `side-item${x.id === id ? ' current' : ''}`, 'data-name': `${x.first_name} ${x.last_name}`.toLowerCase() },
+    h('a', { class: 'side-link', href: `#/client/${x.id}/${tab}`, 'aria-current': x.id === id ? 'page' : false },
+      h('span', { class: 'avatar' }, initials(x)), h('span', { class: 'side-name' }, `${x.first_name} ${x.last_name}`), x.attention.length ? h('span', { class: 'side-attn', title: x.attention.join('; ') }, '⚠') : ''),
+    h('span', { class: 'side-tabs' }, TABS.map(([k, label]) =>
+      h('a', { href: `#/client/${x.id}/${k}`, class: `side-tab${x.id === id && k === tab ? ' current' : ''}`, title: label, 'aria-label': `${x.first_name} ${x.last_name}: ${label}` }, TAB_ICONS[k])))));
   const search = h('input', { type: 'search', placeholder: 'Search clients', 'aria-label': 'Search clients', oninput: () => {
     const q = search.value.trim().toLowerCase();
     for (const a of sideItems) a.hidden = q !== '' && !a.dataset.name.includes(q);
