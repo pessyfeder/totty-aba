@@ -5,6 +5,7 @@ import { renderReport } from './reports-page.js';
 import { renderSettings } from './settings-page.js';
 import { renderAppointment } from './appointment-page.js';
 import { renderInfoPage } from './info-page.js';
+import { renderIntakeForms } from './intake-forms-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -95,11 +96,13 @@ async function renderDashboard() {
   const option = (href, key, title, text) => h('a', { href, class: 'option' },
     h('span', { class: 'option-icon' }, ICONS[key]()), h('span', { class: 'option-title' }, title), h('span', { class: 'option-text' }, text));
   const n = d.attention.length;
+  const waiting = (await api('/intake-submissions').catch(() => [])).length;
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('h2', { class: 'options-heading' }, 'Dashboard'),
     h('div', { class: 'options' },
       option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View, add and manage your clients.` : 'View, add and manage your clients.'),
+      waiting > 0 && option('#/intake-forms', 'clients', 'Intake forms', `${waiting} new form${waiting === 1 ? '' : 's'} to copy into a client.`),
       option('#/appointments', 'appointments', 'Schedule', 'View upcoming scheduled appointments.'),
       option('#/settings', 'settings', 'Settings', 'Booking links and check-in text.')),
   ].filter(Boolean));
@@ -274,12 +277,11 @@ async function route() {
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
   const apptRoute = /^#\/appointment\/([0-9a-f-]{36})$/i.exec(location.hash);
-  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1], m[2]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/intake-forms' ? renderIntakeForms({ h, api, app, logoutBtn, handle }) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1], m[2]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {
-  const info = /^\/info\/([^/]+)\/?$/.exec(location.pathname); // parents' link: their own Profile page, no login
-  if (info) return renderInfoPage({ h, app }, decodeURIComponent(info[1])).catch(handle);
+  if (location.pathname === '/intake') return renderInfoPage({ h, app }).catch(handle); // public intake form, no login
   try {
     const s = await (await fetch('/api/status')).json();
     showingLocked = false;
@@ -290,11 +292,11 @@ async function boot() {
 }
 
 logoutBtn.addEventListener('click', async () => { await api('/logout', { method: 'POST' }).catch(() => {}); renderLogin(); });
-if (!location.pathname.startsWith('/info/')) window.addEventListener('hashchange', route);
+if (location.pathname !== '/intake') window.addEventListener('hashchange', route);
 // Pick up the Shabbos lock and reopening without a manual refresh, without redrawing
 // (and wiping a half-typed form) while the app is open and unlocked.
 setInterval(async () => {
-  if (location.pathname.startsWith('/info/')) return;
+  if (location.pathname === '/intake') return;
   try {
     const s = await (await fetch('/api/status')).json();
     if (s.locked !== showingLocked) boot();

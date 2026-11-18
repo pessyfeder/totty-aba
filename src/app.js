@@ -14,7 +14,7 @@ import * as consultEmail from './consult-email.js';
 import * as inquiryEmail from './inquiry-email.js';
 import { buildCheckinBody } from './scheduler.js';
 import { appointmentKind } from './calendar.js';
-import { infoRoutes } from './info-routes.js';
+import { infoRoutes, intakeFormRoutes } from './info-routes.js';
 
 // Check-ins this client already had before an appointment: tells the first (baseline) check-in from later bi-weekly ones.
 const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
@@ -103,7 +103,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     res.status(200).end();
   });
 
-  // ---- Parents' client information page (SPEC 5.1a): token link, no login ----
+  // ---- The public intake form (SPEC 5.1a): one general page, no login ----
   infoRoutes({ app, db, now });
 
   // ---- Session + Shabbos lock ----
@@ -619,6 +619,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
 
   // ---- Intake upload + auto-fill (SPEC 5.1a, 5.7b) ----
   intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClient });
+  intakeFormRoutes({ app, db, HttpError, bad, audit, now });
 
   // ---- Progress reports (SPEC 5.6); the parent's /r/:token link is outside /api, so it is not locked ----
   reportRoutes({ app, db, messenger, config, now, HttpError, bad, audit, ownedClient, insertRow })();

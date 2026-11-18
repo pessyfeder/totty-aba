@@ -51,7 +51,7 @@ async function load(db, clientId) {
     `SELECT c.*, cn.name AS clinician_name, cn.settings_json FROM client c JOIN clinician cn ON cn.id = c.clinician_id WHERE c.id = $1`, [clientId]);
   if (!client) return null;
   const { rows: contacts } = await db.query('SELECT * FROM contact WHERE client_id = $1 ORDER BY id', [clientId]);
-  return { client, contacts, clinician: { name: client.clinician_name }, link: (publicUrl && client.info_token ? `${publicUrl}/info/${client.info_token}` : client.settings_json?.client_info_url) ?? '', body: client.settings_json?.first_reply_body };
+  return { client, contacts, clinician: { name: client.clinician_name }, link: (publicUrl ? `${publicUrl}/intake?c=${client.info_token}` : client.settings_json?.client_info_url) ?? '', body: client.settings_json?.first_reply_body };
 }
 
 /** What Totty reviews: status, recipient, the exact text, and anything that blocks sending. Null when no draft exists. */
