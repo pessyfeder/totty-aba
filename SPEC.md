@@ -120,10 +120,11 @@ Each contact logs goal data by **one** of three methods: **text message**, **ema
 - Email delivery uses a transactional email provider that will sign a BAA (open question 12). The provider's inbound email is not used: answers come only through the answer page.
 
 **C) Paper log**
-- The contact records answers on a paper log Totty gives them (one row per goal, one column per day: Y/N, or minutes). **No prompts, follow-ups or daily emails are sent** for these goals, and no prompts are created for them.
+- The contact records answers on a paper log Totty gives them (one row per goal, one column per day: Y/N, or minutes). **No goal prompts, follow-ups or daily emails are sent** for these goals, and no prompts are created for them. The family still gets the **weekly appointment email** (5.7a).
 - The family brings the completed log to a check-in. Totty enters the answers into the app by hand (the manual data entry in 5.5, with `source = 'paper'`; Y/N or minutes under the same value rules, `0` valid, limit 1440). Each entry is recorded in the audit log.
 - Days not entered show as **no response**, never as No (5.5). Entries can be made for past days at any time.
-- The rest is unchanged: the bi-weekly check-in text (5.7a) and report links (5.6) still go to a paper contact who has a mobile number and recorded text consent; without them, Totty reaches the family himself.
+- **Weekly appointment email**: a paper contact gets the weekly check-in as an **email** (not a text) inviting them to schedule an appointment, with the booking link, every 7 days (5.7a). It requires a contact email and recorded consent that covers email; without them, Totty reaches the family himself.
+- Report links (5.6) are unchanged: they still go by text to a paper contact who has a mobile number and recorded text consent.
 - Goals on the paper method are still add-and-archive only (5.2). Changing a contact's method affects only prompts created afterward.
 
 ### 5.5 Charts and progress
@@ -169,6 +170,7 @@ Each contact logs goal data by **one** of three methods: **text message**, **ema
 - After the first check-in, the 7 days are counted from the last check-in text sent to that contact (`checkin_last_sent_at`). "Answered" counts the prompts sent to that contact in the 7 days before the text is due. Only active clients and active contacts receive it; a paused contact gets none and, when resumed, gets the next one at the next permitted time rather than a backlog. It is logged in the message log like any other message.
 - **Skip when already booked**: if the client already has a future appointment (5.7b) when the text is due, the text is skipped for that cycle and `checkin_last_sent_at` is not advanced, so the next check happens at the next permitted time after that appointment has passed. A booking that cannot be matched to a client does not count, so the text is still sent.
 - The text contains no progress details, only the child's first name and the invitation to schedule.
+- **Paper-log contacts** (5.4b C) get this check-in **by email** instead of text. They receive no goal prompts, so there is no answer rate to check: the email **always carries the booking link**, never the "reach out" variant. The first one is due 7 days after baseline starts (or after the contact is switched to paper, if later), then every 7 days from `checkin_last_sent_at`. Skip-when-booked, the send rules (no Shabbos/Yom Tov, no quiet hours, active contacts and clients only, consent required), message-log entry and bounce flagging all apply as for other emails. Same wording and no progress details.
 - **The booking text includes a link to book the appointment** (a scheduling link, stored in Settings as `CHECKIN_BOOKING_URL`; the website's scheduling portal handles both the appointment and payment, so the text carries no separate payment reminder). Example: "Time to schedule a check-in for <first name> with Yisroel Feder, BCBA, LBA: <link>. You can book and pay for your appointment there."
 - **The reach-out text has no link.** Example: "Please reach out to Yisroel Feder, BCBA, LBA, about <first name>'s check-in." The booking link is withheld until a week in which every prompt was answered.
 
@@ -232,7 +234,7 @@ Visibility for Totty:
 8. Calling the send function directly during Shabbos fails with a logged refusal.
 9. During the Shabbos window, logging in or performing any action as Totty is refused with a notice showing when the app reopens, and a parent's reply received then is still recorded.
 10. Replying "20" to a duration prompt stores 20 minutes and the chart updates; replying "abc" is treated as unparseable.
-11. A contact whose first prompt was sent 7 days ago receives a check-in text at a permitted time (not during Shabbos or quiet hours), and again every 7 days after the last one. If all of the last 7 days' prompts were answered, the text has the booking link for Yisroel Feder, BCBA, LBA; otherwise it tells the parent to reach out to him and has no link.
+11. A contact whose first prompt was sent 7 days ago receives a check-in text at a permitted time (not during Shabbos or quiet hours), and again every 7 days after the last one. If all of the last 7 days' prompts were answered, the text has the booking link for Yisroel Feder, BCBA, LBA; otherwise it tells the parent to reach out to him and has no link. A paper-log contact instead gets the check-in by email every 7 days, always with the booking link, and no goal prompts.
 12. Submitting the intake form without the signed consents is refused, with a message naming what is missing. A submission with them creates the client with the informed consent recorded and no text/email consent yet.
 
 ## 10. Milestones
