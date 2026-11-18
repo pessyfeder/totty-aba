@@ -74,7 +74,15 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
       showTemplate((await api('/settings')).first_reply_template);
     } catch (ex) { say('error', ex.message); }
   };
+  // The public intake form: one general page for every family. Shown here so it can be copied and shared anywhere.
+  const intakeUrl = `${location.origin}/intake`;
+  const copied = h('span', { class: 'muted', role: 'status' });
+  const intakeLink = h('p', {}, h('strong', {}, 'Online intake form link: '), h('a', { href: intakeUrl, target: '_blank', rel: 'noopener' }, intakeUrl), ' ',
+    h('button', { type: 'button', class: 'link', onclick: async () => {
+      try { await navigator.clipboard.writeText(intakeUrl); copied.textContent = 'Copied'; } catch { copied.textContent = 'Select the link and copy it'; }
+    } }, 'Copy'), ' ', copied);
   const firstReply = [
+    intakeLink,
     h('h3', {}, 'New client intake email'), emailBox,
     h('label', {}, 'Send to', picker), problems, h('p', {}, sendBtn)];
 
