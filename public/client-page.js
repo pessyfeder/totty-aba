@@ -174,7 +174,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
     lbl('Time', h('input', { name: 'time', type: 'time', value: '18:30', required: true })),
     lbl('Start date', h('input', { name: 'start_date', type: 'date', value: today(), required: true })),
     lbl('Target (% yes or average minutes, optional)', h('input', { name: 'target', type: 'number', min: 0, step: 'any' })),
-    h('fieldset', {}, h('legend', {}, 'Days'), DAYS.map((d, i) => h('label', {}, h('input', { name: 'day', type: 'checkbox', value: i, checked: true }), ` ${d}`))),
+    h('details', { class: 'days-pick' }, h('summary', {}, 'Days'), h('div', { class: 'days-list' }, DAYS.map((d, i) => h('label', { class: 'day-opt' }, h('input', { name: 'day', type: 'checkbox', value: i, checked: true }), ` ${d}`)))),
   ], 'Add goal', async (f) => {
     const days = f.getAll('day').map(Number);
     const body = trimmed(f);

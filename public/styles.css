@@ -323,3 +323,10 @@ form.intake { max-width: 760px; margin: 16px auto; display: grid; gap: 16px; }
 .sig-input { font-family: "Segoe Script", "Brush Script MT", cursive; font-size: 1.15rem; }
 table.rates td { padding: 8px 12px; } table.rates td:last-child { text-align: right; font-weight: 700; white-space: nowrap; }
 @media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } }
+
+/* Collapsible day picker in the goal form */
+details.days-pick { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+details.days-pick > summary { cursor: pointer; padding: 10px 14px; min-height: 44px; display: flex; align-items: center; }
+.days-list { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 14px 12px; }
+.days-list label.day-opt { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; width: auto; margin: 0; }
+.days-list label.day-opt input { width: auto; margin: 0; }
