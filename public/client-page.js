@@ -215,8 +215,10 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const liveGoals = c.goals.filter((g) => g.status !== 'archived');
   const archivedGoals = c.goals.filter((g) => g.status === 'archived');
 
-  const reinforcementForm = inlineForm(h, [lbl('Preferred reinforcement', h('input', { name: 'name', required: true, placeholder: 'e.g. bubbles' }))],
-    'Add', (f) => post('/reinforcements', trimmed(f)));
+  const REINFORCERS = ['Bubbles', 'iPad time', 'Gummy bears', 'Stickers', 'Tickets / tokens', 'Tickling', 'Music', 'Swing', 'Favorite toy', 'Playground time', 'Videos', 'Snack', 'High five', 'Praise'];
+  const have = new Set(c.reinforcements.map((i) => i.name.toLowerCase()));
+  const reinforcementPick = h('select', { 'aria-label': 'Add preferred reinforcement', hidden: true, onchange: (e) => { if (e.target.value) post('/reinforcements', { name: e.target.value }).catch(handle); } },
+    h('option', { value: '' }, 'Choose a reinforcement…'), REINFORCERS.filter((r) => !have.has(r.toLowerCase())).map((r) => h('option', { value: r }, r)));
 
   const intakeDocs = await intakeDocsSection(ctx, id, async (last) => {
     await reload();
@@ -326,7 +328,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
     : h('p', { class: 'muted' }, 'No contacts yet.');
   const reinfBody = h('div', {},
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
-    reinforcementForm);
+    reinforcementPick);
   const day10 = (v) => (v ? String(v).slice(0, 10) : '');
   const detailsView = h('div', { class: 'acc-list' }, [
     ['Name', `${c.first_name} ${c.last_name}`],
@@ -389,7 +391,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
       consultEmail ? chip(h, 'consult', 'Initial consultation email', '', consultEmail.node, consultEmail) : '',
       chip(h, 'contacts', 'Contact info', `${c.contacts.length} ${c.contacts.length === 1 ? 'contact' : 'contacts'}${noPhone ? ` · ${noPhone} without consent` : ''}`, contactsEd.box, { action: { icon: 'edit', label: 'Edit contacts', onclick: contactsEd.toggle } }),
       chip(h, 'reinf', 'Preferred reinforcements', c.reinforcements.map((i) => i.name).join(', '), reinfBody,
-        { action: { icon: 'add', label: 'Add reinforcement', onclick: () => setTimeout(() => reinfBody.querySelector('input')?.focus(), 0) } }),
+        { action: { icon: 'add', label: 'Add reinforcement', onclick: () => { reinforcementPick.hidden = false; reinforcementPick.focus(); } } }),
       chip(h, 'docs', 'Documents', '', intakeDocs.node, { badge: intakeDocs.badge, cls: intakeDocs.cls,
         action: { icon: 'add', label: 'Upload documents', onclick: () => setTimeout(() => intakeDocs.input?.focus(), 0) } })),
   ];
