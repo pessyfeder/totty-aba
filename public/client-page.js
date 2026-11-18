@@ -22,7 +22,8 @@ function inlineForm(h, fields, submitLabel, onSubmit) {
 }
 const trimmed = (f) => Object.fromEntries([...f.entries()].map(([k, v]) => [k, String(v).trim()]).filter(([, v]) => v !== ''));
 
-function goalCard({ h, api, handle }, g, contacts, reload) {
+function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
+  const progress = mode === 'progress';
   const lbl = (text, input) => h('label', {}, text, input);
   const body = h('div', {});
   const summary = h('div', { class: 'muted' }, 'Loading…');
@@ -51,20 +52,20 @@ function goalCard({ h, api, handle }, g, contacts, reload) {
   ], 'Add note', async (f) => { await api(`/goals/${g.id}/annotations`, { method: 'POST', body: trimmed(f) }); await draw(); });
 
   const owner = contacts.find((c) => c.id === g.contact_id);
-  const card = h('article', { class: 'card goal-card' },
-    h('h3', {}, g.title),
-    h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`),
-    summary, rangeBar, body, g.status === 'archived' ? '' : note,
-    g.status === 'archived' ? h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.') : h('div', {},
-      h('button', { type: 'button', class: 'link', onclick: () => {
-        const next = g.status === 'paused' ? 'active' : 'paused';
-        api(`/goals/${g.id}`, { method: 'PATCH', body: { status: next } }).then(reload, handle);
-      } }, g.status === 'paused' ? 'Resume prompts' : 'Pause prompts'),
-      h('button', { type: 'button', class: 'link', onclick: () => {
-        if (!confirm(`Archive "${g.title}"? Prompts stop for good and the goal can't be edited or restored. Its history is kept.`)) return;
-        api(`/goals/${g.id}`, { method: 'PATCH', body: { status: 'archived' } }).then(reload, handle);
-      } }, 'Archive goal')));
-  draw().catch(handle);
+  const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`);
+  const card = progress
+    ? h('article', { class: 'card goal-card' }, h('h3', {}, g.title), meta, summary, rangeBar, body, g.status === 'archived' ? '' : note)
+    : h('article', { class: 'card goal-card' }, h('h3', {}, g.title, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status)), meta,
+      g.status === 'archived' ? h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.') : h('div', {},
+        h('button', { type: 'button', class: 'link', onclick: () => {
+          const next = g.status === 'paused' ? 'active' : 'paused';
+          api(`/goals/${g.id}`, { method: 'PATCH', body: { status: next } }).then(reload, handle);
+        } }, g.status === 'paused' ? 'Resume prompts' : 'Pause prompts'),
+        h('button', { type: 'button', class: 'link', onclick: () => {
+          if (!confirm(`Archive "${g.title}"? Prompts stop for good and the goal can't be edited or restored. Its history is kept.`)) return;
+          api(`/goals/${g.id}`, { method: 'PATCH', body: { status: 'archived' } }).then(reload, handle);
+        } }, 'Archive goal')));
+  if (progress) draw().catch(handle);
   return card;
 }
 
@@ -147,12 +148,14 @@ async function emailSection({ h, api, handle }, id, reload, { path, title, name,
     h('button', { type: 'button', class: 'link', onclick: () => { if (confirm(`Don't send the ${name}?`)) act('cancel'); } }, approved ? 'Cancel' : 'Decline'));
 }
 
-export async function renderClient(ctx, id) {
+const TABS = [['profile', 'Profile'], ['goals', 'Goals'], ['progress', 'Progress']];
+
+export async function renderClient(ctx, id, tab = 'profile') {
   const { h, api, app, logoutBtn, handle } = ctx;
   const c = await api(`/clients/${id}`);
   logoutBtn.hidden = false;
   const lbl = (text, input) => h('label', {}, text, input);
-  const reload = () => renderClient(ctx, id).catch(handle);
+  const reload = () => renderClient(ctx, id, tab).catch(handle);
   const post = (path, body) => api(`/clients/${id}${path}`, { method: 'POST', body }).then(reload);
 
   const goalForm = inlineForm(h, [
@@ -219,15 +222,7 @@ export async function renderClient(ctx, id) {
         } }, 'Go'),
         h('p', { class: 'muted' }, 'No prompts are sent until Go is pressed.')]);
 
-  app.replaceChildren(
-    h('p', {}, h('a', { href: '#/' }, '← Dashboard')),
-    h('h2', {}, `${c.first_name} ${c.last_name}`, ' ', h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
-    h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
-    intakeSection,
-    inquiryEmail,
-    intakeDocs,
-    consultEmail,
-    ...todaySection,
+  const scheduleSection = [
     h('h2', {}, 'Schedule'),
     c.appointments.length
       ? h('table', { class: 'compact' }, h('tbody', {}, c.appointments.map((a) => h('tr', {},
@@ -235,15 +230,64 @@ export async function renderClient(ctx, id) {
           h('td', {}, a.type),
           h('td', { class: a.status === 'cancelled' ? 'muted' : '' }, a.status === 'cancelled' ? 'Cancelled' : new Date(a.starts_at) < new Date() ? 'Past' : 'Upcoming')))))
       : h('p', { class: 'muted' }, 'Nothing scheduled yet.'),
+  ];
+  const contactsSection = [
+    h('h2', {}, 'Contact info'),
+    c.contacts.length
+      ? h('div', { class: 'contact-grid' }, c.contacts.map((p) => h('article', { class: 'card' },
+        h('h3', {}, p.name, p.relationship ? h('span', { class: 'muted' }, ` · ${p.relationship}`) : ''),
+        h('div', {}, p.phone ?? 'No phone'),
+        p.email ? h('div', {}, p.email) : '',
+        h('div', { class: 'muted' }, `${p.preferred_channel === 'call' ? 'Prefers calls' : 'Prefers texts'} · ${p.consent_given_at ? 'consent recorded' : 'no consent recorded'} · ${p.status}`))))
+      : h('p', { class: 'muted' }, 'No contacts yet.'),
+    h('p', {}, h('a', { href: `#/client/${id}/contacts`, class: 'button' }, 'Edit contacts')),
+  ];
+  const reinforcementSection = [
     h('h2', {}, 'Preferred reinforcements'),
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
     reinforcementForm,
-    h('h2', {}, 'Contacts'),
-    h('ul', {}, c.contacts.map((p) => h('li', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${p.phone ?? 'no phone'}, ${p.consent_given_at ? 'consent recorded' : 'no consent recorded'}, ${p.status}`))),
-    h('p', {}, h('a', { href: `#/client/${id}/contacts`, class: 'button' }, 'Edit contacts')),
-    h('h2', {}, 'Goals'),
-    ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload)) : [h('p', { class: 'muted' }, 'No goals yet.')]),
-    c.contacts.length ? h('details', {}, h('summary', {}, 'Add a goal'), goalForm) : h('p', { class: 'muted' }, 'Add a contact (Edit contacts, above) before adding a goal.'),
+  ];
+  const profileTab = [
+    h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
+    intakeSection, inquiryEmail, consultEmail,
+    ...contactsSection, ...reinforcementSection, ...scheduleSection, intakeDocs,
+  ];
+  const goalsTab = [
+    h('h2', { class: 'first' }, 'Goals'),
+    ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals')) : [h('p', { class: 'muted' }, 'No goals yet.')]),
+    c.contacts.length ? h('details', {}, h('summary', {}, 'Add a goal'), goalForm) : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
+    archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals'))) : '',
+  ];
+  const progressTab = [
+    ...todaySection,
+    h('h2', {}, 'Progress'),
+    ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'progress')) : [h('p', { class: 'muted' }, 'No goals to chart yet.')]),
     reports,
-    archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload))) : '');
+    archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'progress'))) : '',
+  ];
+
+  // Sidebar: every client, the current one highlighted; searchable.
+  const everyone = [...dash.clients.filter((x) => x.id !== id), { id, first_name: c.first_name, last_name: c.last_name, attention: me?.attention ?? [] }]
+    .sort((a, b) => `${a.last_name} ${a.first_name}`.localeCompare(`${b.last_name} ${b.first_name}`));
+  const initials = (x) => `${x.first_name[0] ?? ''}${x.last_name[0] ?? ''}`.toUpperCase();
+  const sideItems = everyone.map((x) => h('a', { href: `#/client/${x.id}/${tab}`, class: `side-item${x.id === id ? ' current' : ''}`, 'data-name': `${x.first_name} ${x.last_name}`.toLowerCase(), 'aria-current': x.id === id ? 'page' : false },
+    h('span', { class: 'avatar' }, initials(x)), h('span', { class: 'side-name' }, `${x.first_name} ${x.last_name}`), x.attention.length ? h('span', { class: 'side-attn', title: x.attention.join('; ') }, '⚠') : ''));
+  const search = h('input', { type: 'search', placeholder: 'Search clients', 'aria-label': 'Search clients', oninput: () => {
+    const q = search.value.trim().toLowerCase();
+    for (const a of sideItems) a.hidden = q !== '' && !a.dataset.name.includes(q);
+  } });
+  const sidebar = h('aside', { class: 'sidebar' },
+    h('div', { class: 'side-head' }, 'Clients ', h('span', { class: 'count' }, String(everyone.length))), search, h('nav', { class: 'side-list', 'aria-label': 'Clients' }, sideItems));
+  const tabs = h('nav', { class: 'tabs', 'aria-label': 'Client sections' }, TABS.map(([k, label]) =>
+    h('a', { href: `#/client/${id}/${k}`, class: `tab${k === tab ? ' current' : ''}`, 'aria-current': k === tab ? 'page' : false }, label)));
+
+  app.className = 'wide';
+  app.replaceChildren(h('div', { class: 'client-layout' }, sidebar,
+    h('section', { class: 'client-main' },
+      h('div', { class: 'client-head' },
+        h('a', { href: '#/clients', class: 'back', 'aria-label': 'Back to all clients' }, '‹'),
+        h('h2', {}, `${c.first_name} ${c.last_name}`),
+        h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
+      tabs,
+      h('div', { class: 'tab-body' }, ...(tab === 'goals' ? goalsTab : tab === 'progress' ? progressTab : profileTab)))));
 }

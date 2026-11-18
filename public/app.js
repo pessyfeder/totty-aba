@@ -128,10 +128,12 @@ async function renderClients() {
     ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ Consultation email for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
     d.clients.length
-      ? h('ul', { class: 'chips' }, d.clients.map((c) => h('li', { class: 'chip chip-client' },
-        h('span', { class: 'chip-name' }, `${c.first_name} ${c.last_name}`),
-        c.attention.length ? h('span', { class: 'chip-attn', title: c.attention.join('; ') }, `⚠ Needs attention: ${c.attention.join('; ')}`) : null,
-        h('a', { href: `#/client/${c.id}`, class: 'chip-view', 'aria-label': `View ${c.first_name} ${c.last_name}` }, 'View'))))
+      ? h('ul', { class: 'client-chips' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'client-chip' },
+        h('span', { class: 'avatar avatar-lg' }, `${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase()),
+        h('span', { class: 'client-chip-text' },
+          h('span', { class: 'client-chip-name' }, `${c.first_name} ${c.last_name}`),
+          c.attention.length ? h('span', { class: 'chip-attn', title: c.attention.join('; ') }, `⚠ ${c.attention.join('; ')}`) : null),
+        h('span', { class: 'client-chip-arrow', 'aria-hidden': 'true' }, '›')))))
       : h('p', { class: 'muted' }, 'No clients yet.'),
   ].filter(Boolean));
 }
@@ -184,7 +186,7 @@ async function renderAppointments() {
     ...(list.length ? [] : [h('p', { class: 'muted' }, 'Nothing scheduled this month.')]));
 }
 
-const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);
+const renderClient = (id, tab) => renderClientPage({ h, api, app, logoutBtn, handle }, id, tab);
 
 /** Add (c == null) or edit (c = existing client) form. Editing sends every field, so a cleared optional field is cleared. */
 function renderClientForm(c = null) {
@@ -276,12 +278,13 @@ function handle(err) {
 }
 
 async function route() {
-  const m = /^#\/client\/([0-9a-f-]{36})$/i.exec(location.hash);
+  app.className = '';
+  const m = /^#\/client\/([0-9a-f-]{36})(?:\/(profile|goals|progress))?$/i.exec(location.hash);
   const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
   const apptRoute = /^#\/appointment\/([0-9a-f-]{36})$/i.exec(location.hash);
-  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1], m[2]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {
