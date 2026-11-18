@@ -1,6 +1,6 @@
 // Online new-client intake form (SPEC 5.1a). ONE general public page, /intake (no login, no per-client link), follows the BTB
 // paper packet: client & family information, contact preferences with text/email consent, informed consent, fee policy,
-// session logistics, background, preference assessment, crisis response, release of information (optional) and the NJ / NY
+// session logistics, background, preference assessment, release of information (optional) and the NJ / NY
 // location & eligibility form. Submit validates the required items (every signed consent among them) and CREATES THE CLIENT
 // (status "information submitted") with its parent contact(s) and the recorded consent, then drafts the consultation email for
 // Totty's approval. Typed signatures are stamped with the time of submission. Nothing is contacted automatically.
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { ensureDraft } from './consult-email.js';
 
 const clean = (v, max = 500) => String(v ?? '').trim().slice(0, max);
-const GENDERS = ['Male', 'Female', 'Other'];
+const GENDERS = ['Male', 'Female'];
 const STATES = ['NJ', 'NY'];
 
 /** US-friendly phone entry -> E.164, or null when it cannot be one. */
@@ -32,7 +32,7 @@ export const TEXT = {
     'fav_toys', 'fav_foods', 'fav_social', 'fav_sensory', 'fav_screen', 'fav_other'),
   ...Object.fromEntries(['nj', 'ny'].flatMap((p) => [1, 2, 3, 4, 5].map((i) => [`${p}_i${i}`, 6]))), // typed initials
 };
-const BOOL = ['pref_text', 'pref_email', 'pref_call', 'p2_pref_text', 'p2_pref_email', 'p2_pref_call', 'consent_ack', 'fee_ack', 'crisis_ack'];
+const BOOL = ['pref_text', 'pref_email', 'pref_call', 'p2_pref_text', 'p2_pref_email', 'p2_pref_call', 'consent_ack', 'fee_ack'];
 const CHOICE = { gender: GENDERS, state: STATES, pay_due: ['session', 'other'], roi_direction: ['share', 'receive', 'both'] };
 const DATES = ['dob', 'ny_dx_date', 'roi_until'];
 const SIGS = ['consent_sig', 'roi_sig', 'loc_sig'];
@@ -62,7 +62,6 @@ export function requiredItems(f) {
     ['phone', 'a valid mobile phone number', Boolean(normalizePhone(f.phone))], ['email', 'a valid email address', EMAIL.test(f.email ?? '')],
     ['consent_ack', 'your agreement to the Informed Consent for Services', has('consent_ack')], ['consent_sig', 'your signature under Informed Consent', has('consent_sig')],
     ['fee_ack', 'your acknowledgment of the Fee & Cancellation Policy', has('fee_ack')],
-    ['crisis_ack', 'your acknowledgment of the Crisis & Emergency Response sheet', has('crisis_ack')],
   ];
   if (f.state) {
     const p = f.state === 'NY' ? 'ny' : 'nj';

@@ -1,7 +1,7 @@
 // Online new-client intake form (public page, /intake): one general form for every family. It follows the BTB paper packet, section by section.
 // Answers are kept in this browser while the parent types, so a half-filled form survives a reload; Submit sends it to the app,
 // which creates the client. The page shown afterwards carries the consultation booking link.
-const GENDERS = ['Male', 'Female', 'Other'];
+const GENDERS = ['Male', 'Female'];
 const STATES = [['NJ', 'New Jersey'], ['NY', 'New York']];
 
 const CONSENT_ITEMS = [
@@ -189,17 +189,7 @@ export async function renderInfoPage({ h, app }) {
       h('h4', {}, 'Top 3 overall (ranked)'),
       text('top1', '1.', { wide: true }), text('top2', '2.', { wide: true }), text('top3', '3.', { wide: true })),
 
-    section('7. Crisis & Emergency Response', 'What to do if H.O.P. happens',
-      numbered([
-        'Ensure immediate physical safety first. If you can safely do so, remove your child or others from danger.',
-        'If there is serious risk to life or safety, call 911 (or your local emergency number) right away. Do not wait to contact The BTB Method first.',
-        'Once safe, contact The BTB Method at (718) 344-6806 or Office@TheBTBMethod.com to let us know what happened, so we can review and adjust the plan together.',
-        'Write down what happened as soon as you can, while it’s fresh. This helps us adjust the plan.']),
-      h('p', {}, h('strong', {}, 'H.O.P. means danger to: '), 'H — Him / Herself · O — Others · P — Property. Otherwise — no emergency response needed. Just record it, as always.'),
-      h('p', {}, h('em', {}, '“Hop in — only when there’s H.O.P.”')),
-      check('crisis_ack', 'I have read the Crisis & Emergency Response sheet. *')),
-
-    section('8. Release of Information (optional)', 'Complete only if you’d like The BTB Method to communicate directly with another provider involved in your child’s care (for example, a school, pediatrician, or therapist).',
+    section('7. Release of Information (optional)', 'Complete only if you’d like The BTB Method to communicate directly with another provider involved in your child’s care (for example, a school, pediatrician, or therapist).',
       h('h4', {}, 'Authorize The BTB Method to'),
       radios('roi_direction', [['share', 'Share information with'], ['receive', 'Receive information from'], ['both', 'Both']]),
       text('roi_provider', 'Provider / organization name', { wide: true }), text('roi_contact', 'Contact info (phone / email)', { wide: true }),
@@ -207,7 +197,7 @@ export async function renderInfoPage({ h, app }) {
       text('roi_until', 'This authorization is valid until (date), or until revoked in writing', { type: 'date', wide: true }),
       signature('roi_sig', 'Parent / Caregiver / Educator signature (only if completing this section)')),
 
-    section('9. Telepractice Location & Eligibility', 'Complete the part for your state, initial each item, and sign.',
+    section('8. Telepractice Location & Eligibility', 'Complete the part for your state, initial each item, and sign.',
       locPick, njBox, nyBox, locSig),
 
     h('p', { class: 'muted' }, '* Required'),

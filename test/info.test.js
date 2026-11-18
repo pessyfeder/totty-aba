@@ -27,7 +27,7 @@ const full = {
   dob: '2019-03-14', gender: 'Male', parent_name: 'Rivka Levi', parent_relationship: 'Mother',
   street: '12 Main St', city: 'Lakewood', state: 'NJ', zip: '08701', phone: '(555) 555-0123', email: 'rivka@example.test', language: 'Yiddish',
   pref_text: true,
-  consent_ack: true, consent_sig: 'Rivka Levi', fee_ack: true, crisis_ack: true,
+  consent_ack: true, consent_sig: 'Rivka Levi', fee_ack: true,
   anything_else: 'Likes trains', ...initials('nj'), loc_sig: 'Rivka Levi', evil: 'dropped',
 };
 
