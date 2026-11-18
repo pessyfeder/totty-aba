@@ -181,7 +181,7 @@ async function renderAppointments() {
     h('div', { class: 'cal' },
       ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((n) => h('div', { class: 'cal-dow' }, n)),
       cells),
-    list.length ? null : h('p', { class: 'muted' }, 'Nothing scheduled this month.'));
+    ...(list.length ? [] : [h('p', { class: 'muted' }, 'Nothing scheduled this month.')]));
 }
 
 const renderClient = (id) => renderClientPage({ h, api, app, logoutBtn, handle }, id);
