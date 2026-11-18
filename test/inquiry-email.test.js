@@ -38,7 +38,7 @@ const emailOf = (id) => call('GET', `/api/clients/${id}/inquiry-email`);
 test('the email is plain: first name, the form link, no last name', () => {
   const m = buildInquiryEmail({ client: { first_name: 'Moshe', last_name: 'Levi' }, contact: { name: 'Rivka Levi' }, clinician: { name: 'Yisroel Feder, LBA, BCBA' }, link: LINK });
   assert.match(m.subject, /Moshe/);
-  assert.ok(m.text.includes(LINK) && m.text.includes('Hi Rivka Levi') && /New Jersey or New York/.test(m.text));
+  assert.ok(m.text.includes(LINK) && m.text.startsWith('Hi,') && /fill in your child's information/.test(m.text));
   assert.ok(!/Levi\b(?!,)/.test(m.text.replace('Rivka Levi', '')), 'child last name must not appear');
 });
 
@@ -59,9 +59,9 @@ test('a client created through the API starts at reached out with a draft awaiti
 
 test('approval is refused until the link is set; then it sends once and only once', async () => {
   const c = await newClient('Yosef');
-  await setStatus(c.id, 'paperwork_sent');
+  await setStatus(c.id, 'baseline');
   await setStatus(c.id, 'inquiry'); // back to reached out: drafts
-  assert.deepEqual((await emailOf(c.id)).json.problems, ['Set the client information page link in Settings first.']);
+  assert.deepEqual((await emailOf(c.id)).json.problems, ['Set the app address (PUBLIC_URL) or the client information page link in Settings first.']);
   assert.equal((await call('POST', `/api/clients/${c.id}/inquiry-email/approve`)).status, 400);
   await call('PUT', '/api/settings', { client_info_url: LINK });
 
@@ -71,7 +71,7 @@ test('approval is refused until the link is set; then it sends once and only onc
   assert.equal(env.mails.length, n + 1);
   const m = env.mails.at(-1);
   assert.equal(m.to, 'rivka@example.test');
-  assert.ok(m.text.includes(LINK) && m.text.includes('Yosef'));
+  assert.ok(m.text.includes(LINK) && m.subject.includes('Yosef'));
   assert.equal((await call('POST', `/api/clients/${c.id}/inquiry-email/approve`)).status, 400);
   await sendApproved({ db, mailer: env.mailer, now: env.now });
   assert.equal(env.mails.length, n + 1);
@@ -79,12 +79,12 @@ test('approval is refused until the link is set; then it sends once and only onc
 
 test('no parent email blocks approval until one is added; declining stops it', async () => {
   const c = await newClient('Dovid2', { email: '' });
-  await setStatus(c.id, 'paperwork_sent');
+  await setStatus(c.id, 'baseline');
   await setStatus(c.id, 'inquiry');
   assert.deepEqual((await emailOf(c.id)).json.problems, ['Add an email address for a parent or guardian first.']);
   await db.query(`UPDATE contact SET email = 'new@example.test' WHERE client_id = $1`, [c.id]);
   const d = await newClient('Avrumi');
-  await setStatus(d.id, 'paperwork_sent');
+  await setStatus(d.id, 'baseline');
   await setStatus(d.id, 'inquiry');
   const n = env.mails.length;
   assert.equal((await call('POST', `/api/clients/${d.id}/inquiry-email/cancel`)).json.status, 'cancelled');
@@ -94,7 +94,7 @@ test('no parent email blocks approval until one is added; declining stops it', a
 
 test('an approved email waits out Shabbos, and is dropped if the client moved on', async () => {
   const c = await newClient('Shmuel');
-  await setStatus(c.id, 'paperwork_sent');
+  await setStatus(c.id, 'baseline');
   await setStatus(c.id, 'inquiry');
   await approve(db, c.id);
   const n = env.mails.length;
@@ -106,10 +106,10 @@ test('an approved email waits out Shabbos, and is dropped if the client moved on
   env.at('2026-11-04T15:00:00Z');
 
   const d = await newClient('Zalman');
-  await setStatus(d.id, 'paperwork_sent');
+  await setStatus(d.id, 'baseline');
   await setStatus(d.id, 'inquiry');
   await approve(db, d.id);
-  await setStatus(d.id, 'paperwork_sent'); // Totty sent the paperwork by other means
+  await setStatus(d.id, 'baseline'); // Totty sent the paperwork by other means
   await sendApproved({ db, mailer: env.mailer, now: env.now });
   assert.equal(env.mails.length, n + 1);
   assert.equal((await emailOf(d.id)).json.status, 'cancelled');

@@ -29,7 +29,7 @@ const get = (path) => fetch(base + path, { headers: { 'X-Requested-With': 'totty
 async function newClient(first = 'Moshe', last = 'Levi', extra = {}) {
   const { rows: [c] } = await db.query(
     `INSERT INTO client (clinician_id, first_name, last_name, admission_date, latitude, longitude, timezone, intake_status, gender, notes)
-     VALUES ($1, $2, $3, '2026-11-01', 40.0979, -74.2176, 'America/New_York', 'paperwork_sent', $4, $5) RETURNING *`,
+     VALUES ($1, $2, $3, '2026-11-01', 40.0979, -74.2176, 'America/New_York', 'inquiry', $4, $5) RETURNING *`,
     [world.clinician.id, first, last, extra.gender ?? null, extra.notes ?? null]);
   return c;
 }
@@ -120,10 +120,10 @@ test('documents are attached encrypted, listed, and downloadable only by the own
 
 test('upload does not move a client backwards, and bad files are refused', async () => {
   const c = await newClient();
-  await db.query(`UPDATE client SET intake_status = 'ready' WHERE id = $1`, [c.id]);
+  await db.query(`UPDATE client SET intake_status = 'baseline' WHERE id = $1`, [c.id]);
   const ok = await (await upload(`/api/clients/${c.id}/documents`, 'x.pdf', 'pdf')).json();
   assert.equal(ok.status_advanced, false);
-  assert.equal((await db.query('SELECT intake_status FROM client WHERE id = $1', [c.id])).rows[0].intake_status, 'ready');
+  assert.equal((await db.query('SELECT intake_status FROM client WHERE id = $1', [c.id])).rows[0].intake_status, 'baseline');
   assert.equal((await upload(`/api/clients/${c.id}/documents`, 'run.exe', 'x')).status, 400);
   assert.equal((await upload(`/api/clients/${c.id}/documents`, 'empty.pdf', '')).status, 400);
   assert.equal((await upload(`/api/clients/${c.id}/intake/form`, 'f.csv', 'nonsense,here\r\n1,2')).status, 400);

@@ -25,7 +25,7 @@ const call = (method, path, body) => fetch(base + path, {
   body: body ? JSON.stringify(body) : undefined,
 }).then(async (r) => ({ status: r.status, json: await r.json().catch(() => null) }));
 
-async function newClient(first, { email = 'rivka@example.test', status = 'paperwork_sent' } = {}) {
+async function newClient(first, { email = 'rivka@example.test', status = 'inquiry' } = {}) {
   const { rows: [c] } = await db.query(
     `INSERT INTO client (clinician_id, first_name, last_name, admission_date, latitude, longitude, timezone, intake_status)
      VALUES ($1, $2, 'Levi', '2026-11-01', 40.0979, -74.2176, 'America/New_York', $3) RETURNING *`, [world.clinician.id, first, status]);
@@ -73,7 +73,7 @@ test('approval is refused until a booking link is set; then it sends once and on
   await sendApproved({ db, mailer: env.mailer, now: env.now });
   assert.equal(env.mails.length, before + 1);
   // Re-reaching the status does not draft a second email.
-  await setStatus(c.id, 'paperwork_sent');
+  await setStatus(c.id, 'baseline');
   await setStatus(c.id, 'paperwork_received');
   assert.equal((await emailOf(c.id)).json.status, 'sent');
 });
@@ -124,7 +124,7 @@ test('a failing mailer retries, then gives up and says why; a moved-on client is
   const d = await newClient('Zalman');
   await setStatus(d.id, 'paperwork_received');
   await approve(db, d.id);
-  await setStatus(d.id, 'consult_scheduled'); // consult already booked by other means
+  await setStatus(d.id, 'baseline'); // consult already booked by other means
   const n = env.mails.length;
   await sendApproved({ db, mailer: env.mailer, now: env.now });
   assert.equal(env.mails.length, n);

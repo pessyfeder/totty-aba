@@ -6,7 +6,13 @@ const RANGES = [['week', '1 week'], ['month', '1 month'], ['3months', '3 months'
 const TREND = { improving: 'Improving', flat: 'Flat', declining: 'Declining', not_enough_data: 'Not enough data yet' };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STATUS = { scheduled: 'Scheduled', deferred: 'Deferred', sending: 'Sending', sent: 'Sent', answered: 'Answered', no_response: 'No response', skipped: 'Skipped', failed: 'Failed' };
-const INTAKE = { inquiry: 'Inquiry', paperwork_sent: 'Paperwork sent', paperwork_received: 'Paperwork received', consult_scheduled: 'Consult scheduled', ready: 'Ready (awaiting Go)', active: 'Active' };
+const INTAKE = { inquiry: 'Reached out', paperwork_received: 'Information submitted', baseline: 'Baseline', active: 'Active' };
+// What Yisroel should do next at each status (SPEC 5.1a).
+const NEXT_STEP = {
+  inquiry: 'Reached out: send the email with the link to the profile page for the parents to fill out and submit (review and approve it below).',
+  paperwork_received: 'Information submitted: send the initial consultation email with the document explaining what will be discussed (review and approve it below). At the consultation, set the goals and plan, then press Start baseline.',
+  baseline: 'Baseline: prompts are going to the parents. After a week of consistent replies the parent is texted to schedule the first check-in; the client becomes Active after that appointment.',
+};
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
 const today = () => new Date().toISOString().slice(0, 10);
 
@@ -89,7 +95,7 @@ async function intakeDocsSection({ h, api, handle }, id, reload) {
   const result = h('div', { role: 'status' });
   const show = (r) => result.replaceChildren(
     r.filled?.length ? h('p', { class: 'ok-line' }, `Filled from the form: ${r.filled.join(', ')}.`) : '',
-    r.status_advanced ? h('p', { class: 'ok-line' }, 'Status set to Paperwork received.') : '',
+    r.status_advanced ? h('p', { class: 'ok-line' }, 'Status set to Information submitted.') : '',
     ...(r.warnings ?? []).map((w) => h('p', { class: 'warn-line' }, `⚠ ${w}`)));
   const pick = (label, accept, path, multiple) => {
     const input = h('input', { type: 'file', accept, multiple, required: true });
@@ -122,11 +128,11 @@ async function intakeDocsSection({ h, api, handle }, id, reload) {
 
 /** Initial consultation email (SPEC 5.7b): Totty reads the exact text and approves or declines the first send. */
 const consultEmailSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
-  path: 'consult-email', title: 'Consultation email', name: 'consultation email', hint: 'Paperwork received. Review this email to the family and approve it to send.' });
+  path: 'consult-email', title: 'Initial consultation email', name: 'consultation email', hint: 'Information submitted. Review this email to the family and approve it to send.' });
 
 /** First reply to a new inquiry (SPEC 5.1a): carries the client information page link. */
 const inquiryEmailSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
-  path: 'inquiry-email', title: 'First reply email', name: 'first reply email', hint: 'New inquiry. Review this reply to the family, with the client information page link, and approve it to send.' });
+  path: 'inquiry-email', title: 'Profile page email', name: 'first reply email', hint: 'Reached out. Review this email to the family, with the link to the profile page for them to fill out, and approve it to send.' });
 
 async function emailSection({ h, api, handle }, id, reload, { path, title, name, hint }) {
   const e = await api(`/clients/${id}/${path}`);
@@ -191,6 +197,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const consultEmail = await consultEmailSection(ctx, id, reload).catch((e) => h('p', { class: 'error' }, e.message));
   const inquiryEmail = await inquiryEmailSection(ctx, id, reload).catch((e) => h('p', { class: 'error' }, e.message));
   const reports = await reportsSection(ctx, id);
+  const responseLog = await responseLogSection(ctx, id);
   const dash = await api('/dashboard');
   const me = dash.clients.find((x) => x.id === id);
   const prompts = dash.today.filter((p) => p.client_id === id);
@@ -207,20 +214,38 @@ export async function renderClient(ctx, id, tab = 'profile') {
   ];
 
   const isActive = c.intake_status === 'active';
-  const statusSelect = h('select', { 'aria-label': 'Intake status', disabled: isActive, onchange: (e) => {
+  const isArchived = c.status === 'archived';
+  const statusSelect = h('select', { 'aria-label': 'Client status', disabled: isActive, onchange: (e) => {
     api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: e.target.value } }).then(reload, handle);
-  } }, Object.entries(INTAKE).filter(([k]) => k !== 'active' || isActive)
+  } }, Object.entries(INTAKE)
     .map(([k, label]) => h('option', { value: k, selected: k === c.intake_status }, label)));
   const intakeSection = h('div', { class: 'intake' },
-    h('span', {}, 'Intake: ', h('span', { class: `badge ${isActive ? 'ok' : ''}` }, INTAKE[c.intake_status] ?? c.intake_status), ' '),
+    h('span', {}, 'Client status: ', h('span', { class: `badge ${isActive && !isArchived ? 'ok' : ''}` }, isArchived ? 'Archived' : (INTAKE[c.intake_status] ?? c.intake_status)), ' '),
+    h('span', { class: 'client-actions' },
+      h('button', { type: 'button', onclick: () => {
+        if (!isArchived && !confirm(`Archive ${c.first_name} ${c.last_name}? Prompts stop and they move to Archived. You can restore them any time.`)) return;
+        api(`/clients/${id}/archive`, { method: 'POST', body: { restore: isArchived } }).then(() => { location.hash = '#/clients'; }, handle);
+      } }, isArchived ? 'Restore client' : 'Archive client'), ' ',
+      h('button', { type: 'button', class: 'danger', onclick: () => {
+        if (!confirm(`Permanently delete ${c.first_name} ${c.last_name}? All their contacts, goals, responses and documents are erased and this cannot be undone. (Archive keeps everything.)`)) return;
+        api(`/clients/${id}`, { method: 'DELETE' }).then(() => { location.hash = '#/clients'; }, handle);
+      } }, 'Delete client')),
+    ' ',
     isActive
       ? h('span', { class: 'muted' }, `Active since ${String(c.activated_at).slice(0, 10)}`)
       : [statusSelect, ' ',
-        h('button', { type: 'button', disabled: c.intake_status !== 'ready', title: c.intake_status === 'ready' ? '' : 'Set status to "Ready" first', onclick: () => {
-          if (!confirm(`Press Go for ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
-          api(`/clients/${id}/go`, { method: 'POST' }).then(reload, handle);
-        } }, 'Go'),
-        h('p', { class: 'muted' }, 'No prompts are sent until Go is pressed.')]);
+        c.intake_status === 'paperwork_received'
+          ? h('button', { type: 'button', onclick: () => {
+            if (!confirm(`Start baseline for ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
+            api(`/clients/${id}/go`, { method: 'POST' }).then(reload, handle);
+          } }, 'Start baseline') : '',
+        c.intake_status === 'baseline'
+          ? h('button', { type: 'button', class: 'link', onclick: () => {
+            if (!confirm('Mark as Active now? This normally happens by itself after the first check-in appointment.')) return;
+            api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: 'active' } }).then(reload, handle);
+          } }, 'Mark active') : '',
+        h('p', { class: 'warn-line' }, NEXT_STEP[c.intake_status] ?? ''),
+        h('p', { class: 'muted' }, 'No prompts are sent until baseline starts.')]);
 
   const APPT = { to_be_scheduled: 'To be scheduled', scheduled: 'Scheduled', missed: 'Missed', completed: 'Completed', cancelled: 'Cancelled' };
   const apptWhen = (a) => (a.starts_at ? new Date(a.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No date yet');
@@ -292,6 +317,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
     ...todaySection,
     h('h2', {}, 'Progress'),
     ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'progress')) : [h('p', { class: 'muted' }, 'No goals to chart yet.')]),
+    ...responseLog,
     reports,
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'progress'))) : '',
   ];
@@ -320,4 +346,48 @@ export async function renderClient(ctx, id, tab = 'profile') {
         h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
       tabs,
       h('div', { class: 'tab-body' }, ...(tab === 'goals' ? goalsTab : tab === 'progress' ? progressTab : tab === 'appointments' ? apptTab : profileTab)))));
+}
+
+const EVENT_LABEL = { prompt: 'Question sent', followup: 'Follow-up sent (no reply yet)', reprompt: 'Asked to resend (reply unreadable)', unreadable: 'Parent replied, but it could not be read', reply: 'Parent replied' };
+const fmtStamp = (iso) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const fmtWait = (min) => (min < 60 ? `${min} min` : min < 1440 ? `${Math.round(min / 6) / 10} hr` : `${Math.round(min / 144) / 10} days`);
+
+/** Response log: when each question went out, every follow-up/re-prompt, and when (or whether) the parent answered. */
+async function responseLogSection({ h, api, handle }, clientId) {
+  let range = 'month';
+  const box = h('div', {});
+  const rangeBar = h('div', { class: 'range', role: 'group', 'aria-label': 'Response log range' });
+  const outcome = (e) => {
+    if (e.replied_at) {
+      const last = e.events.filter((x) => x.kind === 'reply').at(-1);
+      const val = last.value_bool != null ? (last.value_bool ? 'Yes' : 'No') : last.value_minutes != null ? `${last.value_minutes} min` : '';
+      return [h('span', { class: 'badge ok' }, 'Replied'), ` ${val}${last.source === 'manual' ? ' (entered manually)' : ''}`];
+    }
+    if (e.status === 'no_response') return [h('span', { class: 'badge bad' }, 'No response')];
+    return [h('span', { class: 'badge' }, STATUS[e.status] ?? e.status)];
+  };
+  async function draw() {
+    for (const b of rangeBar.children) b.setAttribute('aria-pressed', String(b.dataset.r === range));
+    const d = await api(`/clients/${clientId}/response-log?range=${range}`);
+    const s = d.summary;
+    box.replaceChildren(
+      h('p', { class: 'muted' }, `${s.total} questions · ${s.answered} answered · ${s.no_response} no response · ${s.needed_followup} needed a follow-up · ${s.needed_reprompt} needed a re-prompt`),
+      d.entries.length ? h('div', {}, d.entries.map((e) => h('details', { class: 'log-entry' },
+        h('summary', {}, h('strong', {}, e.goal_title), ` · ${e.sent_at ? fmtStamp(e.sent_at) : e.date} · `, ...outcome(e),
+          e.replied_at && e.reply_minutes != null ? h('span', { class: 'muted' }, ` · answered after ${fmtWait(e.reply_minutes)}`) : '',
+          e.followups ? h('span', { class: 'badge' }, `${e.followups} follow-up${e.followups > 1 ? 's' : ''}`) : '',
+          e.reprompts ? h('span', { class: 'badge' }, `${e.reprompts} re-prompt${e.reprompts > 1 ? 's' : ''}`) : ''),
+        h('ul', { class: 'log-events' }, e.events.length
+          ? e.events.map((ev) => h('li', {}, h('time', {}, fmtStamp(ev.at)), ' — ', EVENT_LABEL[ev.kind] ?? ev.kind,
+              ev.kind === 'reply' && ev.value_bool != null ? `: ${ev.value_bool ? 'Yes' : 'No'}` : '',
+              ev.kind === 'reply' && ev.value_minutes != null ? `: ${ev.value_minutes} min` : '',
+              ev.kind === 'reply' && ev.source === 'manual' ? ' (entered by you)' : '',
+              ev.kind === 'unreadable' && ev.text ? `: "${ev.text}"` : ''))
+          : [h('li', { class: 'muted' }, 'Nothing was sent.')],
+          e.status === 'no_response' && !e.replied_at ? h('li', { class: 'muted' }, 'Day ended with no reply from the parent.') : ''))))
+        : h('p', { class: 'muted' }, 'No questions sent in this range yet.'));
+  }
+  for (const [r, label] of RANGES) rangeBar.append(h('button', { type: 'button', 'data-r': r, onclick: () => { range = r; draw().catch(handle); } }, label));
+  await draw().catch(handle);
+  return [h('h2', {}, 'Parent response log'), rangeBar, box];
 }

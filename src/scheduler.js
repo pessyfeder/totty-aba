@@ -19,7 +19,9 @@ export function buildBody(row, { reminder = false } = {}) {
   return `${reminder ? 'Reminder: ' : ''}Hi, ${row.contact_name}. ${code}${question} ${how}`;
 }
 
-const CHECKIN_FIRST_AFTER_DAYS = 14;
+const CHECKIN_FIRST_AFTER_DAYS = 7;
+// "Consistently responding": the first check-in text goes out only once the parent answered at least this share of the last 7 days' prompts.
+const CONSISTENT_SHARE = 0.7;
 const CHECKIN_EVERY_DAYS = 14;
 
 export function buildCheckinBody(row, link) {
@@ -37,7 +39,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
          FROM goal g
          JOIN client cl ON cl.id = g.client_id
          JOIN contact c ON c.id = g.contact_id
-        WHERE g.status = 'active' AND cl.status = 'active' AND cl.intake_status = 'active'
+        WHERE g.status = 'active' AND cl.status = 'active' AND cl.intake_status IN ('baseline', 'active')
           AND c.status = 'active' AND c.consent_given_at IS NOT NULL AND g.channel = 'sms'
         ORDER BY g.created_at, g.id`,
     );
@@ -93,7 +95,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
 
     for (const r of rows) {
       const settings = r.settings_json;
-      if (r.goal_status !== 'active' || r.contact_status !== 'active' || !r.consent_given_at || r.client_status !== 'active' || r.intake_status !== 'active') {
+      if (r.goal_status !== 'active' || r.contact_status !== 'active' || !r.consent_given_at || r.client_status !== 'active' || !['baseline', 'active'].includes(r.intake_status)) {
         await setStatus(r.id, 'skipped'); // paused/ended goal or contact, or client not yet Go, stops all further prompts
         continue;
       }
@@ -152,7 +154,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
           AND p.followups_sent < COALESCE((cn.settings_json->>'max_followups')::int, 2)
           AND p.sent_at > $1::timestamptz - interval '2 days'
           AND g.status = 'active' AND c.status = 'active' AND c.consent_given_at IS NOT NULL
-          AND cl.status = 'active' AND cl.intake_status = 'active'
+          AND cl.status = 'active' AND cl.intake_status IN ('baseline', 'active')
         ORDER BY p.sent_at, p.id`,
       [at],
     );
@@ -187,20 +189,43 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     }
   }
 
+  /** Did this contact answer at least CONSISTENT_SHARE of the prompts that came due since they started (and at least one)? */
+  async function respondsConsistently({ contact_id: contactId, first_message_at: since }, at) {
+    const { rows: [r] } = await db.query(
+      `SELECT count(*) FILTER (WHERE p.status = 'answered')::int AS answered, count(*)::int AS total
+         FROM prompt p JOIN goal g ON g.id = p.goal_id
+        WHERE g.contact_id = $1 AND p.status IN ('sent', 'answered', 'no_response', 'failed')
+          AND p.scheduled_for >= $3::timestamptz - interval '1 day' AND p.scheduled_for <= $2`, [contactId, at, since]);
+    return r.total > 0 && r.answered / r.total >= CONSISTENT_SHARE;
+  }
+
   /**
-   * Check-in text (SPEC 5.7a): 14 days after a contact's first message, then every 14 days after the last one,
+   * After the first check-in appointment, a baseline client becomes active (SPEC 5.1a). The appointment must be a
+   * check-in that has ended and that falls after baseline began.
+   */
+  async function activateAfterFirstCheckin(at) {
+    await db.query(
+      `UPDATE client SET intake_status = 'active', activated_at = COALESCE(activated_at, $1), updated_at = $1
+        WHERE intake_status = 'baseline' AND status = 'active' AND EXISTS (
+          SELECT 1 FROM appointment a WHERE a.client_id = client.id AND a.type = 'check-in' AND a.status = 'scheduled'
+             AND COALESCE(a.ends_at, a.starts_at + interval '1 hour') <= $1
+             AND (client.baseline_started_at IS NULL OR a.starts_at >= client.baseline_started_at))`, [at]);
+  }
+
+  /**
+   * Check-in text (SPEC 5.7a): 7 days after a contact's first message (if they replied consistently), then every 14 days after the last one,
    * with the link to the website's scheduling portal. Same send rules as prompts: active client and contact, recorded
    * consent, never in a Shabbos/Yom Tov window or quiet hours. A blocked one is sent once the window ends.
    */
   async function sendCheckins(at) {
     const { rows } = await db.query(
-      `SELECT c.id AS contact_id, c.name AS contact_name, c.phone, c.checkin_last_sent_at, cl.first_name,
+      `SELECT c.id AS contact_id, c.name AS contact_name, c.phone, c.checkin_last_sent_at, c.first_message_at, cl.first_name, cl.intake_status,
               cl.latitude, cl.longitude, cl.timezone, cl.in_israel, cl.candle_lighting_minutes, cn.settings_json
          FROM contact c
          JOIN client cl ON cl.id = c.client_id
          JOIN clinician cn ON cn.id = cl.clinician_id
         WHERE c.status = 'active' AND c.phone IS NOT NULL AND c.consent_given_at IS NOT NULL
-          AND cl.status = 'active' AND cl.intake_status = 'active'
+          AND cl.status = 'active' AND cl.intake_status IN ('baseline', 'active')
           AND c.first_message_at IS NOT NULL
           AND COALESCE(c.checkin_last_sent_at + make_interval(days => $2), c.first_message_at + make_interval(days => $3)) <= $1
         ORDER BY c.first_message_at, c.id`,
@@ -210,6 +235,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
       const settings = r.settings_json;
       const link = settings.checkin_booking_url;
       if (!link) continue; // nothing to book with; sent once Totty sets the link
+      if (!r.checkin_last_sent_at && !(await respondsConsistently(r, at))) continue; // first text waits for consistent replies
       if (windowAt(at, locationFrom(r, settings))) continue;
       const q = settings.quiet_hours;
       const hhmm = DateTime.fromJSDate(at, { zone: r.timezone }).toFormat('HH:mm');
@@ -254,8 +280,9 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     await sendDue(at);
     await sendFollowUps(at);
     await sendCheckins(at);
+    await activateAfterFirstCheckin(at);
     await markNoResponse(at);
   }
 
-  return { tick, generatePrompts, sendDue, sendFollowUps, sendCheckins, markNoResponse };
+  return { tick, activateAfterFirstCheckin, generatePrompts, sendDue, sendFollowUps, sendCheckins, markNoResponse };
 }

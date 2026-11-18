@@ -14,6 +14,7 @@ import * as consultEmail from './consult-email.js';
 import * as inquiryEmail from './inquiry-email.js';
 import { buildCheckinBody } from './scheduler.js';
 import { appointmentKind } from './calendar.js';
+import { infoRoutes } from './info-routes.js';
 
 // Check-ins this client already had before an appointment: tells the first (baseline) check-in from later bi-weekly ones.
 const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
@@ -75,6 +76,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   app.use(express.json({ limit: '100kb', verify: (req, _res, buf) => { req.rawBody = buf.toString('utf8'); } }));
   app.use(express.urlencoded({ extended: false }));
 
+  inquiryEmail.setPublicUrl(config.publicUrl);
   app.param('id', (req, res, next, id) => (UUID.test(id) ? next() : next(new HttpError(404, 'Not found'))));
 
   // ---- Telnyx inbound webhook: always accepted, never locked ----
@@ -99,6 +101,9 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     }
     res.status(200).end();
   });
+
+  // ---- Parents' client information page (SPEC 5.1a): token link, no login ----
+  infoRoutes({ app, db, now });
 
   // ---- Session + Shabbos lock ----
   const getClinician = async (id) => {
@@ -342,23 +347,37 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     res.json(row);
   });
 
-  // Intake progress (SPEC 5.1a): Totty moves a client along before Go. `active` is reached only through Go.
-  app.post('/api/clients/:id/intake-status', async (req, res) => {
-    const next = req.body?.intake_status;
-    if (!['inquiry', 'paperwork_sent', 'paperwork_received', 'consult_scheduled', 'ready'].includes(next)) throw bad('Invalid intake status');
+  // Client status (SPEC 5.1a): reached out -> information submitted -> baseline -> active. Yisroel can move a client
+  // between the first three by hand; `active` is reached after the first check-in appointment (or by hand from baseline).
+  const setIntakeStatus = async (req, next, from = null) => {
     const { rows } = await db.query(
-      `UPDATE client SET intake_status = $3, updated_at = now()
-        WHERE id = $1 AND clinician_id = $2 AND intake_status <> 'active' RETURNING *`,
-      [req.params.id, req.clinician.id, next],
+      `UPDATE client SET intake_status = $3, updated_at = now(),
+              baseline_started_at = CASE WHEN $3 = 'baseline' THEN COALESCE(baseline_started_at, now()) ELSE baseline_started_at END,
+              activated_at = CASE WHEN $3 = 'active' THEN COALESCE(activated_at, now()) ELSE activated_at END
+        WHERE id = $1 AND clinician_id = $2 AND intake_status <> 'active' AND ($4::text IS NULL OR intake_status = $4) RETURNING *`,
+      [req.params.id, req.clinician.id, next, from],
     );
     if (!rows.length) {
-      await ownedClient(req, req.params.id);
-      throw bad('Client is already active');
+      await ownedClient(req, req.params.id); // 404 if not theirs
+      throw bad(from ? `Client must be at "${from}" first` : 'Client is already active');
     }
     if (next === 'paperwork_received') await ensureDraft(db, rows[0].id);
     if (next === 'inquiry') await inquiryEmail.ensureDraft(db, rows[0].id);
     await audit(req, 'update', 'client', rows[0].id, { fields: ['intake_status'] });
-    res.json(rows[0]);
+    return rows[0];
+  };
+  // Permanent delete: removes the client and, by cascade, their contacts, goals, prompts, responses and documents.
+  app.delete('/api/clients/:id', async (req, res) => {
+    const { rows } = await db.query(`DELETE FROM client WHERE id = $1 AND clinician_id = $2 RETURNING id`, [req.params.id, req.clinician.id]);
+    if (!rows.length) throw new HttpError(404, 'Client not found');
+    await audit(req, 'delete', 'client', rows[0].id);
+    res.status(204).end();
+  });
+
+  app.post('/api/clients/:id/intake-status', async (req, res) => {
+    const next = req.body?.intake_status;
+    if (!['inquiry', 'paperwork_received', 'baseline', 'active'].includes(next)) throw bad('Invalid intake status');
+    res.json(await setIntakeStatus(req, next, next === 'active' ? 'baseline' : null));
   });
 
   // ---- Initial consultation email (SPEC 5.7b): drafted at paperwork_received, sent only after Totty approves ----
@@ -399,19 +418,10 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     res.json(await inquiryEmail.preview(db, req.params.id));
   });
 
-  // Go (SPEC 5.1a): activates a client that is ready; only then does the app start prompting the family.
+  // Start baseline (SPEC 5.1a): at the initial consultation Yisroel sets goals and the plan, then starts baseline.
+  // From then on prompts go to the family (subject to Shabbos/quiet-hours rules and consent).
   app.post('/api/clients/:id/go', async (req, res) => {
-    const { rows } = await db.query(
-      `UPDATE client SET intake_status = 'active', activated_at = now(), updated_at = now()
-        WHERE id = $1 AND clinician_id = $2 AND intake_status = 'ready' RETURNING *`,
-      [req.params.id, req.clinician.id],
-    );
-    if (!rows.length) {
-      await ownedClient(req, req.params.id); // 404 if not theirs
-      throw bad('Client must be in "ready" status before Go');
-    }
-    await audit(req, 'activate', 'client', rows[0].id);
-    res.json(rows[0]);
+    res.json(await setIntakeStatus(req, 'baseline', 'paperwork_received'));
   });
 
   // ---- Reinforcements (record only, SPEC 5.6a) ----
@@ -497,6 +507,65 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     );
     const { rows: annotations } = await db.query('SELECT id, date::text AS date, text FROM annotation WHERE goal_id = $1 ORDER BY date', [req.params.id]);
     res.json({ goal: g[0], points, annotations, trend: trendOf(points, g[0].response_type) });
+  });
+
+  // Response log: one row per prompt with a dated timeline of what was sent and what the parent did (SPEC 5.4).
+  app.get('/api/clients/:id/response-log', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    const days = RANGE_DAYS[req.query.range];
+    const since = days ? new Date(now().getTime() - days * 864e5) : new Date(0);
+    const { rows: prompts } = await db.query(
+      `SELECT p.id, p.goal_id, g.title AS goal_title, g.response_type, ct.name AS contact_name, p.prompt_date::text AS date,
+              p.scheduled_for, p.sent_at, p.status, p.followups_sent, p.last_followup_at
+         FROM prompt p JOIN goal g ON g.id = p.goal_id JOIN contact ct ON ct.id = g.contact_id
+        WHERE g.client_id = $1 AND p.prompt_date >= $2::date AND p.status NOT IN ('scheduled', 'deferred')
+        ORDER BY p.scheduled_for DESC LIMIT 300`,
+      [req.params.id, since.toISOString().slice(0, 10)]);
+    const ids = prompts.map((p) => p.id);
+    const { rows: msgs } = ids.length ? await db.query(
+      `SELECT prompt_id, direction, status, body, created_at FROM message_log
+        WHERE prompt_id = ANY($1::uuid[]) AND status <> 'refused' ORDER BY created_at, id`, [ids]) : { rows: [] };
+    const { rows: resps } = ids.length ? await db.query(
+      `SELECT prompt_id, received_at, value_bool, value_minutes, source FROM response
+        WHERE prompt_id = ANY($1::uuid[]) AND parse_status <> 'unparsed' ORDER BY received_at`, [ids]) : { rows: [] };
+    const entries = prompts.map((p) => {
+      const events = [];
+      let outbound = 0;
+      for (const m of msgs.filter((x) => x.prompt_id === p.id)) {
+        if (m.direction === 'outbound') {
+          const reprompt = /^Sorry, I couldn't read/.test(m.body ?? '');
+          events.push({ at: m.created_at, kind: reprompt ? 'reprompt' : outbound++ === 0 ? 'prompt' : 'followup' });
+        } else if (m.status === 'unparsed') events.push({ at: m.created_at, kind: 'unreadable', text: m.body });
+      }
+      // Prompts with no message log (older data): fall back to the prompt row itself.
+      if (!events.some((e) => e.kind === 'prompt') && p.sent_at) events.push({ at: p.sent_at, kind: 'prompt' });
+      if (!events.some((e) => e.kind === 'followup') && p.followups_sent && p.last_followup_at) events.push({ at: p.last_followup_at, kind: 'followup' });
+      for (const r of resps.filter((x) => x.prompt_id === p.id)) {
+        events.push({ at: r.received_at, kind: 'reply', source: r.source, value_bool: r.value_bool, value_minutes: r.value_minutes });
+      }
+      events.sort((a, b) => new Date(a.at) - new Date(b.at));
+      const reply = [...events].reverse().find((e) => e.kind === 'reply');
+      const sentAt = events.find((e) => e.kind === 'prompt')?.at ?? p.sent_at;
+      return {
+        prompt_id: p.id, goal_id: p.goal_id, goal_title: p.goal_title, response_type: p.response_type, contact_name: p.contact_name,
+        date: p.date, status: p.status, sent_at: sentAt,
+        followups: events.filter((e) => e.kind === 'followup').length,
+        reprompts: events.filter((e) => e.kind === 'reprompt').length,
+        replied_at: reply?.at ?? null,
+        reply_minutes: reply && sentAt ? Math.round((new Date(reply.at) - new Date(sentAt)) / 6e4) : null,
+        events,
+      };
+    });
+    res.json({
+      summary: {
+        total: entries.length,
+        answered: entries.filter((r) => r.replied_at).length,
+        no_response: entries.filter((r) => r.status === 'no_response' && !r.replied_at).length,
+        needed_followup: entries.filter((r) => r.followups > 0).length,
+        needed_reprompt: entries.filter((r) => r.reprompts > 0).length,
+      },
+      entries,
+    });
   });
 
   app.post('/api/goals/:id/annotations', async (req, res) => {

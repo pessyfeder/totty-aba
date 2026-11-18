@@ -7,19 +7,19 @@ import { recipientOf } from './consult-email.js';
 
 const MAX_ATTEMPTS = 3;
 
-/** The email body Totty can edit. {parent}, {child}, {link} and {sign} are filled in per family. */
+/** The email body Totty can edit. {parent}, {link} and {sign} are filled in per family. */
 export const DEFAULT_BODY = [
-  'Hi {parent},',
+  'Hi,',
   '',
-  "Thank you for reaching out about {child}. I'd love to help.",
+  "Thank you for reaching out about your child.",
   '',
-  'The next step is a short client information form. Please open the link below and fill in the section that applies to you, New Jersey or New York:',
+  "The next step is a short client information form. Please open the link below and fill in your child's information.",
   '',
   '{link}',
   '',
-  "Once I receive it, I'll send you a link to schedule our first consultation.",
+  "Once you press Submit, you will receive the details for our initial consultation.",
   '',
-  'If you have any trouble with the form, just reply to this email.',
+  'If you have any questions, just reply to this email.',
   '',
   'Warm regards,',
   '{sign}',
@@ -42,12 +42,16 @@ export async function ensureDraft(db, clientId) {
   return rows.length > 0;
 }
 
+let publicUrl = '';
+/** The app's public address (PUBLIC_URL): the first-reply email links to the client's own /info page when it is set. */
+export const setPublicUrl = (u) => { publicUrl = String(u ?? '').replace(/\/+$/, ''); };
+
 async function load(db, clientId) {
   const { rows: [client] } = await db.query(
     `SELECT c.*, cn.name AS clinician_name, cn.settings_json FROM client c JOIN clinician cn ON cn.id = c.clinician_id WHERE c.id = $1`, [clientId]);
   if (!client) return null;
   const { rows: contacts } = await db.query('SELECT * FROM contact WHERE client_id = $1 ORDER BY id', [clientId]);
-  return { client, contacts, clinician: { name: client.clinician_name }, link: client.settings_json?.client_info_url ?? '', body: client.settings_json?.first_reply_body };
+  return { client, contacts, clinician: { name: client.clinician_name }, link: (publicUrl && client.info_token ? `${publicUrl}/info/${client.info_token}` : client.settings_json?.client_info_url) ?? '', body: client.settings_json?.first_reply_body };
 }
 
 /** What Totty reviews: status, recipient, the exact text, and anything that blocks sending. Null when no draft exists. */
@@ -57,7 +61,7 @@ export async function preview(db, clientId) {
   const w = await load(db, clientId);
   const to = recipientOf(w.contacts);
   const problems = [];
-  if (!w.link) problems.push('Set the client information page link in Settings first.');
+  if (!w.link) problems.push('Set the app address (PUBLIC_URL) or the client information page link in Settings first.');
   if (!to) problems.push('Add an email address for a parent or guardian first.');
   const out = { status: row.status, sent_at: row.sent_at, approved_at: row.approved_at, last_error: row.last_error, problems };
   if (row.status === 'sent') return { ...out, to: row.to_email };
@@ -96,7 +100,7 @@ export async function sendApproved({ db, mailer, now = () => new Date(), clientI
   const sent = [];
   for (const { client_id } of rows) {
     const w = await load(db, client_id);
-    if (w.client.intake_status !== 'inquiry') { // moved on (paperwork already sent): no longer needed
+    if (w.client.intake_status !== 'inquiry') { // moved on (information already submitted): no longer needed
       await db.query(`UPDATE inquiry_email SET status = 'cancelled' WHERE client_id = $1 AND status = 'approved'`, [client_id]);
       continue;
     }

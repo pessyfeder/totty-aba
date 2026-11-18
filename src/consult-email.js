@@ -1,8 +1,14 @@
 // Initial consultation email (SPEC 5.7b). Once intake paperwork is received the app drafts an email carrying the
 // consultation booking link (CONSULT_BOOKING_URL). Totty reviews and approves it; only then is it sent.
-// The email holds no clinical detail: the child's first name and the booking link, nothing else.
+// The email holds no clinical detail: the child's first name, the booking link and the consultation overview document.
 // Shabbos / Yom Tov: an approved email waits while the recipient's window is open and goes out afterwards.
+import { existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { locationFrom, windowAt } from './shabbos.js';
+
+// The document explaining what the initial consultation covers; attached to the email when the file is present.
+const CONSULT_DOC = fileURLToPath(new URL('../btb-forms-english/BTB_Initial_Consultation_Form.pdf', import.meta.url));
+const attachments = () => (existsSync(CONSULT_DOC) ? [{ filename: 'Initial-Consultation-Overview.pdf', path: CONSULT_DOC }] : []);
 
 const MAX_ATTEMPTS = 3;
 
@@ -14,9 +20,11 @@ export function buildConsultEmail({ client, contact, clinician, link }) {
     text: [
       `Hi ${contact.name},`,
       '',
-      `Thank you for returning the paperwork for ${client.first_name}. The next step is a consultation. Please pick a time that works for you here:`,
+      `Thank you for submitting the information for ${client.first_name}. The next step is an initial consultation. Please pick a time that works for you here:`,
       '',
       link,
+      '',
+      'The attached document explains what we will discuss at the consultation: the goals for your child and the priority goal, preferred reinforcements, how the daily text prompts work, and what happens after the first week.',
       '',
       'Looking forward to meeting you.',
       '',
@@ -103,7 +111,7 @@ export async function sendApproved({ db, mailer, now = () => new Date(), clientI
     const { rows: claimed } = await db.query(`UPDATE consult_email SET status = 'sending' WHERE client_id = $1 AND status = 'approved' RETURNING client_id`, [client_id]);
     if (!claimed.length) continue;
     try {
-      const { id } = await mailer.send({ to: to.email.trim(), ...buildConsultEmail({ client: w.client, contact: to, clinician: w.clinician, link: w.link }) });
+      const { id } = await mailer.send({ to: to.email.trim(), ...buildConsultEmail({ client: w.client, contact: to, clinician: w.clinician, link: w.link }), attachments: attachments() });
       await db.query(`UPDATE consult_email SET status = 'sent', sent_at = now(), to_email = $2, provider_id = $3, last_error = NULL WHERE client_id = $1`,
         [client_id, to.email.trim(), id ?? null]);
       sent.push(client_id);
@@ -130,5 +138,5 @@ export const unconfiguredMailer = { async send() { throw new Error('Email is not
 export async function smtpMailer({ url, from }) {
   const { default: nodemailer } = await import('nodemailer');
   const transport = nodemailer.createTransport(url);
-  return { async send({ to, subject, text }) { const info = await transport.sendMail({ from, to, subject, text }); return { id: info.messageId }; } };
+  return { async send({ to, subject, text, attachments }) { const info = await transport.sendMail({ from, to, subject, text, attachments }); return { id: info.messageId }; } };
 }

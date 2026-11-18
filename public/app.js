@@ -125,7 +125,7 @@ async function renderClients() {
     h('div', { class: 'chip-bar' },
       h('a', { href: '#/client/new', class: 'chip chip-add' }, '+ Add client'),
       h('a', { href: '#/archived', class: 'chip chip-archived' }, 'View Archived')),
-    ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ Consultation email for ${c.first_name} ${c.last_name} is waiting for your approval. `,
+    ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ ${c.kind === 'inquiry' ? 'Profile page email' : 'Initial consultation email'} for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
     d.clients.length
       ? h('ul', { class: 'client-chips' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'client-chip' },

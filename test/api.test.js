@@ -240,31 +240,33 @@ test('editing a client can change and clear optional fields; invalid edits are r
   assert.equal(rows.length, 1);
 });
 
-test('Go activates a ready client and is refused from any other intake status', async () => {
+test('Start baseline works from information submitted and is refused from any other status', async () => {
   const { cookie } = await login();
   const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Go', last_name: 'Test', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
   assert.equal(c.json.intake_status, 'inquiry');
   assert.equal((await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} })).status, 400);
-  await db.query(`UPDATE client SET intake_status = 'ready' WHERE id = $1`, [c.json.id]);
+  await db.query(`UPDATE client SET intake_status = 'paperwork_received' WHERE id = $1`, [c.json.id]);
   const go = await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} });
   assert.equal(go.status, 200);
-  assert.equal(go.json.intake_status, 'active');
-  assert.ok(go.json.activated_at);
+  assert.equal(go.json.intake_status, 'baseline');
+  assert.ok(go.json.baseline_started_at);
   assert.equal((await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} })).status, 400);
   assert.equal((await call('/api/clients/999999/go', { method: 'POST', cookie, body: {} })).status, 404);
 });
 
-test('intake status can be moved along but never to active, and not once active', async () => {
+test('status can be moved by hand; active only from baseline, and nothing changes once active', async () => {
   const { cookie } = await login();
   const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'In', last_name: 'Take', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
   const set = (v) => call(`/api/clients/${c.json.id}/intake-status`, { method: 'POST', cookie, body: { intake_status: v } });
-  assert.equal((await set('paperwork_sent')).json.intake_status, 'paperwork_sent');
+  assert.equal((await set('paperwork_received')).json.intake_status, 'paperwork_received');
   assert.equal((await set('active')).status, 400);
   assert.equal((await set('bogus')).status, 400);
-  assert.equal((await set('ready')).json.intake_status, 'ready');
-  await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} });
+  assert.equal((await set('baseline')).json.intake_status, 'baseline');
+  const act = await set('active');
+  assert.equal(act.json.intake_status, 'active');
+  assert.ok(act.json.activated_at);
   assert.equal((await set('inquiry')).status, 400);
-  assert.equal((await call('/api/clients/999999/intake-status', { method: 'POST', cookie, body: { intake_status: 'ready' } })).status, 404);
+  assert.equal((await call('/api/clients/999999/intake-status', { method: 'POST', cookie, body: { intake_status: 'baseline' } })).status, 404);
 });
 
 test('archived clients are listed separately and can be restored', async () => {
@@ -275,6 +277,14 @@ test('archived clients are listed separately and can be restored', async () => {
   assert.ok(!(await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
   await call(`/api/clients/${c.json.id}/archive`, { method: 'POST', cookie, body: { restore: true } });
   assert.ok((await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
+});
+
+test('a client can be permanently deleted', async () => {
+  const { cookie } = await login();
+  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Del', last_name: 'Ete', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  assert.equal((await call(`/api/clients/${c.json.id}`, { method: 'DELETE', cookie })).status, 204);
+  assert.ok(!(await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
+  assert.equal((await call(`/api/clients/${c.json.id}`, { method: 'DELETE', cookie })).status, 404);
 });
 
 test('goals cannot be edited, only paused/resumed or archived; archived goals stop prompting but keep history', async () => {
@@ -318,4 +328,36 @@ test('settings store, normalise and clear booking links, and reject non-web addr
   assert.equal(cleared.json.consult_booking_url, 'https://calendar.google.com/book/abc'); // untouched fields stay
   const { rows: [c] } = await db.query('SELECT settings_json FROM clinician WHERE id = $1', [world.clinician.id]);
   assert.equal(c.settings_json.deferred_prompt_policy, 'send_latest_only'); // other settings survive
+});
+
+test('response log: dated timeline of sends, follow-ups, re-prompts, replies and non-responses', async () => {
+  const { cookie } = await login();
+  const g = await world.addGoal('Log goal');
+  const mk = (day, status) => world.one(
+    `INSERT INTO prompt (goal_id, scheduled_for, prompt_date, sent_at, channel, status) VALUES ($1, $2, $3, $2, 'sms', $4) RETURNING id`,
+    [g.id, `${day}T22:30:00Z`, day, status]);
+  const a = await mk('2026-10-20', 'answered');
+  const ins = (pid, dir, body, status, at) => db.query(
+    `INSERT INTO message_log (direction, to_from, body, status, prompt_id, created_at) VALUES ($1, '+15550000', $2, $3, $4, $5)`, [dir, body, status, pid, at]);
+  await ins(a.id, 'outbound', 'Did Sam use words?', 'sent', '2026-10-20T22:30:00Z');
+  await ins(a.id, 'outbound', 'Reminder: did Sam use words?', 'sent', '2026-10-21T00:30:00Z');
+  await ins(a.id, 'inbound', 'maybe??', 'unparsed', '2026-10-21T00:40:00Z');
+  await ins(a.id, 'outbound', "Sorry, I couldn't read that reply. Please reply Y or N.", 'sent', '2026-10-21T00:40:05Z');
+  await db.query(`INSERT INTO response (prompt_id, received_at, value_bool, source) VALUES ($1, '2026-10-21T01:00:00Z', true, 'sms')`, [a.id]);
+  const n = await mk('2026-10-21', 'no_response');
+  await ins(n.id, 'outbound', 'Did Sam use words?', 'sent', '2026-10-21T22:30:00Z');
+
+  const r = await call(`/api/clients/${g.client_id}/response-log?range=all`, { cookie });
+  assert.equal(r.status, 200);
+  const ea = r.json.entries.find((e) => e.prompt_id === a.id);
+  assert.deepEqual(ea.events.map((e) => e.kind), ['prompt', 'followup', 'unreadable', 'reprompt', 'reply']);
+  assert.equal(ea.followups, 1);
+  assert.equal(ea.reprompts, 1);
+  assert.equal(ea.reply_minutes, 150);
+  const en = r.json.entries.find((e) => e.prompt_id === n.id);
+  assert.equal(en.replied_at, null);
+  assert.equal(r.json.summary.no_response >= 1, true);
+  const other = await seedWorld(db, { email: 'logother@example.test' });
+  const og = await other.addGoal('Private');
+  assert.equal((await call(`/api/clients/${og.client_id}/response-log`, { cookie })).status, 404);
 });

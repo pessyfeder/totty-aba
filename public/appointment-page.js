@@ -7,14 +7,14 @@ const KINDS = {
     label: 'Initial Consultation',
     intro: 'First session with the family, guided by the Initial Consultation Form.',
     agenda: ['Discuss the goals and agree on the priority goal', 'Choose preferred reinforcements', 'Explain how goal logging works (daily text prompts)', 'Explain what happens after the 7-day baseline'],
-    after: ['Send the family the paperwork or follow-ups agreed in the meeting', 'Enter the goals and reinforcements discussed', 'Set the client to Ready, then press Go to start the 7-day baseline'],
+    after: ['Send the family the paperwork or follow-ups agreed in the meeting', 'Enter the goals and reinforcements discussed', 'Press Start baseline on the client page to begin the 7 days of daily prompts'],
     showGoals: false,
   },
   first_checkin: {
     label: 'First check-in (Baseline)',
     intro: 'Review the first 7 days of baseline data with the family.',
     agenda: ['Review the baseline data for each goal', 'Set or confirm goal targets and reinforcement levels', 'Confirm prompt schedules going forward'],
-    after: ['Set or update goal targets and prompt schedules', 'Adjust reinforcements if needed', 'Family books the next check-in (the bi-weekly text carries the booking link)'],
+    after: ['Set or update goal targets and prompt schedules', 'Adjust reinforcements if needed', 'The client becomes Active once this appointment has passed; the family books the next check-in (the bi-weekly text carries the booking link)'],
     showGoals: true, range: 'week',
   },
   biweekly_checkin: {
