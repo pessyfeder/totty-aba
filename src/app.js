@@ -354,12 +354,12 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       `UPDATE client SET intake_status = $3, updated_at = now(),
               baseline_started_at = CASE WHEN $3 = 'baseline' THEN COALESCE(baseline_started_at, now()) ELSE baseline_started_at END,
               activated_at = CASE WHEN $3 = 'active' THEN COALESCE(activated_at, now()) ELSE activated_at END
-        WHERE id = $1 AND clinician_id = $2 AND intake_status <> 'active' AND ($4::text IS NULL OR intake_status = $4) RETURNING *`,
+        WHERE id = $1 AND clinician_id = $2 AND ($4::text IS NULL OR intake_status = $4) RETURNING *`,
       [req.params.id, req.clinician.id, next, from],
     );
     if (!rows.length) {
       await ownedClient(req, req.params.id); // 404 if not theirs
-      throw bad(from ? `Client must be at "${from}" first` : 'Client is already active');
+      throw bad(from ? `Client must be at "${from}" first` : 'Client not found');
     }
     if (next === 'paperwork_received') await ensureDraft(db, rows[0].id);
     if (next === 'inquiry') await inquiryEmail.ensureDraft(db, rows[0].id);

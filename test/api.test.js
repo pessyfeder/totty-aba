@@ -254,7 +254,7 @@ test('Start baseline works from information submitted and is refused from any ot
   assert.equal((await call('/api/clients/999999/go', { method: 'POST', cookie, body: {} })).status, 404);
 });
 
-test('status can be moved by hand; active only from baseline, and nothing changes once active', async () => {
+test('status can be moved by hand; and an active client can be moved back', async () => {
   const { cookie } = await login();
   const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'In', last_name: 'Take', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
   const set = (v) => call(`/api/clients/${c.json.id}/intake-status`, { method: 'POST', cookie, body: { intake_status: v } });
@@ -264,7 +264,7 @@ test('status can be moved by hand; active only from baseline, and nothing change
   const act = await set('active');
   assert.equal(act.json.intake_status, 'active');
   assert.ok(act.json.activated_at);
-  assert.equal((await set('inquiry')).status, 400);
+  assert.equal((await set('inquiry')).json.intake_status, 'inquiry');
   assert.equal((await call('/api/clients/999999/intake-status', { method: 'POST', cookie, body: { intake_status: 'baseline' } })).status, 404);
 });
 

@@ -237,7 +237,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
 
   const isActive = c.intake_status === 'active';
   const isArchived = c.status === 'archived';
-  const statusSelect = h('select', { 'aria-label': 'Client status', disabled: isActive, onchange: (e) => {
+  const statusSelect = h('select', { 'aria-label': 'Change status', onchange: (e) => {
     api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: e.target.value } }).then(reload, handle);
   } }, Object.entries(INTAKE)
     .map(([k, label]) => h('option', { value: k, selected: k === c.intake_status }, label)));
@@ -256,21 +256,17 @@ export async function renderClient(ctx, id, tab = 'profile') {
         api(`/clients/${id}`, { method: 'DELETE' }).then(() => { location.hash = '#/clients'; }, handle);
       } }, 'Delete');
   const intakeSection = h('div', { class: 'intake' },
-    isActive
-      ? ''
-      : [statusSelect, ' ',
-        c.intake_status === 'paperwork_received'
-          ? h('button', { type: 'button', onclick: () => {
-            if (!confirm(`Activate ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
-            api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: 'active' } }).then(reload, handle);
-          } }, 'Activate') : '',
-        c.intake_status === 'baseline'
-          ? h('button', { type: 'button', class: 'link', onclick: () => {
-            if (!confirm('Mark as Active now? This normally happens by itself after the first check-in appointment.')) return;
-            api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: 'active' } }).then(reload, handle);
-          } }, 'Mark active') : '',
-        h('p', { class: 'warn-line' }, NEXT_STEP[c.intake_status] ?? ''),
-        h('p', { class: 'muted' }, 'No prompts are sent until baseline starts.')]);
+    h('div', {}, 'Change status: ', statusSelect),
+    isActive ? '' : [
+      c.intake_status === 'paperwork_received'
+        ? h('button', { type: 'button', onclick: () => {
+          if (!confirm(`Activate ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
+          api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: 'active' } }).then(reload, handle);
+        } }, 'Activate') : '',
+      h('p', { class: 'warn-line' }, NEXT_STEP[c.intake_status] ?? ''),
+      h('p', { class: 'muted' }, 'No prompts are sent until baseline starts.')]);
+  intakeSection.hidden = isActive;
+  const editStatusBtn = h('button', { type: 'button', onclick: () => { intakeSection.hidden = !intakeSection.hidden; } }, 'Edit status');
 
   const APPT = { to_be_scheduled: 'To be scheduled', scheduled: 'Scheduled', missed: 'Missed', completed: 'Completed', cancelled: 'Cancelled' };
   const apptWhen = (a) => (a.starts_at ? new Date(a.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No date yet');
@@ -323,13 +319,11 @@ export async function renderClient(ctx, id, tab = 'profile') {
     reinforcementForm);
   const detailsBody = h('div', {}, h('div', {}, `Admitted ${String(c.admission_date).slice(0, 10)}`), h('div', {}, c.location_name ?? ''), h('div', { class: 'muted' }, c.timezone));
   const statusLabel = isArchived ? 'Archived' : (INTAKE[c.intake_status] ?? c.intake_status);
-  const statusRight = [archiveBtn, deleteBtn];
-  const statusSince = isActive && c.activated_at ? `Active since ${String(c.activated_at).slice(0, 10)}` : '';
-  const statusCls = isActive && !isArchived ? 'ok' : '';
-  const statusChip = isActive
-    ? h('div', { class: 'acc acc-flat' }, h('div', { class: 'acc-flat-row' }, h('span', { class: 'acc-title' }, 'Client status'),
-      h('span', { class: `badge ${statusCls}` }, statusLabel), statusSince ? h('span', { class: 'acc-sum' }, statusSince) : '', h('span', { class: 'acc-right' }, statusRight)))
-    : chip(h, 'status', 'Client status', '', intakeSection, { badge: statusLabel, cls: statusCls, badgeFirst: true, right: statusRight });
+  const statusText = isActive && !isArchived && c.activated_at ? `Active since ${String(c.activated_at).slice(0, 10)}` : statusLabel;
+  const statusChip = h('div', { class: 'acc acc-flat' },
+    h('div', { class: 'acc-flat-row' }, h('span', { class: 'acc-title' }, 'Client status'), h('span', { class: 'acc-sum' }, statusText),
+      h('span', { class: 'acc-right' }, editStatusBtn, archiveBtn, deleteBtn)),
+    h('div', { class: 'acc-flat-panel' }, intakeSection));
   const profileTab = [
     h('div', { class: 'acc-stack' },
       statusChip,

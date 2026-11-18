@@ -198,8 +198,9 @@ a.client-chip:hover { border-color: var(--accent); transform: translateY(-1px); 
 .client-chip-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
 .client-chip-name { font-size: 1.25rem; font-weight: 650; }
 .client-search-bar { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
-.client-search { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; }
-.client-filter { padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; }
+.client-search, .client-filter { box-sizing: border-box; height: 42px; padding: 0 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; font-size: 15px; line-height: 1.2; }
+.client-search { flex: 0 1 260px; min-width: 160px; }
+.client-filter { flex: 0 0 auto; padding-right: 10px; }
 .client-chip-status { justify-self: start; }
 .client-chip-arrow { font-size: 1.8rem; color: var(--accent); line-height: 1; }
 .avatar { display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: .8rem; }
@@ -273,6 +274,9 @@ details.acc > summary > .acc-sum + .badge { margin-left: 0; }
 .acc-body h2 { display: none; }
 .acc-body .intake .client-actions { float: none; display: block; margin-bottom: 8px; }
 .acc-body .chips { margin: 0; }
+.intake select { min-height: 36px; padding: 4px 36px 4px 14px; margin: 2px 0 2px 6px; }
+.intake .client-actions { display: flex; gap: 8px; }
+.intake .client-actions button { min-height: 32px; padding: 3px 12px; font-size: .85rem; border-radius: 8px; }
 .acc-list { display: grid; gap: 10px; }
 .acc-row { padding: 8px 12px; background: var(--bg); border-radius: 10px; }
 
@@ -281,3 +285,5 @@ details.acc > summary > .acc-sum + .badge { margin-left: 0; }
 details.acc > summary.acc-first > .acc-title { margin-left: 0; }
 details.acc > summary.acc-first > .badge:last-child { margin-left: 0; }
 .acc-right button { padding: 4px 12px; min-height: 0; font-size: .85rem; }
+.acc-flat-panel { padding: 0 18px 12px; }
+.acc-flat-panel .intake > div:first-child { margin-bottom: 6px; }
