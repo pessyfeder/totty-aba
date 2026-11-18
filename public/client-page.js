@@ -62,16 +62,27 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
   const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`);
   const card = progress
     ? h('article', { class: 'card goal-card' }, h('h3', {}, g.title), meta, summary, rangeBar, body, g.status === 'archived' ? '' : note)
-    : h('article', { class: 'card goal-card' }, h('h3', {}, g.title, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status)), meta,
-      g.status === 'archived' ? h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.') : h('div', {},
-        h('button', { type: 'button', class: 'link', onclick: () => {
-          const next = g.status === 'paused' ? 'active' : 'paused';
-          api(`/goals/${g.id}`, { method: 'PATCH', body: { status: next } }).then(reload, handle);
-        } }, g.status === 'paused' ? 'Resume prompts' : 'Pause prompts'),
-        h('button', { type: 'button', class: 'link', onclick: () => {
-          if (!confirm(`Archive "${g.title}"? Prompts stop for good and the goal can't be edited or restored. Its history is kept.`)) return;
-          api(`/goals/${g.id}`, { method: 'PATCH', body: { status: 'archived' } }).then(reload, handle);
-        } }, 'Archive goal')));
+    : goalListCard();
+  function goalListCard() {
+    if (g.status === 'archived') {
+      return h('article', { class: 'card goal-card' }, h('h3', {}, g.title, ' ', h('span', { class: 'badge' }, g.status)), meta,
+        h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.'));
+    }
+    // The pencil reveals the edit panel in place; Pause/Resume and Archive live there.
+    const panel = h('div', { hidden: true },
+      h('button', { type: 'button', class: 'link', onclick: () => {
+        const next = g.status === 'paused' ? 'active' : 'paused';
+        api(`/goals/${g.id}`, { method: 'PATCH', body: { status: next } }).then(reload, handle);
+      } }, g.status === 'paused' ? 'Resume prompts' : 'Pause prompts'),
+      h('button', { type: 'button', class: 'link', onclick: () => {
+        if (!confirm(`Archive "${g.title}"? Prompts stop for good and the goal can't be edited or restored. Its history is kept.`)) return;
+        api(`/goals/${g.id}`, { method: 'PATCH', body: { status: 'archived' } }).then(reload, handle);
+      } }, 'Archive goal'));
+    const pencil = h('button', { type: 'button', class: 'acc-act', title: 'Edit goal', 'aria-label': `Edit goal: ${g.title}`, onclick: () => { panel.hidden = !panel.hidden; } });
+    pencil.innerHTML = ICON.edit;
+    return h('article', { class: 'card goal-card' },
+      h('h3', {}, g.title, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status), ' ', pencil), meta, panel);
+  }
   if (progress) draw().catch(handle);
   return card;
 }
@@ -276,7 +287,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   ];
   const noPhone = c.contacts.filter((p) => !p.consent_given_at).length;
   const contactsView = c.contacts.length
-    ? h('div', { class: 'acc-list' }, c.contacts.map((p) => h('div', { class: 'acc-row' },
+    ? h('div', { class: 'acc-list' }, c.contacts.map((p, idx) => h('div', { class: 'acc-list', style: idx ? 'margin-top:14px' : '' },
       ...[
         ['Name', p.name],
         ['Relationship to client', p.relationship],
@@ -285,10 +296,10 @@ export async function renderClient(ctx, id, tab = 'profile') {
         ['Preferred contact method', p.preferred_channel === 'call' ? 'Call' : 'Text'],
         ['Consent', p.consent_given_at ? 'Recorded' : 'Not recorded'],
         ['Status', p.status.charAt(0).toUpperCase() + p.status.slice(1)],
-      ].filter(([, v]) => v).map(([k, v]) => h('div', {}, h('strong', {}, `${k}: `), String(v))))))
+      ].filter(([, v]) => v).map(([k, v]) => h('div', { class: 'acc-row' }, h('strong', {}, `${k}: `), String(v))))))
     : h('p', { class: 'muted' }, 'No contacts yet.');
   const reinfBody = h('div', {},
-    c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
+    c.reinforcements.length ? h('div', { class: 'acc-list' }, c.reinforcements.map((i) => h('div', { class: 'acc-row' }, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
     reinforcementPick);
   const day10 = (v) => (v ? String(v).slice(0, 10) : '');
   const ageOf = (v) => {
