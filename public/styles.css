@@ -325,8 +325,10 @@ table.rates td { padding: 8px 12px; } table.rates td:last-child { text-align: ri
 @media (max-width: 520px) { .row2 { grid-template-columns: 1fr; } }
 
 /* Collapsible day picker in the goal form */
-details.days-pick { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
-details.days-pick > summary { cursor: pointer; padding: 10px 14px; min-height: 44px; display: flex; align-items: center; justify-content: space-between; list-style: none; }
+.days-field { display: grid; gap: 5px; font-size: .86rem; font-weight: 500; color: var(--muted); min-width: 0; max-width: 100%; }
+details.days-pick { border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font-size: 1rem; font-weight: 400; }
+details.days-pick:hover { border-color: var(--muted); }
+details.days-pick > summary { cursor: pointer; padding: 10px 14px; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; list-style: none; }
 details.days-pick > summary::-webkit-details-marker { display: none; }
 details.days-pick > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-top: -4px; transition: transform .15s; }
 details.days-pick[open] > summary::after { transform: rotate(-135deg); margin-top: 4px; }
