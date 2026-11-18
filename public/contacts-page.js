@@ -2,16 +2,12 @@
 // Kept on its own page so contact details are not edited by accident from the goals view.
 const STATUS = { active: 'Active', paused: 'Paused (no prompts)', ended: 'Ended' };
 
-export async function renderContacts({ h, api, app, logoutBtn, handle }, clientId) {
-  const c = await api(`/clients/${clientId}`);
-  logoutBtn.hidden = false;
-  const reload = () => renderContacts({ h, api, app, logoutBtn, handle }, clientId).catch(handle);
-
+/** One form for both adding (p == null) and editing. Editing sends every field so cleared fields are cleared. onSaved runs after a successful save. */
+export function contactForm({ h, api }, clientId, p, onSaved) {
   const lbl = (text, input) => h('label', {}, text, input);
   const phoneAttrs = { name: 'phone', type: 'tel', pattern: '\\+[1-9][0-9]{6,14}', title: 'International format, e.g. +15551234567' };
 
-  /** One form for both adding (p == null) and editing. Editing sends every field so cleared fields are cleared. */
-  function contactForm(p) {
+  {
     const msg = h('span', { class: 'error', role: 'alert' });
     const val = (k) => p?.[k] ?? '';
     const consent = h('input', { name: 'consent', type: 'checkbox', checked: Boolean(p?.consent_given_at) });
@@ -30,7 +26,7 @@ export async function renderContacts({ h, api, app, logoutBtn, handle }, clientI
       try {
         if (p) await api(`/contacts/${p.id}`, { method: 'PATCH', body });
         else await api(`/clients/${clientId}/contacts`, { method: 'POST', body });
-        await reload();
+        await onSaved();
       } catch (ex) { msg.textContent = ex.message; }
     } },
       lbl('Name', h('input', { name: 'name', value: val('name'), required: true })),
@@ -46,13 +42,20 @@ export async function renderContacts({ h, api, app, logoutBtn, handle }, clientI
       h('button', { type: 'submit' }, p ? 'Save changes' : 'Add contact'), msg);
     return form;
   }
+}
+
+export async function renderContacts({ h, api, app, logoutBtn, handle }, clientId) {
+  const c = await api(`/clients/${clientId}`);
+  logoutBtn.hidden = false;
+  const reload = () => renderContacts({ h, api, app, logoutBtn, handle }, clientId).catch(handle);
+  const contactForm_ = (p) => contactForm({ h, api }, clientId, p, reload);
 
   app.replaceChildren(
     h('p', {}, h('a', { href: `#/client/${clientId}` }, `← ${c.first_name} ${c.last_name}`)),
     h('h2', {}, 'Contacts'),
     h('p', { class: 'muted' }, 'Pausing or ending a contact stops all prompts to that person.'),
     ...c.contacts.map((p) => h('details', { class: 'card goal-card', open: c.contacts.length === 1 },
-      h('summary', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${STATUS[p.status] ?? p.status}`), contactForm(p))),
+      h('summary', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${STATUS[p.status] ?? p.status}`), contactForm_(p))),
     h('h2', {}, 'Add a contact'),
-    h('div', { class: 'card' }, contactForm(null)));
+    h('div', { class: 'card' }, contactForm_(null)));
 }

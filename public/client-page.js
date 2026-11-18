@@ -1,6 +1,7 @@
 // Client page: contacts, goals, per-goal charts, notes (SPEC 5.1, 5.2, 5.5, 5.6a).
 import { chartFor } from './charts.js';
 import { reportsSection } from './reports-page.js';
+import { contactForm } from './contacts-page.js';
 
 const RANGES = [['week', '1 week'], ['month', '1 month'], ['3months', '3 months'], ['all', 'All']];
 const TREND = { improving: 'Improving', flat: 'Flat', declining: 'Declining', not_enough_data: 'Not enough data yet' };
@@ -176,6 +177,13 @@ function chip(h, key, title, summary, body, { badge, cls, action } = {}) {
   return d;
 }
 
+/** Body = read-only view + a hidden edit panel; the chip's pencil reveals the panel in place (no page change). */
+function editable(h, view, editPanel) {
+  editPanel.hidden = true;
+  const box = h('div', {}, view, editPanel);
+  return { box, toggle: () => { editPanel.hidden = !editPanel.hidden; view.hidden = !editPanel.hidden; } };
+}
+
 const TABS = [['profile', 'Profile'], ['goals', 'Goals'], ['progress', 'Progress'], ['appointments', 'Appointments']];
 
 export async function renderClient(ctx, id, tab = 'profile') {
@@ -308,7 +316,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
     h('details', { open: c.appointments.length === 0 }, h('summary', {}, 'Add an appointment'), addAppt),
   ];
   const noPhone = c.contacts.filter((p) => !p.consent_given_at).length;
-  const contactsBody = c.contacts.length
+  const contactsView = c.contacts.length
     ? h('div', { class: 'acc-list' }, c.contacts.map((p) => h('div', { class: 'acc-row' },
       h('strong', {}, p.name), p.relationship ? h('span', { class: 'muted' }, ` · ${p.relationship}`) : '',
       h('div', {}, [p.phone ?? 'No phone', p.email].filter(Boolean).join(' · ')),
@@ -317,7 +325,45 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const reinfBody = h('div', {},
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
     reinforcementForm);
-  const detailsBody = h('div', {}, h('div', {}, `Admitted ${String(c.admission_date).slice(0, 10)}`), h('div', {}, c.location_name ?? ''), h('div', { class: 'muted' }, c.timezone));
+  const detailsView = h('div', {}, h('div', {}, `Admitted ${String(c.admission_date).slice(0, 10)}`), h('div', {}, c.location_name ?? ''), h('div', { class: 'muted' }, c.timezone));
+  const detailsMsg = h('p', { class: 'error', role: 'alert' });
+  const dv = (k) => (c[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
+  const dfield = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, value: dv(name), ...attrs }));
+  const DETAIL_OPTIONAL = ['gender', 'dob', 'location_name', 'candle_lighting_minutes', 'notes'];
+  const detailsForm = h('form', { class: 'contact-form', onsubmit: async (e) => {
+    e.preventDefault();
+    detailsMsg.textContent = '';
+    const f = new FormData(detailsForm);
+    const body = {};
+    for (const [k, val] of f.entries()) {
+      const t = String(val).trim();
+      if (t !== '') body[k] = t;
+      else if (DETAIL_OPTIONAL.includes(k)) body[k] = null;
+    }
+    body.in_israel = f.get('in_israel') === 'on';
+    try { await api(`/clients/${id}`, { method: 'PATCH', body }); await reload(); } catch (ex) { detailsMsg.textContent = ex.message; }
+  } },
+    dfield('First name', 'first_name', { required: true }),
+    dfield('Last name', 'last_name', { required: true }),
+    dfield('Gender', 'gender'),
+    dfield('Date of birth', 'dob', { type: 'date' }),
+    dfield('Admission date', 'admission_date', { type: 'date', required: true }),
+    dfield('Location name', 'location_name', { placeholder: 'e.g. Brooklyn, NY' }),
+    dfield('Latitude', 'latitude', { type: 'number', step: 'any', min: -90, max: 90, required: true }),
+    dfield('Longitude', 'longitude', { type: 'number', step: 'any', min: -180, max: 180, required: true }),
+    dfield('Timezone', 'timezone', { required: true }),
+    h('label', {}, h('input', { name: 'in_israel', type: 'checkbox', checked: Boolean(c.in_israel) }), ' Lives in Israel (Yom Tov observance)'),
+    dfield('Candle lighting (minutes before sunset)', 'candle_lighting_minutes', { type: 'number', min: 0, placeholder: 'default 18' }),
+    h('label', {}, 'Notes', h('textarea', { name: 'notes', rows: 3 }, c.notes ?? '')),
+    h('button', { type: 'submit' }, 'Save changes'), detailsMsg);
+  const detailsEd = editable(h, detailsView, detailsForm);
+  const detailsBody = detailsEd.box;
+
+  const contactsEdit = h('div', {},
+    h('p', { class: 'muted' }, 'Pausing or ending a contact stops all prompts to that person.'),
+    ...c.contacts.map((p) => h('details', { class: 'card goal-card' }, h('summary', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''}`), contactForm({ h, api }, id, p, reload))),
+    h('h3', {}, 'Add a contact'), contactForm({ h, api }, id, null, reload));
+  const contactsEd = editable(h, contactsView, contactsEdit);
   const statusLabel = isArchived ? 'Archived' : (INTAKE[c.intake_status] ?? c.intake_status);
   const statusText = isActive && !isArchived && c.activated_at ? `Active since ${String(c.activated_at).slice(0, 10)}` : statusLabel;
   const statusChip = h('div', { class: 'acc acc-flat' },
@@ -327,10 +373,10 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const profileTab = [
     h('div', { class: 'acc-stack' },
       statusChip,
-      chip(h, 'details', 'Client details', `${c.location_name ?? ''} · ${c.timezone}`, detailsBody, { action: { icon: 'edit', label: 'Edit client details', href: `#/client/${id}/edit` } }),
+      chip(h, 'details', 'Client details', `${c.location_name ?? ''} · ${c.timezone}`, detailsBody, { action: { icon: 'edit', label: 'Edit client details', onclick: detailsEd.toggle } }),
       inquiryEmail ? chip(h, 'inquiry', 'Profile page email', '', inquiryEmail.node, inquiryEmail) : '',
       consultEmail ? chip(h, 'consult', 'Initial consultation email', '', consultEmail.node, consultEmail) : '',
-      chip(h, 'contacts', 'Contact info', `${c.contacts.length} ${c.contacts.length === 1 ? 'contact' : 'contacts'}${noPhone ? ` · ${noPhone} without consent` : ''}`, contactsBody, { action: { icon: 'edit', label: 'Edit contacts', href: `#/client/${id}/contacts` } }),
+      chip(h, 'contacts', 'Contact info', `${c.contacts.length} ${c.contacts.length === 1 ? 'contact' : 'contacts'}${noPhone ? ` · ${noPhone} without consent` : ''}`, contactsEd.box, { action: { icon: 'edit', label: 'Edit contacts', onclick: contactsEd.toggle } }),
       chip(h, 'reinf', 'Preferred reinforcements', c.reinforcements.map((i) => i.name).join(', '), reinfBody,
         { action: { icon: 'add', label: 'Add reinforcement', onclick: () => setTimeout(() => reinfBody.querySelector('input')?.focus(), 0) } }),
       chip(h, 'docs', 'Documents', '', intakeDocs.node, { badge: intakeDocs.badge, cls: intakeDocs.cls,
