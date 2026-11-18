@@ -377,7 +377,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   app.post('/api/clients/:id/intake-status', async (req, res) => {
     const next = req.body?.intake_status;
     if (!['inquiry', 'paperwork_received', 'baseline', 'active'].includes(next)) throw bad('Invalid intake status');
-    res.json(await setIntakeStatus(req, next, next === 'active' ? 'baseline' : null));
+    res.json(await setIntakeStatus(req, next));
   });
 
   // ---- Initial consultation email (SPEC 5.7b): drafted at paperwork_received, sent only after Totty approves ----

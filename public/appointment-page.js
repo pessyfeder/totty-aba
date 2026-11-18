@@ -7,7 +7,7 @@ const KINDS = {
     label: 'Initial Consultation',
     intro: 'First session with the family, guided by the Initial Consultation Form.',
     agenda: ['Discuss the goals and agree on the priority goal', 'Choose preferred reinforcements', 'Explain how goal logging works (daily text prompts)', 'Explain what happens after the 7-day baseline'],
-    after: ['Send the family the paperwork or follow-ups agreed in the meeting', 'Enter the goals and reinforcements discussed', 'Press Start baseline on the client page to begin the 7 days of daily prompts'],
+    after: ['Send the family the paperwork or follow-ups agreed in the meeting', 'Enter the goals and reinforcements discussed', 'Press Activate on the client page to start the daily prompts'],
     showGoals: false,
   },
   first_checkin: {

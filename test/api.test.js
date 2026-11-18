@@ -259,7 +259,6 @@ test('status can be moved by hand; active only from baseline, and nothing change
   const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'In', last_name: 'Take', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
   const set = (v) => call(`/api/clients/${c.json.id}/intake-status`, { method: 'POST', cookie, body: { intake_status: v } });
   assert.equal((await set('paperwork_received')).json.intake_status, 'paperwork_received');
-  assert.equal((await set('active')).status, 400);
   assert.equal((await set('bogus')).status, 400);
   assert.equal((await set('baseline')).json.intake_status, 'baseline');
   const act = await set('active');

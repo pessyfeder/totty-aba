@@ -10,7 +10,7 @@ const INTAKE = { inquiry: 'Reached out', paperwork_received: 'Information submit
 // What Yisroel should do next at each status (SPEC 5.1a).
 const NEXT_STEP = {
   inquiry: 'Reached out: send the email with the link to the profile page for the parents to fill out and submit (review and approve it below).',
-  paperwork_received: 'Information submitted: send the initial consultation email with the document explaining what will be discussed (review and approve it below). At the consultation, set the goals and plan, then press Start baseline.',
+  paperwork_received: 'Information submitted: send the initial consultation email with the document explaining what will be discussed (review and approve it below). At the consultation, set the goals and plan, then press Activate.',
   baseline: 'Baseline: prompts are going to the parents. After a week of consistent replies the parent is texted to schedule the first check-in; the client becomes Active after that appointment.',
 };
 const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -236,9 +236,9 @@ export async function renderClient(ctx, id, tab = 'profile') {
       : [statusSelect, ' ',
         c.intake_status === 'paperwork_received'
           ? h('button', { type: 'button', onclick: () => {
-            if (!confirm(`Start baseline for ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
-            api(`/clients/${id}/go`, { method: 'POST' }).then(reload, handle);
-          } }, 'Start baseline') : '',
+            if (!confirm(`Activate ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
+            api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: 'active' } }).then(reload, handle);
+          } }, 'Activate') : '',
         c.intake_status === 'baseline'
           ? h('button', { type: 'button', class: 'link', onclick: () => {
             if (!confirm('Mark as Active now? This normally happens by itself after the first check-in appointment.')) return;
