@@ -169,7 +169,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
 
   const goalForm = inlineForm(h, [
     lbl('Goal', h('input', { name: 'title', required: true, placeholder: 'e.g. Used words to ask for help' })),
-    lbl('Ask', h('select', { name: 'contact_id', required: true }, c.contacts.map((p) => h('option', { value: p.id }, p.name)))),
+    lbl('Ask', h('select', { name: 'contact_id', required: true }, c.contacts.map((p) => h('option', { value: p.id }, p.relationship ? `${p.name} (${p.relationship})` : p.name)))),
     lbl('Answer type', h('select', { name: 'response_type' }, h('option', { value: 'yes_no' }, 'Yes / No'), h('option', { value: 'duration' }, 'Minutes'))),
     lbl('Time', h('input', { name: 'time', type: 'time', value: '18:30', required: true })),
     lbl('Start date', h('input', { name: 'start_date', type: 'date', value: today(), required: true })),
