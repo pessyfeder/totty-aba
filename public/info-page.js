@@ -163,7 +163,6 @@ export async function renderInfoPage({ h, app }) {
         h('tr', {}, h('td', {}, 'In-Vivo Observation Session (live guidance by video call while you implement strategies with your child across home, school and community)'), h('td', {}, '$325'))),
       h('h4', {}, 'Payment method(s) accepted'),
       h('p', {}, 'Credit card on file (preferred); Zelle or cash also accepted.'),
-      h('h4', {}, 'Payment due'),
       h('p', {}, 'Payment due upon scheduling appointment.'),
       h('h4', {}, 'Receipts'),
       h('p', {}, 'Superbills/receipts are provided upon request for families seeking reimbursement or using an FSA/HSA. The BTB Method does not bill insurance directly.'),
