@@ -5,7 +5,7 @@ const MISSED_THRESHOLD = 3; // no_response prompts in the last 14 days that flag
 
 export async function loadDashboard(db, clinician, at) {
   const { rows: clients } = await db.query(
-    `SELECT c.id, c.first_name, c.last_name,
+    `SELECT c.id, c.first_name, c.last_name, c.intake_status,
             (SELECT COALESCE(json_agg(json_build_object('id', i.id, 'name', i.name, 'note', i.note) ORDER BY i.name), '[]'::json)
                FROM reinforcement i WHERE i.client_id = c.id) AS reinforcements,
             (SELECT count(*)::int FROM prompt p JOIN goal g ON g.id = p.goal_id

@@ -197,6 +197,10 @@ a.client-chip { display: flex; align-items: center; gap: 16px; padding: 22px; mi
 a.client-chip:hover { border-color: var(--accent); transform: translateY(-1px); }
 .client-chip-text { display: grid; gap: 2px; flex: 1; min-width: 0; }
 .client-chip-name { font-size: 1.25rem; font-weight: 650; }
+.client-search-bar { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 14px; }
+.client-search { flex: 1; min-width: 200px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; }
+.client-filter { padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; }
+.client-chip-status { justify-self: start; }
 .client-chip-arrow { font-size: 1.8rem; color: var(--accent); line-height: 1; }
 .avatar { display: inline-grid; place-items: center; flex: none; width: 36px; height: 36px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); font-weight: 700; font-size: .8rem; }
 .avatar-lg { width: 56px; height: 56px; font-size: 1.1rem; }

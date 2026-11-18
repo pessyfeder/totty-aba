@@ -112,18 +112,17 @@ async function intakeDocsSection({ h, api, handle }, id, reload) {
     return form;
   };
   return h('section', {},
-    h('h2', {}, 'Intake documents'),
+    h('h2', {}, 'Documents'),
     ...conflicts.map((c) => h('div', { class: 'warn-line' }, `⚠ Not filled — ${c.field}: you entered "${c.entered}", the form says "${c.form}". Your value was kept; edit the client to resolve.`)),
-    pick('Returned intake form (.csv or .json)', '.csv,.json', `/clients/${id}/intake/form`, false),
-    pick('Other documents (consent, insurance, assessments)', '.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.txt', `/clients/${id}/documents`, true),
+    pick('Documents (consent, insurance, assessments)', '.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.txt', `/clients/${id}/documents`, true),
     result,
     documents.length
       ? h('table', { class: 'compact' }, h('tbody', {}, documents.map((d) => h('tr', {},
           h('td', {}, h('a', { href: `/api/documents/${d.id}` }, d.filename)),
-          h('td', {}, d.kind === 'form' ? 'Intake form' : 'Document'),
+          h('td', {}, 'Document'),
           h('td', {}, fmtSize(d.size_bytes)),
           h('td', {}, String(d.uploaded_at).slice(0, 10))))))
-      : h('p', { class: 'muted' }, 'No intake documents yet.'));
+      : h('p', { class: 'muted' }, 'No documents yet.'));
 }
 
 /** Initial consultation email (SPEC 5.7b): Totty reads the exact text and approves or declines the first send. */
@@ -227,7 +226,13 @@ export async function renderClient(ctx, id, tab = 'profile') {
         api(`/clients/${id}/archive`, { method: 'POST', body: { restore: isArchived } }).then(() => { location.hash = '#/clients'; }, handle);
       } }, isArchived ? 'Restore client' : 'Archive client'), ' ',
       h('button', { type: 'button', class: 'danger', onclick: () => {
-        if (!confirm(`Permanently delete ${c.first_name} ${c.last_name}? All their contacts, goals, responses and documents are erased and this cannot be undone. (Archive keeps everything.)`)) return;
+        const name = `${c.first_name} ${c.last_name}`;
+        if (!confirm(`⚠️ WARNING: PERMANENT DELETION ⚠️\n\nYou are about to permanently delete ${name}.\n\nEVERYTHING will be erased forever: contacts, goals, responses, appointments, progress and documents. There is NO undo and NO way to recover this data.\n\nIf you just want them out of the way, use "Archive client" instead — it keeps everything.\n\nPress OK only if you are absolutely sure.`)) return;
+        const expected = `Delete ${name}`;
+        const typed = prompt(`To confirm, type exactly:\n\n${expected}`);
+        if (typed === null) return;
+        if (typed.trim() !== expected) { alert('Text did not match. Nothing was deleted.'); return; }
+        if (!confirm(`Final confirmation: permanently delete ${name}? This cannot be undone.`)) return;
         api(`/clients/${id}`, { method: 'DELETE' }).then(() => { location.hash = '#/clients'; }, handle);
       } }, 'Delete client')),
     ' ',

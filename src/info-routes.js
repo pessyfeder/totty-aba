@@ -1,83 +1,96 @@
-// Parents' client information page (SPEC 5.1a). The "reached out" email links here (/info/<token>): an unguessable,
-// per-client link with no login. Parents fill in the profile and press Submit, which moves the client to
-// "information submitted" and drafts the initial consultation email for Yisroel's approval.
+// Parents' Profile page (SPEC 5.1a). The "reached out" email links to /info/<token>: an unguessable per-client link
+// (no login) that opens the app's own Profile page for that client. Entries are saved as the parent types, so
+// Yisroel sees them right away; Submit checks the required fields and moves the client to "information submitted".
+import { fileURLToPath } from 'node:url';
 import { ensureDraft } from './consult-email.js';
 
-const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
 const clean = (v, max = 500) => String(v ?? '').trim().slice(0, max);
 const GENDERS = ['Male', 'Female', 'Other'];
+const INDEX = fileURLToPath(new URL('../public/index.html', import.meta.url));
 
-const page = (body) => `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="robots" content="noindex"><title>Client information</title>
-<style>body{font:16px/1.5 system-ui,sans-serif;max-width:34rem;margin:2rem auto;padding:0 1rem;color:#222}label{display:block;margin:.8rem 0 .2rem;font-weight:600}
-input,select,textarea{width:100%;padding:.5rem;font:inherit;box-sizing:border-box}input[type=checkbox]{width:auto}.row{display:flex;gap:.5rem;align-items:flex-start;margin-top:1rem}
-.row label{margin:0;font-weight:400}button{margin-top:1.2rem;padding:.7rem 1.4rem;font:inherit;font-weight:600;cursor:pointer}.err{color:#b00020}.ok{color:#146c2e}</style></head><body>${body}</body></html>`;
+/** US-friendly phone entry -> E.164, or null when it cannot be one. */
+export function normalizePhone(v) {
+  const s = clean(v, 40);
+  const digits = s.replace(/\D/g, '');
+  const e164 = s.startsWith('+') ? `+${digits}` : digits.length === 10 ? `+1${digits}` : digits.length === 11 && digits[0] === '1' ? `+${digits}` : null;
+  return e164 && /^\+[1-9][0-9]{6,14}$/.test(e164) ? e164 : null;
+}
+
+const REQUIRED = [
+  ['dob', "child's date of birth"], ['gender', "child's gender"], ['name', 'your name'], ['relationship', 'your relationship to the child'],
+  ['phone', 'a valid mobile phone number'], ['email', 'a valid email address'], ['consent', 'your agreement to receive text messages'],
+];
 
 export function infoRoutes({ app, db, now = () => new Date() }) {
   const find = async (token) => {
     const { rows } = await db.query(
-      `SELECT c.id, c.first_name, c.dob::text AS dob, c.gender, c.notes, c.intake_status, c.info_submitted_at, cn.name AS clinician_name
-         FROM client c JOIN clinician cn ON cn.id = c.clinician_id WHERE c.info_token = $1 AND c.status = 'active'`, [token]);
+      `SELECT c.id, c.first_name, c.last_name, c.dob::text AS dob, c.gender, c.notes, c.intake_status, c.info_submitted_at, cn.name AS clinician_name
+         FROM client c JOIN clinician cn ON cn.id = c.clinician_id WHERE c.info_token = $1 AND c.status = 'active'`, [String(token)]);
     return rows[0];
   };
+  const contactOf = async (id) => (await db.query('SELECT * FROM contact WHERE client_id = $1 ORDER BY id LIMIT 1', [id])).rows[0];
   const headers = (res) => res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
-  const notFound = (res) => res.status(404).type('html').send(page('<h1>Link not valid</h1><p>This link is not valid. Please ask Yisroel Feder, LBA, BCBA for a new one.</p>'));
+  const view = async (c) => {
+    const p = await contactOf(c.id);
+    return {
+      child: { first_name: c.first_name, last_name: c.last_name }, clinician: c.clinician_name, submitted_at: c.info_submitted_at,
+      dob: c.dob, gender: c.gender, notes: c.notes,
+      parent: { name: p?.name ?? '', relationship: p?.relationship ?? '', phone: p?.phone ?? '', email: p?.email ?? '', consent: Boolean(p?.consent_given_at) },
+    };
+  };
+  const wrap = (fn) => async (req, res) => {
+    headers(res);
+    const c = await find(req.params.token);
+    if (!c) return res.status(404).json({ error: 'This link is not valid. Please ask your behavior analyst for a new one.' });
+    return fn(req, res, c);
+  };
 
-  const form = (c, contact, error) => page(`
-<h1>Information for ${esc(c.first_name)}</h1>
-<p>Please fill in the details below and press Submit. ${esc(c.clinician_name || 'Your behavior analyst')} will contact you about the next step.</p>
-${error ? `<p class="err" role="alert">${esc(error)}</p>` : ''}
-<form method="post">
-<h2>Your child</h2>
-<label for="dob">Date of birth</label><input id="dob" name="dob" type="date" value="${esc(c.dob)}">
-<label for="gender">Gender</label><select id="gender" name="gender"><option value=""></option>${GENDERS.map((g) => `<option${g === c.gender ? ' selected' : ''}>${g}</option>`).join('')}</select>
-<label for="notes">Anything we should know (background, interests, concerns)</label><textarea id="notes" name="notes" rows="4">${esc(c.notes)}</textarea>
-<h2>Parent / guardian</h2>
-<label for="name">Your name</label><input id="name" name="name" required value="${esc(contact?.name)}">
-<label for="relationship">Relationship to child</label><input id="relationship" name="relationship" value="${esc(contact?.relationship)}">
-<label for="phone">Mobile phone (for text prompts)</label><input id="phone" name="phone" type="tel" value="${esc(contact?.phone)}">
-<label for="email">Email</label><input id="email" name="email" type="email" required value="${esc(contact?.email)}">
-<label for="language">Preferred language</label><input id="language" name="language" value="${esc(contact?.language)}">
-<div class="row"><input id="consent" name="consent" type="checkbox" value="1"${contact?.consent_given_at ? ' checked' : ''}><label for="consent">I agree to receive text messages about my child's goals.</label></div>
-<button type="submit">Submit</button></form>`);
-
+  // The page itself is the app's single-page UI; it switches to the parent view when the path is /info/<token>.
   app.get('/info/:token', async (req, res) => {
     headers(res);
-    const c = await find(req.params.token);
-    if (!c) return notFound(res);
-    if (c.info_submitted_at) return res.type('html').send(page(`<h1>Thank you</h1><p class="ok">The information for ${esc(c.first_name)} was submitted. You will hear from us about the next step.</p>`));
-    const { rows: [contact] } = await db.query('SELECT * FROM contact WHERE client_id = $1 ORDER BY id LIMIT 1', [c.id]);
-    res.type('html').send(form(c, contact));
+    res.status((await find(req.params.token)) ? 200 : 404).sendFile(INDEX);
   });
+  app.get('/info-api/:token', wrap(async (req, res, c) => res.json(await view(c))));
 
-  app.post('/info/:token', async (req, res) => {
-    headers(res);
-    const c = await find(req.params.token);
-    if (!c) return notFound(res);
-    const b = req.body ?? {};
-    const { rows: [contact] } = await db.query('SELECT * FROM contact WHERE client_id = $1 ORDER BY id LIMIT 1', [c.id]);
-    const name = clean(b.name, 200), email = clean(b.email, 200);
-    if (!name || !/^[^@\s]+@[^@\s]+$/.test(email)) return res.status(400).type('html').send(form(c, { ...contact, name, email }, 'Please enter your name and a valid email address.'));
-    const dob = /^\d{4}-\d{2}-\d{2}$/.test(clean(b.dob)) ? clean(b.dob) : null;
+  /** Saves what is valid so far (draft) — nothing here changes the client's status. */
+  async function save(c, b) {
+    const dob = /^\d{4}-\d{2}-\d{2}$/.test(clean(b.dob)) && !Number.isNaN(Date.parse(clean(b.dob))) ? clean(b.dob) : null;
     const gender = GENDERS.includes(b.gender) ? b.gender : null;
-    // Only empty client fields are filled; what Yisroel already entered stays.
     await db.query(
-      `UPDATE client SET dob = COALESCE(dob, $2::date), gender = COALESCE(gender, $3), notes = COALESCE(NULLIF(notes, ''), $4),
-              info_submitted_at = $5, updated_at = $5 WHERE id = $1`, [c.id, dob, gender, clean(b.notes, 2000) || null, now()]);
-    const fields = { name, relationship: clean(b.relationship, 100) || null, phone: clean(b.phone, 40) || null, email, language: clean(b.language, 50) || null };
+      `UPDATE client SET dob = $2::date, gender = $3, notes = $4, updated_at = $5 WHERE id = $1`,
+      [c.id, dob, gender, clean(b.notes, 2000) || null, now()]);
+    const p = b.parent ?? {};
+    const contact = await contactOf(c.id);
+    const name = clean(p.name, 200);
+    const email = /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean(p.email, 200)) ? clean(p.email, 200) : null;
+    const f = { name, relationship: clean(p.relationship, 100) || null, phone: normalizePhone(p.phone), email, consent: p.consent === true };
     if (contact) {
       await db.query(
-        `UPDATE contact SET name = $2, relationship = COALESCE($3, relationship), phone = COALESCE($4, phone), email = $5, language = COALESCE($6, language),
-                consent_given_at = CASE WHEN $7 THEN COALESCE(consent_given_at, $8) ELSE consent_given_at END WHERE id = $1`,
-        [contact.id, fields.name, fields.relationship, fields.phone, fields.email, fields.language, b.consent === '1', now()]);
-    } else {
+        `UPDATE contact SET name = COALESCE(NULLIF($2, ''), name), relationship = $3, phone = $4, email = $5,
+                consent_given_at = CASE WHEN $6 THEN COALESCE(consent_given_at, $7) ELSE NULL END WHERE id = $1`,
+        [contact.id, f.name, f.relationship, f.phone, f.email, f.consent, now()]);
+    } else if (name) {
       await db.query(
-        `INSERT INTO contact (client_id, name, relationship, phone, email, language, consent_given_at) VALUES ($1, $2, $3, $4, $5, COALESCE($6, 'en'), $7)`,
-        [c.id, fields.name, fields.relationship, fields.phone, fields.email, fields.language, b.consent === '1' ? now() : null]);
+        `INSERT INTO contact (client_id, name, relationship, phone, email, consent_given_at) VALUES ($1, $2, $3, $4, $5, $6)`,
+        [c.id, name, f.relationship, f.phone, f.email, f.consent ? now() : null]);
     }
-    const { rows } = await db.query(
-      `UPDATE client SET intake_status = 'paperwork_received' WHERE id = $1 AND intake_status = 'inquiry' RETURNING id`, [c.id]);
+  }
+
+  app.put('/info-api/:token', wrap(async (req, res, c) => {
+    await save(c, req.body ?? {});
+    res.json({ saved: true });
+  }));
+
+  app.post('/info-api/:token/submit', wrap(async (req, res, c) => {
+    const b = req.body ?? {}, p = b.parent ?? {};
+    const have = { dob: /^\d{4}-\d{2}-\d{2}$/.test(clean(b.dob)), gender: GENDERS.includes(b.gender), name: clean(p.name), relationship: clean(p.relationship),
+      phone: normalizePhone(p.phone), email: /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clean(p.email)), consent: p.consent === true };
+    const missing = REQUIRED.filter(([k]) => !have[k]).map(([, label]) => label);
+    if (missing.length) return res.status(400).json({ error: `Please fill in: ${missing.join('; ')}.`, missing: REQUIRED.filter(([k]) => !have[k]).map(([k]) => k) });
+    await save(c, b);
+    await db.query('UPDATE client SET info_submitted_at = COALESCE(info_submitted_at, $2), updated_at = $2 WHERE id = $1', [c.id, now()]);
+    const { rows } = await db.query(`UPDATE client SET intake_status = 'paperwork_received' WHERE id = $1 AND intake_status = 'inquiry' RETURNING id`, [c.id]);
     if (rows.length) await ensureDraft(db, c.id);
-    res.type('html').send(page(`<h1>Thank you</h1><p class="ok">The information for ${esc(c.first_name)} was submitted. You will hear from us about the next step.</p>`));
-  });
+    res.json({ submitted: true });
+  }));
 }

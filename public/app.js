@@ -4,6 +4,7 @@ import { renderContacts } from './contacts-page.js';
 import { renderReport } from './reports-page.js';
 import { renderSettings } from './settings-page.js';
 import { renderAppointment } from './appointment-page.js';
+import { renderInfoPage } from './info-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -65,16 +66,6 @@ function renderLogin(message = '') {
   app.replaceChildren(form);
 }
 
-/** Sends a file as the raw request body (filename in X-Filename), like the server's intake routes expect. */
-async function postFile(path, file) {
-  const res = await fetch(path, { method: 'POST', body: file,
-    headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'totty', 'X-Filename': encodeURIComponent(file.name) } });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401) { renderLogin(); throw new Error('login'); }
-  if (!res.ok) throw new Error(data.error ?? `Upload failed (${res.status})`);
-  return data;
-}
-
 const SVG_NS = 'http://www.w3.org/2000/svg';
 /** Builds a 24x24 stroke icon from SVG path data (static strings only). */
 function icon(...paths) {
@@ -127,15 +118,37 @@ async function renderClients() {
       h('a', { href: '#/archived', class: 'chip chip-archived' }, 'View Archived')),
     ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ ${c.kind === 'inquiry' ? 'Profile page email' : 'Initial consultation email'} for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
-    d.clients.length
-      ? h('ul', { class: 'client-chips' }, d.clients.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'client-chip' },
-        h('span', { class: 'avatar avatar-lg' }, `${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase()),
-        h('span', { class: 'client-chip-text' },
-          h('span', { class: 'client-chip-name' }, `${c.first_name} ${c.last_name}`),
-          c.attention.length ? h('span', { class: 'chip-attn', title: c.attention.join('; ') }, `⚠ ${c.attention.join('; ')}`) : null),
-        h('span', { class: 'client-chip-arrow', 'aria-hidden': 'true' }, '›')))))
-      : h('p', { class: 'muted' }, 'No clients yet.'),
+    d.clients.length ? clientSearch(d.clients) : h('p', { class: 'muted' }, 'No clients yet.'),
   ].filter(Boolean));
+}
+
+const CLIENT_STATUS = { inquiry: 'Reached out', paperwork_received: 'Information submitted', baseline: 'Baseline', active: 'Active' };
+
+/** Search box + status filter above the client chips; filters the list in place as Totty types. */
+function clientSearch(clients) {
+  const list = h('ul', { class: 'client-chips' });
+  const empty = h('p', { class: 'muted' }, 'No clients match.');
+  const search = h('input', { type: 'search', class: 'client-search', placeholder: 'Search clients by name…', 'aria-label': 'Search clients by name' });
+  const filter = h('select', { class: 'client-filter', 'aria-label': 'Filter by status' },
+    h('option', { value: '' }, 'All statuses'),
+    ...Object.entries(CLIENT_STATUS).map(([k, label]) => h('option', { value: k }, label)));
+  const draw = () => {
+    const q = search.value.trim().toLowerCase();
+    const shown = clients.filter((c) => (!filter.value || c.intake_status === filter.value)
+      && (!q || `${c.first_name} ${c.last_name}`.toLowerCase().includes(q) || `${c.last_name} ${c.first_name}`.toLowerCase().includes(q)));
+    list.replaceChildren(...shown.map((c) => h('li', {}, h('a', { href: `#/client/${c.id}`, class: 'client-chip' },
+      h('span', { class: 'avatar avatar-lg' }, `${c.first_name[0] ?? ''}${c.last_name[0] ?? ''}`.toUpperCase()),
+      h('span', { class: 'client-chip-text' },
+        h('span', { class: 'client-chip-name' }, `${c.first_name} ${c.last_name}`),
+        h('span', { class: `badge client-chip-status ${c.intake_status === 'active' ? 'ok' : ''}` }, CLIENT_STATUS[c.intake_status] ?? c.intake_status),
+        c.attention.length ? h('span', { class: 'chip-attn', title: c.attention.join('; ') }, `⚠ ${c.attention.join('; ')}`) : null),
+      h('span', { class: 'client-chip-arrow', 'aria-hidden': 'true' }, '›')))));
+    empty.hidden = shown.length > 0;
+  };
+  search.addEventListener('input', draw);
+  filter.addEventListener('change', draw);
+  draw();
+  return h('div', {}, h('div', { class: 'client-search-bar' }, search, filter), list, empty);
 }
 
 const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
@@ -195,27 +208,6 @@ function renderClientForm(c = null) {
   const v = (k) => (c?.[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
   const field = (label, name, attrs = {}) => h('label', {}, label, h('input', { name, value: v(name), ...attrs }));
   const OPTIONAL = ['gender', 'dob', 'location_name', 'candle_lighting_minutes', 'notes'];
-  // Upload intake form (new clients only): reads the file, fills the fields below, saves nothing until Create client.
-  let intakeFile = null;
-  const uploadMsg = h('span', { class: 'muted', role: 'status' });
-  const uploadInput = h('input', { type: 'file', accept: '.csv,.json', onchange: async () => {
-    const file = uploadInput.files[0];
-    intakeFile = null;
-    uploadMsg.className = 'muted';
-    uploadMsg.textContent = '';
-    if (!file) return;
-    try {
-      const parsed = await postFile('/api/intake/parse', file);
-      for (const [k, val] of Object.entries(parsed.client)) {
-        const el = form.elements[k];
-        if (el) el.value = val;
-      }
-      intakeFile = file;
-      const n = Object.keys(parsed.client).length;
-      uploadMsg.textContent = `Filled ${n} field${n === 1 ? '' : 's'} from the form. Check them, then click Create client.${parsed.warnings.length ? ` Check: ${parsed.warnings.join('; ')}` : ''}`;
-    } catch (ex) { uploadMsg.className = 'error'; uploadMsg.textContent = ex.message; uploadInput.value = ''; }
-  } });
-  const uploadRow = h('div', { class: 'upload-row' }, h('label', {}, 'Upload intake form (.csv or .json) to fill the fields', uploadInput), uploadMsg);
   const form = h('form', { class: 'login', onsubmit: async (e) => {
     e.preventDefault();
     msg.textContent = '';
@@ -229,15 +221,9 @@ function renderClientForm(c = null) {
     body.in_israel = f.get('in_israel') === 'on';
     try {
       const saved = c ? await api(`/clients/${c.id}`, { method: 'PATCH', body }) : await api('/clients', { method: 'POST', body });
-      if (!c && intakeFile) {
-        // Keep the uploaded form with the new client: stored encrypted, parents added, status advanced.
-        try { await postFile(`/api/clients/${saved.id}/intake/form`, intakeFile); }
-        catch (ex) { alert(`Client created, but the intake form could not be saved: ${ex.message}. Upload it again from the client's page.`); }
-      }
       location.hash = `#/client/${saved.id}`;
     } catch (ex) { msg.textContent = ex.message; }
   } },
-    !c && uploadRow,
     field('First name', 'first_name', { required: true }),
     field('Last name', 'last_name', { required: true }),
     field('Gender', 'gender'),
@@ -288,6 +274,8 @@ async function route() {
 }
 
 async function boot() {
+  const info = /^\/info\/([^/]+)\/?$/.exec(location.pathname); // parents' link: their own Profile page, no login
+  if (info) return renderInfoPage({ h, app }, decodeURIComponent(info[1])).catch(handle);
   try {
     const s = await (await fetch('/api/status')).json();
     showingLocked = false;
@@ -298,10 +286,11 @@ async function boot() {
 }
 
 logoutBtn.addEventListener('click', async () => { await api('/logout', { method: 'POST' }).catch(() => {}); renderLogin(); });
-window.addEventListener('hashchange', route);
+if (!location.pathname.startsWith('/info/')) window.addEventListener('hashchange', route);
 // Pick up the Shabbos lock and reopening without a manual refresh, without redrawing
 // (and wiping a half-typed form) while the app is open and unlocked.
 setInterval(async () => {
+  if (location.pathname.startsWith('/info/')) return;
   try {
     const s = await (await fetch('/api/status')).json();
     if (s.locked !== showingLocked) boot();
