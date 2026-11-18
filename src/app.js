@@ -11,6 +11,7 @@ import { reportRoutes } from './report-routes.js';
 import { intakeRoutes } from './intake-routes.js';
 import { ensureDraft } from './consult-email.js';
 import * as consultEmail from './consult-email.js';
+import * as inquiryEmail from './inquiry-email.js';
 import { buildCheckinBody } from './scheduler.js';
 import { appointmentKind, normalizeFeedUrl, syncCalendar } from './calendar.js';
 
@@ -25,7 +26,7 @@ const CONTACT_FIELDS = ['name', 'relationship', 'phone', 'email', 'preferred_cha
 const GOAL_FIELDS = ['contact_id', 'title', 'description', 'question_text', 'response_type', 'channel', 'schedule_json', 'date_added', 'start_date', 'end_date', 'status', 'target_json'];
 const REINFORCEMENT_FIELDS = ['name', 'note'];
 // Links to the website's appointment scheduling portal (SPEC 5.1a, 5.7b): the app stores them and puts them in messages; the website handles booking and payment, the app never creates bookings.
-const LINK_SETTINGS = ['consult_booking_url', 'checkin_booking_url'];
+const LINK_SETTINGS = ['consult_booking_url', 'checkin_booking_url', 'client_info_url'];
 
 class HttpError extends Error {
   constructor(status, message, extra = {}) {
@@ -282,6 +283,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     const f = pick(req.body, CLIENT_FIELDS);
     checkClient(f, { partial: false });
     const row = await insertRow('client', { ...f, clinician_id: req.clinician.id });
+    await inquiryEmail.ensureDraft(db, row.id); // a new client starts at "reached out": draft the first reply
     await audit(req, 'create', 'client', row.id);
     res.status(201).json(row);
   });
@@ -327,6 +329,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       throw bad('Client is already active');
     }
     if (next === 'paperwork_received') await ensureDraft(db, rows[0].id);
+    if (next === 'inquiry') await inquiryEmail.ensureDraft(db, rows[0].id);
     await audit(req, 'update', 'client', rows[0].id, { fields: ['intake_status'] });
     res.json(rows[0]);
   });
@@ -348,6 +351,25 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     if (!(await consultEmail.cancel(db, req.params.id))) throw bad('There is no unsent consultation email to cancel');
     await audit(req, 'cancel', 'consult_email', req.params.id);
     res.json(await consultEmail.preview(db, req.params.id));
+  });
+
+  // ---- First reply to a new inquiry (SPEC 5.1a): drafted at "reached out", sent only after Totty approves ----
+  app.get('/api/clients/:id/inquiry-email', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    res.json(await inquiryEmail.preview(db, req.params.id));
+  });
+  app.post('/api/clients/:id/inquiry-email/approve', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    try { await inquiryEmail.approve(db, req.params.id); } catch (e) { throw bad(e.message); }
+    await audit(req, 'approve', 'inquiry_email', req.params.id);
+    if (mailer) await inquiryEmail.sendApproved({ db, mailer, now, clientId: req.params.id });
+    res.json(await inquiryEmail.preview(db, req.params.id));
+  });
+  app.post('/api/clients/:id/inquiry-email/cancel', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    if (!(await inquiryEmail.cancel(db, req.params.id))) throw bad('There is no unsent first-reply email to cancel');
+    await audit(req, 'cancel', 'inquiry_email', req.params.id);
+    res.json(await inquiryEmail.preview(db, req.params.id));
   });
 
   // Go (SPEC 5.1a): activates a client that is ready; only then does the app start prompting the family.

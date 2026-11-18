@@ -2,6 +2,7 @@
 const FIELDS = [
   ['consult_booking_url', 'Consultation booking link', 'Link to the website scheduling portal. Emailed once intake paperwork is received.'],
   ['checkin_booking_url', 'Ongoing meeting booking link', 'Link to the website scheduling portal (booking and payment). Sent in the bi-weekly check-in text (every 14 days).'],
+  ['client_info_url', 'Client information form link', 'Link to the client information web page (one link; the family picks the New Jersey or New York section). Put in the first reply to a new inquiry, which you review and send.'],
 ];
 
 export async function renderSettings({ h, api, app, logoutBtn }) {
@@ -40,6 +41,7 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
     } catch (ex) { msg.className = 'error'; msg.textContent = ex.message; }
   } },
     FIELDS.flatMap(([k, label, hint], i) => [
+      ...(k === 'client_info_url' ? [h('h3', {}, 'Intake')] : []),
       h('label', {}, label, inputs[i], h('small', { class: 'muted' }, hint)),
       ...(k === 'checkin_booking_url' ? [h('small', {}, 'Preview of the check-in text:'), preview] : [])]),
     h('h3', {}, 'Google Calendar (read-only)'),

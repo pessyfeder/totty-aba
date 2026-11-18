@@ -5,6 +5,7 @@ import { createApp } from './app.js';
 import { createMessenger, consoleProvider, telnyxProvider } from './messaging.js';
 import { createScheduler } from './scheduler.js';
 import { consoleMailer, sendApproved, smtpMailer, unconfiguredMailer } from './consult-email.js';
+import { sendApproved as sendApprovedInquiry } from './inquiry-email.js';
 import { syncAll, httpFetchText } from './calendar.js';
 
 const env = process.env;
@@ -66,6 +67,7 @@ setInterval(async () => {
   try {
     await scheduler.tick();
     await sendApproved({ db, mailer }); // approved consultation emails that waited out a Shabbos window
+    await sendApprovedInquiry({ db, mailer }); // same for first-reply emails
   } catch (err) {
     console.error('scheduler tick failed:', err);
   } finally {
