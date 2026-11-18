@@ -241,14 +241,11 @@ export async function renderClient(ctx, id, tab = 'profile') {
     api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: e.target.value } }).then(reload, handle);
   } }, Object.entries(INTAKE)
     .map(([k, label]) => h('option', { value: k, selected: k === c.intake_status }, label)));
-  const intakeSection = h('div', { class: 'intake' },
-    h('span', {}, 'Client status: ', h('span', { class: `badge ${isActive && !isArchived ? 'ok' : ''}` }, isArchived ? 'Archived' : (INTAKE[c.intake_status] ?? c.intake_status)), ' '),
-    h('span', { class: 'client-actions' },
-      h('button', { type: 'button', onclick: () => {
+  const archiveBtn = h('button', { type: 'button', onclick: () => {
         if (!isArchived && !confirm(`Archive ${c.first_name} ${c.last_name}? Prompts stop and they move to Archived. You can restore them any time.`)) return;
         api(`/clients/${id}/archive`, { method: 'POST', body: { restore: isArchived } }).then(() => { location.hash = '#/clients'; }, handle);
-      } }, isArchived ? 'Restore client' : 'Archive client'), ' ',
-      h('button', { type: 'button', class: 'danger', onclick: () => {
+      } }, isArchived ? 'Restore' : 'Archive');
+  const deleteBtn = h('button', { type: 'button', class: 'danger', onclick: () => {
         const name = `${c.first_name} ${c.last_name}`;
         if (!confirm(`⚠️ WARNING: PERMANENT DELETION ⚠️\n\nYou are about to permanently delete ${name}.\n\nEVERYTHING will be erased forever: contacts, goals, responses, appointments, progress and documents. There is NO undo and NO way to recover this data.\n\nIf you just want them out of the way, use "Archive client" instead — it keeps everything.\n\nPress OK only if you are absolutely sure.`)) return;
         const expected = `Delete ${name}`;
@@ -257,10 +254,10 @@ export async function renderClient(ctx, id, tab = 'profile') {
         if (typed.trim() !== expected) { alert('Text did not match. Nothing was deleted.'); return; }
         if (!confirm(`Final confirmation: permanently delete ${name}? This cannot be undone.`)) return;
         api(`/clients/${id}`, { method: 'DELETE' }).then(() => { location.hash = '#/clients'; }, handle);
-      } }, 'Delete client')),
-    ' ',
+      } }, 'Delete');
+  const intakeSection = h('div', { class: 'intake' },
     isActive
-      ? h('span', { class: 'muted' }, `Active since ${String(c.activated_at).slice(0, 10)}`)
+      ? ''
       : [statusSelect, ' ',
         c.intake_status === 'paperwork_received'
           ? h('button', { type: 'button', onclick: () => {
@@ -326,9 +323,16 @@ export async function renderClient(ctx, id, tab = 'profile') {
     reinforcementForm);
   const detailsBody = h('div', {}, h('div', {}, `Admitted ${String(c.admission_date).slice(0, 10)}`), h('div', {}, c.location_name ?? ''), h('div', { class: 'muted' }, c.timezone));
   const statusLabel = isArchived ? 'Archived' : (INTAKE[c.intake_status] ?? c.intake_status);
+  const statusRight = [archiveBtn, deleteBtn];
+  const statusSince = isActive && c.activated_at ? `Active since ${String(c.activated_at).slice(0, 10)}` : '';
+  const statusCls = isActive && !isArchived ? 'ok' : '';
+  const statusChip = isActive
+    ? h('div', { class: 'acc acc-flat' }, h('div', { class: 'acc-flat-row' }, h('span', { class: 'acc-title' }, 'Client status'),
+      h('span', { class: `badge ${statusCls}` }, statusLabel), statusSince ? h('span', { class: 'acc-sum' }, statusSince) : '', h('span', { class: 'acc-right' }, statusRight)))
+    : chip(h, 'status', 'Client status', '', intakeSection, { badge: statusLabel, cls: statusCls, badgeFirst: true, right: statusRight });
   const profileTab = [
     h('div', { class: 'acc-stack' },
-      chip(h, 'status', 'Client status', '', intakeSection, { badge: statusLabel, cls: isActive && !isArchived ? 'ok' : '' }),
+      statusChip,
       chip(h, 'details', 'Client details', `${c.location_name ?? ''} · ${c.timezone}`, detailsBody, { action: { icon: 'edit', label: 'Edit client details', href: `#/client/${id}/edit` } }),
       inquiryEmail ? chip(h, 'inquiry', 'Profile page email', '', inquiryEmail.node, inquiryEmail) : '',
       consultEmail ? chip(h, 'consult', 'Initial consultation email', '', consultEmail.node, consultEmail) : '',
