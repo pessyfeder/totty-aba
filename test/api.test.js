@@ -299,6 +299,9 @@ test('goals cannot be edited, only paused/resumed or archived; archived goals st
   const arch = await call(`/api/goals/${g.id}`, { method: 'PATCH', cookie, body: { status: 'archived' } });
   assert.equal(arch.json.status, 'archived');
   assert.equal((await call(`/api/goals/${g.id}/series`, { cookie })).status, 200); // history still readable
+  const { rows: ch } = await db.query('SELECT from_status, to_status, change_made_datetime FROM goal_status_change WHERE goal_id = $1 ORDER BY change_made_datetime', [g.id]);
+  assert.deepEqual(ch.map((c) => `${c.from_status}>${c.to_status}`), ['active>paused', 'paused>archived']);
+  assert.ok(ch.every((c) => c.change_made_datetime));
 });
 
 test('contact details can be edited and cleared; name cannot be blanked', async () => {

@@ -60,12 +60,15 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
 
   const owner = contacts.find((c) => c.id === g.contact_id);
   const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`);
+  const stamp = (iso) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const history = h('div', { class: 'muted' }, `Created ${stamp(g.created_at)}`,
+    ...(g.status_changes ?? []).flatMap((c) => [h('br'), `${c.from_status} → ${c.to_status} on ${stamp(c.change_made_datetime)}`]));
   const card = progress
-    ? h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`), meta, summary, rangeBar, body, g.status === 'archived' ? '' : note)
+    ? h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`), meta, history, summary, rangeBar, body, g.status === 'archived' ? '' : note)
     : goalListCard();
   function goalListCard() {
     if (g.status === 'archived') {
-      return h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: 'badge' }, g.status)), meta,
+      return h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: 'badge' }, g.status)), meta, history,
         h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.'));
     }
     // The pencil reveals the edit panel in place; Pause/Resume and Archive live there.
@@ -81,7 +84,7 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
     const pencil = h('button', { type: 'button', class: 'acc-act', title: 'Edit goal', 'aria-label': `Edit goal: ${g.title}`, onclick: () => { panel.hidden = !panel.hidden; } });
     pencil.innerHTML = ICON.edit;
     return h('article', { class: 'card goal-card' },
-      h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status), ' ', pencil), meta, panel);
+      h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status), ' ', pencil), meta, history, panel);
   }
   if (progress) draw().catch(handle);
   return card;

@@ -319,6 +319,10 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     const [contacts, goals, reinforcements] = await Promise.all(
       ['contact', 'goal', 'reinforcement'].map((t) => db.query(`SELECT * FROM ${t} WHERE client_id = $1 ORDER BY 1`, [req.params.id]).then((r) => r.rows)),
     );
+    const { rows: changes } = await db.query(
+      `SELECT goal_id, from_status, to_status, change_made_datetime FROM goal_status_change
+        WHERE goal_id = ANY($1::uuid[]) ORDER BY change_made_datetime`, [goals.map((g) => g.id)]);
+    for (const g of goals) g.status_changes = changes.filter((c) => c.goal_id === g.id);
     await audit(req, 'view', 'client', req.params.id);
     res.json({ ...rows[0], contacts, goals, reinforcements, appointments });
   });
@@ -464,7 +468,13 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     const status = req.body?.status;
     if (!['active', 'paused', 'archived'].includes(status)) throw bad('status must be active, paused or archived');
     if (Object.keys(req.body).some((k) => k !== 'status')) throw bad('Goals cannot be edited; archive it and add a new goal');
+    const { rows: prev } = await db.query(`SELECT status FROM goal WHERE id = $1 AND ${viaClient}`, [req.params.id, req.clinician.id]);
+    if (!prev.length) throw new HttpError(404, 'Not found');
     const row = await updateRow(req, 'goal', req.params.id, { status }, viaClient);
+    if (prev[0].status !== status) {
+      await db.query('INSERT INTO goal_status_change (goal_id, from_status, to_status, change_made_datetime) VALUES ($1, $2, $3, $4)',
+        [row.id, prev[0].status, status, now()]);
+    }
     await audit(req, status === 'archived' ? 'archive' : 'status', 'goal', row.id, { status });
     res.json(row);
   });
