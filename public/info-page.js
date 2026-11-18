@@ -170,7 +170,8 @@ export async function renderInfoPage({ h, app }) {
       h('p', {}, 'Please give at least 48 hours’ notice to cancel or reschedule a session. Late cancellations or no-shows may be charged the full session rate.'),
       h('h4', {}, 'Billing questions'),
       h('p', {}, h('a', { href: 'mailto:Office@TheBTBMethod.com' }, 'Office@TheBTBMethod.com')),
-      h('p', { class: 'muted' }, 'Credit card details are not collected on this page. The BTB Method will arrange your card on file with you directly.'),
+      h('p', { class: 'muted' }, 'Credit card details are not collected on this page. To put a credit card on file, please use ',
+        h('a', { href: 'https://example.com/btb-credit-card-portal', target: '_blank', rel: 'noopener' }, 'The BTB Method’s secure credit card processing portal'), '.'),
       check('fee_ack', 'I have read and agree to the Fee & Cancellation Policy. *')),
 
     section('5. Background & History', 'Please complete before your first session.',
