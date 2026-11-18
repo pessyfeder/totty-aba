@@ -1,6 +1,6 @@
 // Settings UI (SPEC 5.1a, 5.7b): links to the external booking pages. The app only stores and sends them.
 const FIELDS = [
-  ['client_info_url', 'Client information page link', 'Link to the client information web page (one link; the family picks the New Jersey or New York section). Put in the first reply to a new inquiry, which you review and send.'],
+  ['client_info_url', 'Client information page link', ''],
   ['consult_booking_url', 'Consultation booking link', 'Link to the website scheduling portal. Emailed once intake paperwork is received.'],
   ['checkin_booking_url', 'Ongoing meeting booking link', 'Link to the website scheduling portal (booking and payment). Sent in the bi-weekly check-in text (every 14 days).'],
 ];
@@ -9,7 +9,7 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
   const s = await api('/settings');
   const msg = h('span', { role: 'status' });
   const preview = h('blockquote', { class: 'muted', style: 'overflow-wrap:anywhere;margin:.25rem 0 1rem;border-left:3px solid #ccd;padding-left:.75rem' }, s.checkin_text_preview);
-  const inputs = FIELDS.map(([k]) => h('input', { name: k, type: 'url', value: s[k], placeholder: 'https://calendar.google.com/...', autocomplete: 'off' }));
+  const inputs = FIELDS.map(([k]) => h('input', { name: k, type: 'url', value: s[k], placeholder: k === 'client_info_url' ? 'Link to the client information web page' : 'https://calendar.google.com/...', autocomplete: 'off' }));
   const save = () => api('/settings', { method: 'PUT', body: Object.fromEntries(inputs.map((i) => [i.name, i.value])) });
   const say = (cls, t) => { msg.className = cls; msg.textContent = t; };
 
@@ -75,7 +75,7 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
     } catch (ex) { say('error', ex.message); }
   };
   const firstReply = [
-    h('small', {}, 'First reply to a new inquiry:'), emailBox,
+    h('h3', {}, 'New client intake email'), emailBox,
     h('label', {}, 'Send to', picker), problems, h('p', {}, sendBtn)];
 
   const form = h('form', { class: 'form', onsubmit: async (e) => {
@@ -93,7 +93,7 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
       ...(k === 'client_info_url' ? [h('h3', {}, 'Intake')] : []),
       ...(k === 'consult_booking_url' ? [h('h3', {}, 'Booking links')] : []),
       ...(k === 'client_info_url'
-        ? [h('small', { class: 'muted' }, hint), ...firstReply]
+        ? [...firstReply]
         : [h('label', {}, label, inputs[i], h('small', { class: 'muted' }, hint))]),
       ...(k === 'checkin_booking_url' ? [h('small', {}, 'Preview of the check-in text:'), preview] : [])]),
     h('p', {}, h('button', { type: 'submit' }, 'Save'), ' ', msg));
