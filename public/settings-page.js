@@ -106,5 +106,5 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
       ...(k === 'checkin_booking_url' ? [h('small', {}, 'Preview of the check-in text:'), preview] : [])]),
     h('p', {}, h('button', { type: 'submit' }, 'Save'), ' ', msg));
   logoutBtn.hidden = false;
-  app.replaceChildren(h('p', {}, h('a', { href: '#/' }, '← Dashboard')), h('h2', {}, 'Settings'), form);
+  app.replaceChildren(h('h2', {}, 'Settings'), form);
 }

@@ -86,8 +86,6 @@ const ICONS = {
   settings: () => icon('M4 7h9', 'M17 7h3', 'M15 5v4', 'M4 17h3', 'M11 17h9', 'M9 15v4', 'M4 12h16'),
 };
 
-const backToDashboard = () => h('p', {}, h('a', { href: '#/' }, '← Dashboard'));
-
 /** Dashboard home: three big options under a "Dashboard" heading. */
 async function renderDashboard() {
   const d = await api('/dashboard');
@@ -112,7 +110,6 @@ async function renderClients() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
   app.replaceChildren(...[
-    backToDashboard(),
     h('div', { class: 'stats' },
       h('h2', {}, 'Clients'),
       h('span', { class: 'spacer' })),
@@ -188,7 +185,6 @@ async function renderAppointments() {
   }
 
   app.replaceChildren(
-    backToDashboard(),
     h('div', { class: 'cal-head' },
       h('h2', {}, first.toLocaleDateString([], { month: 'long', year: 'numeric' })),
       h('span', { class: 'spacer' }),
@@ -249,13 +245,13 @@ function renderClientForm(c = null) {
     if (!restoring && !confirm(`Archive ${c.first_name}? Prompts stop and the client leaves the dashboard. History is kept and you can restore later.`)) return;
     try { await api(`/clients/${c.id}/archive`, { method: 'POST', body: { restore: restoring } }); location.hash = '#/'; } catch (ex) { msg.textContent = ex.message; }
   } }, c.status === 'archived' ? 'Restore client' : 'Archive client'));
-  app.replaceChildren(h('p', {}, h('a', { href: c ? `#/client/${c.id}` : '#/' }, c ? '← Back to client' : '← Dashboard')), h('h2', {}, c ? `Edit ${c.first_name} ${c.last_name}` : 'Add client'), form, archive || '');
+  app.replaceChildren(c ? h('p', {}, h('a', { href: `#/client/${c.id}` }, '← Back to client')) : '', h('h2', {}, c ? `Edit ${c.first_name} ${c.last_name}` : 'Add client'), form, archive || '');
 }
 
 async function renderArchived() {
   logoutBtn.hidden = false;
   const list = await api('/clients?status=archived');
-  app.replaceChildren(h('p', {}, h('a', { href: '#/' }, '← Dashboard')), h('h2', {}, 'Archived clients'),
+  app.replaceChildren(h('h2', {}, 'Archived clients'),
     list.length
       ? h('ul', {}, list.map((c) => h('li', {}, `${c.first_name} ${c.last_name} — `, h('a', { href: `#/client/${c.id}/edit` }, 'Open to restore'))))
       : h('p', { class: 'muted' }, 'No archived clients.'));

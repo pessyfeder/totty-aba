@@ -25,7 +25,6 @@ export async function renderIntakeForms({ h, api, app, logoutBtn, handle }) {
         h('button', { type: 'button', class: 'link', onclick: () => done(`/intake-submissions/${s.id}/import`, { create: true }) }, 'Create new client')));
   };
   app.replaceChildren(
-    h('a', { href: '#/' }, '\u2190 Dashboard'),
     h('h2', {}, 'Intake forms'),
     h('p', { class: 'muted' }, 'Forms from the public intake page are copied into the client with the same name automatically. These did not match exactly one client.'),
     msg,
