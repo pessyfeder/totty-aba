@@ -118,7 +118,7 @@ export function renderPdf(content, { note = '' } = {}) {
     doc.moveDown();
   }
   if (!content.goals.length) doc.fontSize(11).text('No goals were active in this period.').moveDown();
-  if (note) doc.font('Helvetica-Bold').fontSize(12).text('Note from Totty').font('Helvetica').fontSize(11).text(safe(note)).moveDown();
+  if (note) doc.font('Helvetica-Bold').fontSize(12).text('Note from Yisroel Feder, LBA, BCBA').font('Helvetica').fontSize(11).text(safe(note)).moveDown();
   if (content.next_focus) doc.font('Helvetica-Bold').fontSize(12).text('Focus for next period').font('Helvetica').fontSize(11).text(safe(content.next_focus));
   doc.end();
   return done;

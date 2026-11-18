@@ -36,7 +36,7 @@ const setStatus = (id, s) => call('POST', `/api/clients/${id}/intake-status`, { 
 const emailOf = (id) => call('GET', `/api/clients/${id}/consult-email`);
 
 test('the email is plain: the child\'s first name and the link, no last name or clinical detail', () => {
-  const m = buildConsultEmail({ client: { first_name: 'Moshe', last_name: 'Levi' }, contact: { name: 'Rivka Levi' }, clinician: { name: 'Totty' }, link: LINK });
+  const m = buildConsultEmail({ client: { first_name: 'Moshe', last_name: 'Levi' }, contact: { name: 'Rivka Levi' }, clinician: { name: 'Yisroel Feder, LBA, BCBA' }, link: LINK });
   assert.match(m.subject, /Moshe/);
   assert.ok(m.text.includes(LINK) && m.text.includes('Hi Rivka Levi'));
   assert.ok(!/Levi\b(?!,)/.test(m.text.replace('Rivka Levi', '')), 'child last name must not appear');

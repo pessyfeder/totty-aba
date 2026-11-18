@@ -23,7 +23,7 @@ export function reportRoutes({ app, db, messenger, config, now, HttpError, bad, 
     const r = rows[0];
     res.set({ 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex', 'Referrer-Policy': 'no-referrer' });
     if (!r?.pdf_path || new Date(r.link_expires_at) < now()) {
-      return res.status(404).type('text/plain').send('This link is not valid or has expired. Please ask Totty for a new one.');
+      return res.status(404).type('text/plain').send('This link is not valid or has expired. Please ask Yisroel Feder, LBA, BCBA for a new one.');
     }
     res.type('application/pdf').set('Content-Disposition', 'inline; filename="progress-report.pdf"').send(await fs.readFile(r.pdf_path));
   });

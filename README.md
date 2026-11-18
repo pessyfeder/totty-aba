@@ -18,7 +18,7 @@ docker compose up -d                                  # Postgres
 cp .env.example .env                                  # fill in SESSION_SECRET
 npm run db:migrate
 CLINICIAN_PASSWORD='at least 12 chars' node scripts/create-clinician.js \
-  totty@example.com "Totty" America/New_York 40.6782 -73.9442
+  totty@example.com "Yisroel Feder, LBA, BCBA" America/New_York 40.6782 -73.9442
 npm start
 ```
 

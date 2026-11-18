@@ -1,6 +1,6 @@
 -- Development seed data only. Fake people, fake numbers.
 INSERT INTO clinician (id, name, email, password_hash, timezone, location_name, latitude, longitude)
-VALUES ('00000000-0000-0000-0000-000000000001', 'Totty (dev)', 'totty@example.test',
+VALUES ('00000000-0000-0000-0000-000000000001', 'Yisroel Feder, LBA, BCBA', 'totty@example.test',
         'REPLACE_WITH_REAL_HASH', 'America/New_York', 'Brooklyn, NY', 40.6782, -73.9442);
 
 INSERT INTO client (id, clinician_id, first_name, last_name, gender, dob, admission_date,

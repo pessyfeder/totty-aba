@@ -33,7 +33,7 @@ export async function seedWorld(db, { email = 'totty@example.test' } = {}) {
   const one = async (sql, params) => (await db.query(sql, params)).rows[0];
   const clinician = await one(
     `INSERT INTO clinician (name, email, password_hash, timezone, latitude, longitude)
-     VALUES ('Totty', $1, $2, 'America/New_York', 40.6782, -73.9442) RETURNING *`,
+     VALUES ('Yisroel Feder, LBA, BCBA', $1, $2, 'America/New_York', 40.6782, -73.9442) RETURNING *`,
     [email, await hashPassword(PASSWORD)],
   );
   const client = await one(
