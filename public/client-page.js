@@ -189,8 +189,6 @@ export async function renderClient(ctx, id, tab = 'profile') {
 
   // Goal numbers follow creation order across all goals (archived ones keep theirs).
   c.goals.forEach((g, i) => { g.number = i + 1; });
-  goalForm.hidden = true;
-  const addGoalBtn = h('button', { type: 'button', onclick: () => { goalForm.hidden = !goalForm.hidden; } }, 'Add a goal');
   const liveGoals = c.goals.filter((g) => g.status !== 'archived');
   const archivedGoals = c.goals.filter((g) => g.status === 'archived');
 
@@ -387,7 +385,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const goalsTab = [
     h('h2', { class: 'first' }, 'Goals'),
     ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals')) : [h('p', { class: 'muted' }, 'No goals yet.')]),
-    c.contacts.length ? h('div', {}, addGoalBtn, goalForm) : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
+    c.contacts.length ? h('div', {}, goalForm) : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals'))) : '',
   ];
   const progressTab = [
