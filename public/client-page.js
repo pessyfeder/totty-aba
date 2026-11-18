@@ -416,8 +416,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
     h('section', { class: 'client-main' },
       h('div', { class: 'client-head' },
         h('a', { href: '#/clients', class: 'back', 'aria-label': 'Back to all clients' }, '‹'),
-        h('h2', {}, `${c.first_name} ${c.last_name}`),
-        h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
+        h('h2', {}, `${c.first_name} ${c.last_name}`)),
       tabs,
       h('div', { class: 'tab-body' }, ...(tab === 'goals' ? goalsTab : tab === 'progress' ? progressTab : tab === 'appointments' ? apptTab : profileTab)))));
 }

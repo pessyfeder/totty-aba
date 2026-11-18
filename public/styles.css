@@ -76,6 +76,8 @@ form.login textarea { width: 100%; font: inherit; }
 .range button { border-radius: 999px; }
 .range button[aria-pressed=true] { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
 .goal-card { margin-bottom: 14px; }
+.goal-card h3 { display: flex; align-items: center; gap: 10px; }
+.goal-card h3 .acc-act { margin-left: auto; }
 .inline-form { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; align-items: end; }
 .trend-improving { color: var(--ok); } .trend-declining { color: var(--bad); }
 label.check { display: flex; gap: 6px; align-items: baseline; font-size: .9rem; }
