@@ -61,7 +61,7 @@ test('approval is refused until the link is set; then it sends once and only onc
   const c = await newClient('Yosef');
   await setStatus(c.id, 'paperwork_sent');
   await setStatus(c.id, 'inquiry'); // back to reached out: drafts
-  assert.deepEqual((await emailOf(c.id)).json.problems, ['Set the client information form link in Settings first.']);
+  assert.deepEqual((await emailOf(c.id)).json.problems, ['Set the client information page link in Settings first.']);
   assert.equal((await call('POST', `/api/clients/${c.id}/inquiry-email/approve`)).status, 400);
   await call('PUT', '/api/settings', { client_info_url: LINK });
 

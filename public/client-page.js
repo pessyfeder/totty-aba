@@ -123,9 +123,9 @@ async function intakeDocsSection({ h, api, handle }, id, reload) {
 const consultEmailSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
   path: 'consult-email', title: 'Consultation email', name: 'consultation email', hint: 'Paperwork received. Review this email to the family and approve it to send.' });
 
-/** First reply to a new inquiry (SPEC 5.1a): carries the client information form link. */
+/** First reply to a new inquiry (SPEC 5.1a): carries the client information page link. */
 const inquiryEmailSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
-  path: 'inquiry-email', title: 'First reply email', name: 'first reply email', hint: 'New inquiry. Review this reply to the family, with the client information form link, and approve it to send.' });
+  path: 'inquiry-email', title: 'First reply email', name: 'first reply email', hint: 'New inquiry. Review this reply to the family, with the client information page link, and approve it to send.' });
 
 async function emailSection({ h, api, handle }, id, reload, { path, title, name, hint }) {
   const e = await api(`/clients/${id}/${path}`);

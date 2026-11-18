@@ -1,5 +1,5 @@
 // First reply to a new inquiry (SPEC 5.1a). When a client is at "reached out" (inquiry) the app drafts an email
-// carrying the client information form link (Settings → Intake). Totty reviews and approves it; only then is it sent.
+// carrying the client information page link (Settings → Intake). Totty reviews and approves it; only then is it sent.
 // The email holds no clinical detail: the child's first name and the link, nothing else.
 // Shabbos / Yom Tov: an approved email waits while the recipient's window is open and goes out afterwards.
 import { locationFrom, windowAt } from './shabbos.js';
@@ -54,7 +54,7 @@ export async function preview(db, clientId) {
   const w = await load(db, clientId);
   const to = recipientOf(w.contacts);
   const problems = [];
-  if (!w.link) problems.push('Set the client information form link in Settings first.');
+  if (!w.link) problems.push('Set the client information page link in Settings first.');
   if (!to) problems.push('Add an email address for a parent or guardian first.');
   const out = { status: row.status, sent_at: row.sent_at, approved_at: row.approved_at, last_error: row.last_error, problems };
   if (row.status === 'sent') return { ...out, to: row.to_email };

@@ -26,3 +26,5 @@ client and appointment type information should be visible to Totty
 show me client intake documents
 
 set up google calendar functions
+
+yes to voice calls

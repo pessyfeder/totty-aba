@@ -189,8 +189,15 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   // ---- Settings: booking and intake links (SPEC 5.1a). Empty string clears a link. ----
   const checkinPreview = (settings) =>
     buildCheckinBody({ first_name: "[child's first name]" }, settings?.checkin_booking_url || '[booking link]');
-  app.get('/api/settings', (req, res) => {
+  app.get('/api/settings', async (req, res) => {
+    const { rows: waiting } = await db.query(
+      `SELECT c.id, c.first_name, c.last_name FROM client c JOIN inquiry_email e ON e.client_id = c.id
+        WHERE c.clinician_id = $1 AND c.intake_status = 'inquiry' AND c.status = 'active' AND e.status = 'pending_approval'
+        ORDER BY lower(c.last_name), lower(c.first_name)`, [req.clinician.id]);
     res.json({
+      first_reply_template: inquiryEmail.buildInquiryEmail({ client: { first_name: "[child's first name]" }, contact: { name: '[parent name]' },
+        clinician: { name: req.clinician.name }, link: req.clinician.settings_json?.client_info_url || '[client information page link]' }),
+      first_reply_clients: waiting,
       checkin_text_preview: checkinPreview(req.clinician.settings_json),
       ...Object.fromEntries(LINK_SETTINGS.map((k) => [k, req.clinician.settings_json?.[k] ?? ''])),
     });
