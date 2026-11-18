@@ -53,6 +53,17 @@
         "3005"
       ],
       "port": 3005
+    },
+    {
+      "name": "demo-3030",
+      "runtimeExecutable": "npm",
+      "runtimeArgs": [
+        "run",
+        "demo",
+        "--",
+        "3030"
+      ],
+      "port": 3030
     }
   ]
 }
