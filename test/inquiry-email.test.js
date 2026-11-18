@@ -73,7 +73,7 @@ test('no parent email blocks approval until one is added; declining stops it', a
   const c = await newClient('Dovid2', { email: '' });
   await setStatus(c.id, 'baseline');
   await setStatus(c.id, 'inquiry');
-  assert.deepEqual((await emailOf(c.id)).json.problems, ['Add an email address for a parent or guardian first.']);
+  assert.deepEqual((await emailOf(c.id)).json.problems, ['Add an email address for a parent or caregiver first.']);
   await db.query(`UPDATE contact SET email = 'new@example.test' WHERE client_id = $1`, [c.id]);
   const d = await newClient('Avrumi');
   await setStatus(d.id, 'baseline');

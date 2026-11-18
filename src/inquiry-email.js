@@ -62,7 +62,7 @@ export async function preview(db, clientId) {
   const to = recipientOf(w.contacts);
   const problems = [];
   if (!w.link) problems.push('Set the app address (PUBLIC_URL) or the client information page link in Settings first.');
-  if (!to) problems.push('Add an email address for a parent or guardian first.');
+  if (!to) problems.push('Add an email address for a parent or caregiver first.');
   const out = { status: row.status, sent_at: row.sent_at, approved_at: row.approved_at, last_error: row.last_error, problems };
   if (row.status === 'sent') return { ...out, to: row.to_email };
   if (to) out.to = to.email.trim();

@@ -82,7 +82,7 @@ test('a client with no parent email cannot be approved until one is added', asyn
   const c = await newClient('Dovid2', { email: '' });
   await setStatus(c.id, 'paperwork_received');
   const e = (await emailOf(c.id)).json;
-  assert.deepEqual(e.problems, ['Add an email address for a parent or guardian first.']);
+  assert.deepEqual(e.problems, ['Add an email address for a parent or caregiver first.']);
   assert.equal((await call('POST', `/api/clients/${c.id}/consult-email/approve`)).status, 400);
   await db.query(`UPDATE contact SET email = 'new@example.test' WHERE client_id = $1`, [c.id]);
   assert.equal((await call('POST', `/api/clients/${c.id}/consult-email/approve`)).json.status, 'sent');

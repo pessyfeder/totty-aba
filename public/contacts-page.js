@@ -1,4 +1,4 @@
-// Contacts pane (SPEC 5.1): add and edit the parent/guardian contact details for one client.
+// Contacts pane (SPEC 5.1): add and edit the parent/caregiver contact details for one client.
 // Kept on its own page so contact details are not edited by accident from the goals view.
 const STATUS = { active: 'Active', paused: 'Paused (no prompts)', ended: 'Ended' };
 

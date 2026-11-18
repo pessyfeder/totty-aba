@@ -97,7 +97,7 @@ export async function renderInfoPage({ h, app }) {
       text('ny_provider_phone', 'Provider phone / contact', { type: 'tel' }), text('ny_dx_date', 'Date of diagnosis', { type: 'date', past: true })),
     h('p', { class: 'muted' }, 'Under New York Education Law Article 167, The BTB Method may provide services to a family located in New York only when the child has been diagnosed with autism spectrum disorder or a related disorder, and a prescription or order for behavioral treatment has been issued by a person licensed or otherwise authorized to provide that diagnosis and order. This form verifies and documents that eligibility. Required before services begin for New York families.'),
     initialsList(NY_ITEMS, 'ny'));
-  const locPick = h('p', { class: 'muted' }, 'Choose your state under “Parent / Guardian” above to see the form for your family.');
+  const locPick = h('p', { class: 'muted' }, 'Choose your state under “Parent / Caregiver” above to see the form for your family.');
   const syncState = () => {
     const s = els.state.value;
     njBox.hidden = s !== 'NJ'; nyBox.hidden = s !== 'NY'; locPick.hidden = Boolean(s);
@@ -135,7 +135,7 @@ export async function renderInfoPage({ h, app }) {
       grid(text('child_first_name', "Child’s first name", { req: true }), text('child_last_name', "Child’s last name", { req: true }),
         text('dob', 'Date of birth', { type: 'date', req: true, past: true }),
         select('gender', 'Gender', GENDERS.map((g) => [g, g]), { req: true })),
-      h('h4', {}, 'Parent / Guardian'),
+      h('h4', {}, 'Parent / Caregiver'),
       grid(text('parent_name', 'Full name', { req: true, auto: 'name' }), text('parent_relationship', 'Relationship to child', { req: true, ph: 'e.g. Mother' }),
         text('street', 'Street address', { req: true, auto: 'street-address', wide: true }),
         text('city', 'City', { req: true, auto: 'address-level2' }), stateSel, text('zip', 'Zip', { req: true, auto: 'postal-code', max: 10 }),
