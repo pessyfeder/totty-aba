@@ -196,7 +196,8 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
         ORDER BY lower(c.last_name), lower(c.first_name)`, [req.clinician.id]);
     res.json({
       first_reply_template: inquiryEmail.buildInquiryEmail({ client: { first_name: "[child's first name]" }, contact: { name: '[parent name]' },
-        clinician: { name: req.clinician.name }, link: req.clinician.settings_json?.client_info_url || '[client information page link]' }),
+        clinician: { name: req.clinician.name }, link: req.clinician.settings_json?.client_info_url || '[client information page link]', body: req.clinician.settings_json?.first_reply_body }),
+      first_reply_body: req.clinician.settings_json?.first_reply_body || inquiryEmail.DEFAULT_BODY,
       first_reply_clients: waiting,
       checkin_text_preview: checkinPreview(req.clinician.settings_json),
       ...Object.fromEntries(LINK_SETTINGS.map((k) => [k, req.clinician.settings_json?.[k] ?? ''])),
@@ -212,8 +213,15 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       if (u.protocol !== 'https:' && u.protocol !== 'http:') throw bad(`${k} must start with https://`);
       next[k] = u.href;
     }
+    if (typeof req.body?.first_reply_body === 'string') {
+      const b = req.body.first_reply_body.replaceAll('\r\n', '\n').trim();
+      if (!b || b === inquiryEmail.DEFAULT_BODY) delete next.first_reply_body;
+      else if (!b.includes('{link}')) throw bad('The email must keep {link} where the client information page link goes');
+      else if (b.length > 5000) throw bad('The email is too long');
+      else next.first_reply_body = b;
+    }
     await db.query('UPDATE clinician SET settings_json = $2 WHERE id = $1', [req.clinician.id, JSON.stringify(next)]);
-    await audit(req, 'update', 'settings', req.clinician.id, { fields: Object.keys(req.body ?? {}).filter((k) => LINK_SETTINGS.includes(k)) });
+    await audit(req, 'update', 'settings', req.clinician.id, { fields: Object.keys(req.body ?? {}).filter((k) => LINK_SETTINGS.includes(k) || k === 'first_reply_body') });
     res.json(Object.fromEntries(LINK_SETTINGS.map((k) => [k, next[k] ?? ''])));
   });
 

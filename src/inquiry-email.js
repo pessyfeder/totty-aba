@@ -7,27 +7,30 @@ import { recipientOf } from './consult-email.js';
 
 const MAX_ATTEMPTS = 3;
 
-/** The subject and text of the email. Pure. */
-export function buildInquiryEmail({ client, contact, clinician, link }) {
-  const sign = clinician.name || 'Your behavior analyst';
+/** The email body Totty can edit. {parent}, {child}, {link} and {sign} are filled in per family. */
+export const DEFAULT_BODY = [
+  'Hi {parent},',
+  '',
+  "Thank you for reaching out about {child}. I'd love to help.",
+  '',
+  'The next step is a short client information form. Please open the link below and fill in the section that applies to you, New Jersey or New York:',
+  '',
+  '{link}',
+  '',
+  "Once I receive it, I'll send you a link to schedule our first consultation.",
+  '',
+  'If you have any trouble with the form, just reply to this email.',
+  '',
+  'Warm regards,',
+  '{sign}',
+].join('\n');
+
+/** The subject and text of the email. Pure. `body` is Totty's edited text (settings), else the default. */
+export function buildInquiryEmail({ client, contact, clinician, link, body }) {
+  const fill = { parent: contact.name, child: client.first_name, link, sign: clinician.name || 'Your behavior analyst' };
   return {
     subject: `Next step for ${client.first_name}: client information form`,
-    text: [
-      `Hi ${contact.name},`,
-      '',
-      `Thank you for reaching out about ${client.first_name}. I'd love to help.`,
-      '',
-      'The next step is a short client information form. Please open the link below and fill in the section that applies to you, New Jersey or New York:',
-      '',
-      link,
-      '',
-      "Once I receive it, I'll send you a link to schedule our first consultation.",
-      '',
-      'If you have any trouble with the form, just reply to this email.',
-      '',
-      'Warm regards,',
-      sign,
-    ].join('\n'),
+    text: (body || DEFAULT_BODY).replace(/\{(parent|child|link|sign)\}/g, (_, k) => fill[k]),
   };
 }
 
@@ -44,7 +47,7 @@ async function load(db, clientId) {
     `SELECT c.*, cn.name AS clinician_name, cn.settings_json FROM client c JOIN clinician cn ON cn.id = c.clinician_id WHERE c.id = $1`, [clientId]);
   if (!client) return null;
   const { rows: contacts } = await db.query('SELECT * FROM contact WHERE client_id = $1 ORDER BY id', [clientId]);
-  return { client, contacts, clinician: { name: client.clinician_name }, link: client.settings_json?.client_info_url ?? '' };
+  return { client, contacts, clinician: { name: client.clinician_name }, link: client.settings_json?.client_info_url ?? '', body: client.settings_json?.first_reply_body };
 }
 
 /** What Totty reviews: status, recipient, the exact text, and anything that blocks sending. Null when no draft exists. */
@@ -59,7 +62,7 @@ export async function preview(db, clientId) {
   const out = { status: row.status, sent_at: row.sent_at, approved_at: row.approved_at, last_error: row.last_error, problems };
   if (row.status === 'sent') return { ...out, to: row.to_email };
   if (to) out.to = to.email.trim();
-  if (to && w.link) Object.assign(out, buildInquiryEmail({ client: w.client, contact: to, clinician: w.clinician, link: w.link }));
+  if (to && w.link) Object.assign(out, buildInquiryEmail({ client: w.client, contact: to, clinician: w.clinician, link: w.link, body: w.body }));
   return out;
 }
 
@@ -103,7 +106,7 @@ export async function sendApproved({ db, mailer, now = () => new Date(), clientI
     const { rows: claimed } = await db.query(`UPDATE inquiry_email SET status = 'sending' WHERE client_id = $1 AND status = 'approved' RETURNING client_id`, [client_id]);
     if (!claimed.length) continue;
     try {
-      const { id } = await mailer.send({ to: to.email.trim(), ...buildInquiryEmail({ client: w.client, contact: to, clinician: w.clinician, link: w.link }) });
+      const { id } = await mailer.send({ to: to.email.trim(), ...buildInquiryEmail({ client: w.client, contact: to, clinician: w.clinician, link: w.link, body: w.body }) });
       await db.query(`UPDATE inquiry_email SET status = 'sent', sent_at = now(), to_email = $2, provider_id = $3, last_error = NULL WHERE client_id = $1`,
         [client_id, to.email.trim(), id ?? null]);
       sent.push(client_id);

@@ -24,9 +24,31 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
     const pre = (t) => h('pre', { style: 'white-space: pre-wrap; font: inherit; margin:0' }, t);
     emailBox.replaceChildren(
       e.to ? h('div', { class: 'muted' }, `To: ${e.to}`) : '',
-      h('strong', {}, e.subject),
-      ...(at < 0 ? [pre(e.text)] : [pre(lines.slice(0, at).join('\n')), linkInput, pre(lines.slice(at + 1).join('\n'))]));
+      h('div', {}, h('strong', {}, e.subject), ' ',
+        h('button', { type: 'button', class: 'link', title: 'Edit the email', 'aria-label': 'Edit the email', onclick: startEdit }, '✎')),
+      ...(at < 0 ? [pre(e.text), linkInput] : [pre(lines.slice(0, at).join('\n')), linkInput, pre(lines.slice(at + 1).join('\n'))]));
   };
+  // The pencil: edit the email body (all families). {parent}, {child}, {link} and {sign} are filled in per family.
+  const startEdit = () => {
+    const box = h('textarea', { rows: 16, style: 'width:100%', 'aria-label': 'Email text' }, bodyText);
+    const note = h('span', { role: 'alert', class: 'error' });
+    const finish = async (value) => {
+      try {
+        await api('/settings', { method: 'PUT', body: { first_reply_body: value } });
+        const f = await api('/settings');
+        bodyText = f.first_reply_body;
+        s.first_reply_template = f.first_reply_template;
+        if (picker.value) picker.onchange(); else showTemplate(f.first_reply_template);
+      } catch (ex) { note.textContent = ex.message; }
+    };
+    emailBox.replaceChildren(
+      h('small', { class: 'muted' }, 'Keep {link} on its own line. {parent}, {child} and {sign} are replaced with the parent name, the child\'s first name and your name.'),
+      box,
+      h('p', {}, h('button', { type: 'button', onclick: () => finish(box.value) }, 'Save email'), ' ',
+        h('button', { type: 'button', onclick: () => finish('') }, 'Reset to original'), ' ',
+        h('button', { type: 'button', onclick: () => (picker.value ? picker.onchange() : showTemplate(s.first_reply_template)) }, 'Cancel'), ' ', note));
+  };
+  let bodyText = s.first_reply_body;
   const showTemplate = (t) => showEmail({ ...t, to: '' });
   showTemplate(s.first_reply_template);
   const problems = h('div', {});
@@ -53,7 +75,7 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
     } catch (ex) { say('error', ex.message); }
   };
   const firstReply = [
-    h('small', {}, 'First reply email to a new inquiry (text the family receives):'), emailBox,
+    h('small', {}, 'First reply to a new inquiry:'), emailBox,
     h('label', {}, 'Send to', picker), problems, h('p', {}, sendBtn)];
 
   const form = h('form', { class: 'form', onsubmit: async (e) => {
