@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 import { locationFrom, windowAt } from './shabbos.js';
 
 // The document explaining what the initial consultation covers; attached to the email when the file is present.
-const CONSULT_DOC = fileURLToPath(new URL('../btb-forms-english/BTB_Initial_Consultation_Form.pdf', import.meta.url));
+const CONSULT_DOC = fileURLToPath(new URL('../btb-docs/BTB_Initial_Consultation_Form.pdf', import.meta.url));
 const attachments = () => (existsSync(CONSULT_DOC) ? [{ filename: 'Initial-Consultation-Overview.pdf', path: CONSULT_DOC }] : []);
 
 const MAX_ATTEMPTS = 3;

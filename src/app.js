@@ -8,13 +8,12 @@ import { loadDashboard } from './dashboard.js';
 import { handleInbound } from './inbound.js';
 import { verifyTelnyxSignature } from './messaging.js';
 import { reportRoutes } from './report-routes.js';
-import { intakeRoutes } from './intake-routes.js';
 import { ensureDraft } from './consult-email.js';
 import * as consultEmail from './consult-email.js';
 import * as inquiryEmail from './inquiry-email.js';
 import { buildCheckinBody } from './scheduler.js';
 import { appointmentKind } from './calendar.js';
-import { infoRoutes, intakeFormRoutes } from './info-routes.js';
+import { infoRoutes } from './info-routes.js';
 
 // Check-ins this client already had before an appointment: tells the first (baseline) check-in from later bi-weekly ones.
 const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
@@ -312,15 +311,6 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     res.json(rows);
   });
 
-  app.post('/api/clients', async (req, res) => {
-    const f = pick(req.body, CLIENT_FIELDS);
-    checkClient(f, { partial: false });
-    const row = await insertRow('client', { ...f, clinician_id: req.clinician.id });
-    await inquiryEmail.ensureDraft(db, row.id); // a new client starts at "reached out": draft the first reply
-    await audit(req, 'create', 'client', row.id);
-    res.status(201).json(row);
-  });
-
   app.get('/api/clients/:id', async (req, res) => {
     const { rows } = await db.query('SELECT * FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
@@ -616,10 +606,6 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     await audit(req, 'review_response', 'response', req.params.id);
     res.json(out[0]);
   });
-
-  // ---- Intake upload + auto-fill (SPEC 5.1a, 5.7b) ----
-  intakeRoutes({ app, db, config, HttpError, bad, audit, ownedClient });
-  intakeFormRoutes({ app, db, HttpError, bad, audit, now });
 
   // ---- Progress reports (SPEC 5.6); the parent's /r/:token link is outside /api, so it is not locked ----
   reportRoutes({ app, db, messenger, config, now, HttpError, bad, audit, ownedClient, insertRow })();

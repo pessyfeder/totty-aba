@@ -49,14 +49,6 @@ test('the client information link is a setting: any web address, blank clears it
   assert.equal((await call('PUT', '/api/settings', { client_info_url: '' })).json.client_info_url, '');
 });
 
-test('a client created through the API starts at reached out with a draft awaiting approval', async () => {
-  const r = await call('POST', '/api/clients', { first_name: 'Dov', last_name: 'Katz', admission_date: '2026-11-01', latitude: 40.1, longitude: -74.2, timezone: 'America/New_York' });
-  assert.equal(r.status, 201);
-  const e = (await emailOf(r.json.id)).json;
-  assert.equal(e.status, 'pending_approval');
-  assert.equal(env.mails.length, 0, 'nothing is sent before approval');
-});
-
 test('approval is refused until the link is set; then it sends once and only once', async () => {
   const c = await newClient('Yosef');
   await setStatus(c.id, 'baseline');

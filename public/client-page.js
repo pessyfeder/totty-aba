@@ -76,54 +76,16 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
   return card;
 }
 
-const fmtSize = (n) => (n >= 1048576 ? `${(n / 1048576).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
-
-/** Raw-file upload (the API reads the body as the file, name in X-Filename). */
-async function upload(path, file) {
-  const res = await fetch(`/api${path}`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/octet-stream', 'X-Requested-With': 'totty', 'X-Filename': encodeURIComponent(file.name) },
-    body: file,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(data.error ?? `${file.name}: upload failed (${res.status})`);
-  return data;
-}
-
-/** Intake paperwork (SPEC 5.1a step 3): returned form auto-fills the client, documents are attached. */
-async function intakeDocsSection({ h, api, handle }, id, reload) {
-  const { documents, conflicts } = await api(`/clients/${id}/intake`);
-  const result = h('div', { role: 'status' });
-  const show = (r) => result.replaceChildren(
-    r.filled?.length ? h('p', { class: 'ok-line' }, `Filled from the form: ${r.filled.join(', ')}.`) : '',
-    r.status_advanced ? h('p', { class: 'ok-line' }, 'Status set to Information submitted.') : '',
-    ...(r.warnings ?? []).map((w) => h('p', { class: 'warn-line' }, `⚠ ${w}`)));
-  const pick = (label, accept, path, multiple) => {
-    const input = h('input', { type: 'file', accept, multiple, required: true });
-    const msg = h('span', { class: 'error', role: 'alert' });
-    const form = h('form', { class: 'inline-form', onsubmit: async (e) => {
-      e.preventDefault();
-      msg.textContent = '';
-      try {
-        let last = {};
-        for (const f of input.files) { last = await upload(path, f); show(last); }
-        await reload(last);
-      } catch (ex) { msg.textContent = ex.message; }
-    } }, h('label', {}, label, input), h('button', { type: 'submit' }, 'Upload'), msg);
-    return form;
+/** Signed consent from the online intake form (SPEC 5.1a step 3): who signed and when. */
+function consentSection({ h }, c) {
+  const when = c.consent_signed_at ? new Date(c.consent_signed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  return {
+    badge: c.consent_signed_at ? 'Signed' : 'None',
+    cls: c.consent_signed_at ? 'ok' : '',
+    node: c.consent_signed_at
+      ? h('p', {}, `Consents signed by ${c.consent_signed_by || 'a parent'} on ${when}, on the online intake form.`)
+      : h('p', { class: 'muted' }, 'No signed consent on file.'),
   };
-  const node = h('div', {},
-    ...conflicts.map((c) => h('div', { class: 'warn-line' }, `⚠ Not filled — ${c.field}: you entered "${c.entered}", the form says "${c.form}". Your value was kept; edit the client to resolve.`)),
-    pick('Documents (consent, insurance, assessments)', '.pdf,.png,.jpg,.jpeg,.gif,.doc,.docx,.txt', `/clients/${id}/documents`, true),
-    result,
-    documents.length
-      ? h('table', { class: 'compact' }, h('tbody', {}, documents.map((d) => h('tr', {},
-          h('td', {}, h('a', { href: `/api/documents/${d.id}` }, d.filename)),
-          h('td', {}, 'Document'),
-          h('td', {}, fmtSize(d.size_bytes)),
-          h('td', {}, String(d.uploaded_at).slice(0, 10))))))
-      : h('p', { class: 'muted' }, 'No documents yet.'));
-  return { badge: documents.length ? String(documents.length) : 'None', node, input: node.querySelector('input[type=file]') };
 }
 
 /** Initial consultation email (SPEC 5.7b): Totty reads the exact text and approves or declines the first send. */
@@ -220,12 +182,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const reinforcementPick = h('select', { 'aria-label': 'Add preferred reinforcement', hidden: true, onchange: (e) => { if (e.target.value) post('/reinforcements', { name: e.target.value }).catch(handle); } },
     h('option', { value: '' }, 'Choose a reinforcement…'), REINFORCERS.filter((r) => !have.has(r.toLowerCase())).map((r) => h('option', { value: r }, r)));
 
-  const intakeDocs = await intakeDocsSection(ctx, id, async (last) => {
-    await reload();
-    // Re-rendering clears the result line; keep the outcome of the last upload visible.
-    const box = document.querySelector('[role=status]');
-    if (box && (last.filled?.length || last.conflicts?.length)) box.append(h('p', { class: 'ok-line' }, `Last upload filled: ${(last.filled ?? []).join(', ') || 'nothing new'}.`));
-  }).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
+  const consent = consentSection(ctx, c);
   const consultEmail = await consultEmailSection(ctx, id, reload).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
   const inquiryEmail = await inquiryEmailSection(ctx, id, reload).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
   const reports = await reportsSection(ctx, id);
@@ -408,8 +365,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
       chip(h, 'contacts', 'Contact info', `${c.contacts.length} ${c.contacts.length === 1 ? 'contact' : 'contacts'}${noPhone ? ` · ${noPhone} without consent` : ''}`, contactsEd.box, { action: { icon: 'edit', label: 'Edit contacts', onclick: contactsEd.toggle } }),
       chip(h, 'reinf', 'Preferred reinforcements', c.reinforcements.map((i) => i.name).join(', '), reinfBody,
         { action: { icon: 'add', label: 'Add reinforcement', onclick: () => { reinforcementPick.hidden = false; reinforcementPick.focus(); } } }),
-      chip(h, 'docs', 'Documents', '', intakeDocs.node, { badge: intakeDocs.badge, cls: intakeDocs.cls,
-        action: { icon: 'add', label: 'Upload documents', onclick: () => setTimeout(() => intakeDocs.input?.focus(), 0) } })),
+      chip(h, 'consent', 'Signed consent', '', consent.node, { badge: consent.badge, cls: consent.cls })),
   ];
   const goalsTab = [
     h('h2', { class: 'first' }, 'Goals'),

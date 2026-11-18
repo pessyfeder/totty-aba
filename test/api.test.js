@@ -31,6 +31,15 @@ async function call(path, { method = 'GET', body, cookie, form } = {}) {
   try { json = JSON.parse(text); } catch { /* xml or empty */ }
   return { status: res.status, json, text, cookie: res.headers.get('set-cookie')?.split(';')[0] };
 }
+
+// Clients are created only by the online intake form (SPEC 5.1a), so tests that need one insert it directly.
+async function mk(f) {
+  const { rows: [row] } = await db.query(
+    `INSERT INTO client (clinician_id, first_name, last_name, admission_date, latitude, longitude, timezone, notes, dob)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING *`,
+    [world.clinician.id, f.first_name, f.last_name, f.admission_date, f.latitude, f.longitude, f.timezone, f.notes ?? null, f.dob ?? null]);
+  return { status: 201, json: row };
+}
 const login = async (email = 'totty@example.test', password = PASSWORD) => (await call('/api/login', { method: 'POST', body: { email, password } }));
 
 test('API requires a login', async () => {
@@ -57,18 +66,9 @@ test('state-changing requests need the X-Requested-With header', async () => {
   assert.equal(res.status, 403);
 });
 
-test('creating a client requires an admission date and a location', async () => {
-  const { cookie } = await login();
-  const r = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'A', last_name: 'B', timezone: 'America/New_York', latitude: 40, longitude: -74 } });
-  assert.equal(r.status, 400);
-  assert.match(r.json.error, /admission_date/);
-  const bad = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'A', last_name: 'B', admission_date: '2026-10-01', timezone: 'Mars/Base', latitude: 40, longitude: -74 } });
-  assert.equal(bad.status, 400);
-});
-
 test('client, contact, goal and reinforcement round trip; dashboard shows reinforcements on the card', async () => {
   const { cookie } = await login();
-  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Miri', last_name: 'Adler', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  const c = await mk({ first_name: 'Miri', last_name: 'Adler', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   assert.equal(c.status, 201);
   const id = c.json.id;
   const contact = await call(`/api/clients/${id}/contacts`, { method: 'POST', cookie, body: { name: 'Mrs. Adler', phone: '+15555550111' } });
@@ -90,7 +90,7 @@ test('client, contact, goal and reinforcement round trip; dashboard shows reinfo
 
 test('archiving removes a client from the dashboard', async () => {
   const { cookie } = await login();
-  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Temp', last_name: 'Zed', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  const c = await mk({ first_name: 'Temp', last_name: 'Zed', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   await call(`/api/clients/${c.json.id}/archive`, { method: 'POST', cookie, body: {} });
   const dash = await call('/api/dashboard', { cookie });
   assert.ok(!dash.json.clients.some((x) => x.id === c.json.id));
@@ -226,7 +226,7 @@ test("another clinician's goal series and annotations are 404", async () => {
 
 test('editing a client can change and clear optional fields; invalid edits are refused; audit is written', async () => {
   const { cookie } = await login();
-  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Edit', last_name: 'Me', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9, notes: 'old', dob: '2020-01-01' } });
+  const c = await mk({ first_name: 'Edit', last_name: 'Me', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9, notes: 'old', dob: '2020-01-01' });
   const id = c.json.id;
   const ok = await call(`/api/clients/${id}`, { method: 'PATCH', cookie, body: { first_name: 'Edited', notes: null, dob: null, candle_lighting_minutes: 25, in_israel: true } });
   assert.equal(ok.status, 200);
@@ -242,7 +242,7 @@ test('editing a client can change and clear optional fields; invalid edits are r
 
 test('Start baseline works from information submitted and is refused from any other status', async () => {
   const { cookie } = await login();
-  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Go', last_name: 'Test', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  const c = await mk({ first_name: 'Go', last_name: 'Test', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   assert.equal(c.json.intake_status, 'inquiry');
   assert.equal((await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} })).status, 400);
   await db.query(`UPDATE client SET intake_status = 'paperwork_received' WHERE id = $1`, [c.json.id]);
@@ -256,7 +256,7 @@ test('Start baseline works from information submitted and is refused from any ot
 
 test('status can be moved by hand; and an active client can be moved back', async () => {
   const { cookie } = await login();
-  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'In', last_name: 'Take', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  const c = await mk({ first_name: 'In', last_name: 'Take', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   const set = (v) => call(`/api/clients/${c.json.id}/intake-status`, { method: 'POST', cookie, body: { intake_status: v } });
   assert.equal((await set('paperwork_received')).json.intake_status, 'paperwork_received');
   assert.equal((await set('bogus')).status, 400);
@@ -270,7 +270,7 @@ test('status can be moved by hand; and an active client can be moved back', asyn
 
 test('archived clients are listed separately and can be restored', async () => {
   const { cookie } = await login();
-  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Arch', last_name: 'Ived', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  const c = await mk({ first_name: 'Arch', last_name: 'Ived', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   await call(`/api/clients/${c.json.id}/archive`, { method: 'POST', cookie, body: {} });
   assert.ok((await call('/api/clients?status=archived', { cookie })).json.some((x) => x.id === c.json.id));
   assert.ok(!(await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
@@ -280,7 +280,7 @@ test('archived clients are listed separately and can be restored', async () => {
 
 test('a client can be permanently deleted', async () => {
   const { cookie } = await login();
-  const c = await call('/api/clients', { method: 'POST', cookie, body: { first_name: 'Del', last_name: 'Ete', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 } });
+  const c = await mk({ first_name: 'Del', last_name: 'Ete', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   assert.equal((await call(`/api/clients/${c.json.id}`, { method: 'DELETE', cookie })).status, 204);
   assert.ok(!(await call('/api/clients', { cookie })).json.some((x) => x.id === c.json.id));
   assert.equal((await call(`/api/clients/${c.json.id}`, { method: 'DELETE', cookie })).status, 404);

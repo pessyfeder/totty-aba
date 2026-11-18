@@ -5,7 +5,6 @@ import { renderReport } from './reports-page.js';
 import { renderSettings } from './settings-page.js';
 import { renderAppointment } from './appointment-page.js';
 import { renderInfoPage } from './info-page.js';
-import { renderIntakeForms } from './intake-forms-page.js';
 const app = document.getElementById('app');
 const logoutBtn = document.getElementById('logout');
 
@@ -94,13 +93,11 @@ async function renderDashboard() {
   const option = (href, key, title, text) => h('a', { href, class: 'option' },
     h('span', { class: 'option-icon' }, ICONS[key]()), h('span', { class: 'option-title' }, title), h('span', { class: 'option-text' }, text));
   const n = d.attention.length;
-  const waiting = (await api('/intake-submissions').catch(() => [])).length;
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('h2', { class: 'options-heading' }, 'Dashboard'),
     h('div', { class: 'options' },
-      option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View, add and manage your clients.` : 'View, add and manage your clients.'),
-      waiting > 0 && option('#/intake-forms', 'clients', 'Intake forms', `${waiting} new form${waiting === 1 ? '' : 's'} to copy into a client.`),
+      option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View and manage your clients.` : 'View and manage your clients.'),
       option('#/appointments', 'appointments', 'Schedule', 'View upcoming scheduled appointments.'),
       option('#/settings', 'settings', 'Settings', 'Booking links and check-in text.')),
   ].filter(Boolean));
@@ -114,7 +111,6 @@ async function renderClients() {
       h('h2', {}, 'Clients'),
       h('span', { class: 'spacer' })),
     h('div', { class: 'chip-bar' },
-      h('a', { href: '#/client/new', class: 'chip chip-add' }, '+ Add client'),
       h('a', { href: '#/archived', class: 'chip chip-archived' }, 'View Archived')),
     ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ ${c.kind === 'inquiry' ? 'Profile page email' : 'Initial consultation email'} for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
@@ -200,8 +196,8 @@ async function renderAppointments() {
 
 const renderClient = (id, tab) => renderClientPage({ h, api, app, logoutBtn, handle }, id, tab);
 
-/** Add (c == null) or edit (c = existing client) form. Editing sends every field, so a cleared optional field is cleared. */
-function renderClientForm(c = null) {
+/** Edit form for an existing client (clients are created only by the online intake form). Sends every field, so a cleared optional field is cleared. */
+function renderClientForm(c) {
   logoutBtn.hidden = false;
   const msg = h('p', { class: 'error', role: 'alert' });
   const v = (k) => (c?.[k] == null ? '' : String(c[k]).slice(0, k === 'dob' || k === 'admission_date' ? 10 : undefined));
@@ -219,7 +215,7 @@ function renderClientForm(c = null) {
     }
     body.in_israel = f.get('in_israel') === 'on';
     try {
-      const saved = c ? await api(`/clients/${c.id}`, { method: 'PATCH', body }) : await api('/clients', { method: 'POST', body });
+      const saved = await api(`/clients/${c.id}`, { method: 'PATCH', body });
       location.hash = `#/client/${saved.id}`;
     } catch (ex) { msg.textContent = ex.message; }
   } },
@@ -239,13 +235,13 @@ function renderClientForm(c = null) {
     h('label', {}, h('input', { name: 'in_israel', type: 'checkbox', checked: Boolean(c?.in_israel) }), ' Lives in Israel (Yom Tov observance)'),
     field('Candle lighting (minutes before sunset)', 'candle_lighting_minutes', { type: 'number', min: 0, placeholder: 'default 18' }),
     h('label', {}, 'Notes', h('textarea', { name: 'notes', rows: 3 }, c?.notes ?? '')),
-    h('button', { type: 'submit' }, c ? 'Save changes' : 'Create client'), msg);
+    h('button', { type: 'submit' }, 'Save changes'), msg);
   const archive = c && h('p', {}, h('button', { type: 'button', class: 'link', onclick: async () => {
     const restoring = c.status === 'archived';
     if (!restoring && !confirm(`Archive ${c.first_name}? Prompts stop and the client leaves the dashboard. History is kept and you can restore later.`)) return;
     try { await api(`/clients/${c.id}/archive`, { method: 'POST', body: { restore: restoring } }); location.hash = '#/'; } catch (ex) { msg.textContent = ex.message; }
   } }, c.status === 'archived' ? 'Restore client' : 'Archive client'));
-  app.replaceChildren(c ? h('p', {}, h('a', { href: `#/client/${c.id}` }, '← Back to client')) : '', h('h2', {}, c ? `Edit ${c.first_name} ${c.last_name}` : 'Add client'), form, archive || '');
+  app.replaceChildren(h('p', {}, h('a', { href: `#/client/${c.id}` }, '← Back to client')), h('h2', {}, `Edit ${c.first_name} ${c.last_name}`), form, archive);
 }
 
 async function renderArchived() {
@@ -257,7 +253,6 @@ async function renderArchived() {
       : h('p', { class: 'muted' }, 'No archived clients.'));
 }
 
-const renderAddClient = () => renderClientForm();
 const renderEditClient = async (id) => renderClientForm(await api(`/clients/${id}`));
 
 function handle(err) {
@@ -273,7 +268,7 @@ async function route() {
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
   const apptRoute = /^#\/appointment\/([0-9a-f-]{36})$/i.exec(location.hash);
-  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/intake-forms' ? renderIntakeForms({ h, api, app, logoutBtn, handle }) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : location.hash === '#/client/new' ? renderAddClient() : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1], m[2]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1], m[2]) : renderDashboard()); } catch (e) { handle(e); }
 }
 
 async function boot() {

@@ -1,6 +1,6 @@
 // Online new-client intake form (public page, /intake): one general form for every family. It follows the BTB paper packet, section by section.
 // Answers are kept in this browser while the parent types, so a half-filled form survives a reload; Submit sends it to the app,
-// which copies it into the matching client's profile (or holds it for Yisroel to match).
+// which creates the client. The page shown afterwards carries the consultation booking link.
 const GENDERS = ['Male', 'Female', 'Other'];
 const STATES = [['NJ', 'New Jersey'], ['NY', 'New York']];
 
@@ -10,7 +10,7 @@ const CONSENT_ITEMS = [
   'Information I share is kept confidential, except where disclosure is required by law (for example, under mandatory reporting requirements, or where there is danger to self or others).',
   'No outcome, result, or timeline is guaranteed. Progress depends on many factors, including consistency of implementation across home, school and community. Think of it like any other ongoing treatment — a weekly visit to a therapist, or a medication taken exactly as prescribed: here, the strategies are the “prescription,” and they only work when applied consistently and precisely.',
   'I am responsible for my child’s safety and supervision at all times; guidance does not replace direct supervision.',
-  'Fees, cancellation terms, and session logistics are described in the Fee & Cancellation Policy and How Sessions Work sections of this form, which I have read.',
+  'Fees, cancellation terms, and session logistics are described in the Fee & Cancellation Policy section of this form, which I have read.',
 ];
 const NJ_ITEMS = [
   'I confirm that I will be physically located in New Jersey during each telepractice session with The BTB Method.',
@@ -37,12 +37,7 @@ export async function renderInfoPage({ h, app }) {
     if (!res.ok) throw Object.assign(new Error(data.error ?? `Request failed (${res.status})`), { missing: data.missing });
     return data;
   };
-  const clientId = new URLSearchParams(location.search).get('c') ?? ''; // this family's own link id, if the link has one
   const f = readDraft();
-  if (clientId) {
-    const known = await call(`/client?c=${encodeURIComponent(clientId)}`, 'GET').catch(() => ({}));
-    if (known.first_name) Object.assign(f, { child_first_name: known.first_name, child_last_name: known.last_name });
-  }
   const els = {}; // key -> input element, for reading values and flagging missing ones
   const saved = h('span', { class: 'muted', role: 'status' });
   const msg = h('p', { class: 'error', role: 'alert' });
@@ -111,17 +106,24 @@ export async function renderInfoPage({ h, app }) {
   const locSig = signature('loc_sig', 'Parent / Caregiver / Educator signature');
   stateSel.querySelector('select').addEventListener('change', syncState);
 
+  const submitBtn = h('button', { type: 'submit' }, 'Submit');
   const form = h('form', { class: 'intake', novalidate: true, onsubmit: async (e) => {
     e.preventDefault();
     msg.textContent = '';
     for (const el of Object.values(els)) el.removeAttribute('aria-invalid');
     try {
-      await call('/submit', 'POST', { form: values(), client: clientId });
+      submitBtn.disabled = true; // one click, one client
+      const { booking_url: bookingUrl } = await call('/submit', 'POST', { form: values() });
       try { localStorage.removeItem(DRAFT); } catch { /* no storage: nothing to clear */ }
       document.title = 'Intake form submitted - BTB';
-      app.replaceChildren(h('h2', {}, 'Thank you!'), h('p', {}, 'Your intake form was submitted. You will hear from us about the next step.'));
+      app.replaceChildren(h('h2', {}, 'Thank you!'),
+        h('p', {}, 'Your intake form was received.'),
+        bookingUrl
+          ? h('p', {}, 'The next step is an initial consultation. ', h('a', { href: bookingUrl, class: 'button', rel: 'noopener' }, 'Schedule your consultation'))
+          : h('p', {}, 'You will hear from us about scheduling your initial consultation.'));
       window.scrollTo({ top: 0 });
     } catch (ex) {
+      submitBtn.disabled = false;
       msg.textContent = ex.message;
       const bad = (ex.missing ?? []).map((k) => els[k]).filter(Boolean);
       for (const el of bad) el.setAttribute('aria-invalid', 'true');
@@ -136,27 +138,18 @@ export async function renderInfoPage({ h, app }) {
       h('h4', {}, 'Parent / Guardian'),
       grid(text('parent_name', 'Full name', { req: true, auto: 'name' }), text('parent_relationship', 'Relationship to child', { req: true, ph: 'e.g. Mother' }),
         text('street', 'Street address', { req: true, auto: 'street-address', wide: true }),
-        text('city', 'City', { req: true, auto: 'address-level2' }), stateSel, text('zip', 'Zip', { req: true, auto: 'postal-code', max: 10 })),
-      h('h4', {}, 'Second parent / caregiver (optional)'),
-      grid(text('p2_name', 'Full name'), text('p2_relationship', 'Relationship to child'))),
-
-    section('2. Contact & Communication Preferences', null,
-      grid(text('phone', 'Mobile phone', { type: 'tel', req: true, auto: 'tel', ph: '(555) 555-0123' }), text('email', 'Email', { type: 'email', req: true, auto: 'email' }),
-        text('language', 'Language', { ph: 'e.g. English' }), text('best_time', 'Best time to reach')),
-      h('h4', {}, 'Second contact (optional)'),
-      grid(text('c2_name', 'Name'), text('c2_contact', 'Mobile phone / email')),
+        text('city', 'City', { req: true, auto: 'address-level2' }), stateSel, text('zip', 'Zip', { req: true, auto: 'postal-code', max: 10 }),
+        text('phone', 'Mobile phone', { type: 'tel', req: true, auto: 'tel', ph: '(555) 555-0123' }), text('email', 'Email', { type: 'email', req: true, auto: 'email' })),
       h('h4', {}, 'Preferred contact method (check all that apply)'),
       h('div', { class: 'checks' }, check('pref_text', 'Text'), check('pref_email', 'Email'), check('pref_call', 'Phone call')),
-      h('h4', {}, 'How would you like to log goal data? *'),
-      radios('log_method', [['text', 'Text — one text per goal at its scheduled time (reply Y/N or minutes)'], ['email', 'Email — one email per day listing all goals, answered on one page']]),
-      h('h4', {}, 'Consent to Text / Email'),
-      h('p', {}, 'I agree that The BTB Method may text and/or email me at the contact details above about my child’s goals, check-in appointments, and progress reports. I understand that:'),
-      h('ul', {},
-        h('li', {}, 'Messages include only my child’s first name and the goal question. They do not include a diagnosis or progress details.'),
-        h('li', {}, 'No messages are sent during Shabbos or Yom Tov, or during quiet hours (early morning and late evening).'),
-        h('li', {}, 'I can change my method or withdraw this consent at any time by telling The BTB Method.')),
-      h('div', { class: 'checks' }, check('consent_text', 'I agree to receive texts'), check('consent_email', 'I agree to receive emails')),
-      signature('contact_sig', 'Parent / Caregiver / Educator signature')),
+      h('h4', {}, 'Second parent / caregiver (optional)'),
+      grid(text('p2_name', 'Full name'), text('p2_relationship', 'Relationship to child'),
+        text('p2_phone', 'Mobile phone', { type: 'tel', ph: '(555) 555-0123' }), text('p2_email', 'Email', { type: 'email' })),
+      h('h4', {}, 'Preferred contact method (check all that apply)'),
+      h('div', { class: 'checks' }, check('p2_pref_text', 'Text'), check('p2_pref_email', 'Email'), check('p2_pref_call', 'Phone call'))),
+
+    section('2. Communication Preferences', null,
+      grid(text('language', 'Language', { ph: 'e.g. English' }))),
 
     section('3. Informed Consent for Services', 'To be signed before services begin. By signing below, I understand and agree to the following:',
       numbered(CONSENT_ITEMS),
@@ -182,31 +175,21 @@ export async function renderInfoPage({ h, app }) {
       h('p', { class: 'muted' }, 'Credit card details are not collected on this page. The BTB Method will arrange your card on file with you directly.'),
       check('fee_ack', 'I have read and agree to the Fee & Cancellation Policy. *')),
 
-    section('5. How Sessions Work', 'Logistics for your ongoing sessions',
-      h('p', {}, 'Think of this like a weekly therapy appointment or a prescribed medication — consistency is what makes it work. Sessions happen on a regular schedule, and the strategies work best when applied precisely between sessions.'),
-      h('p', {}, h('strong', {}, 'Session length: '), '45 minutes'),
-      text('frequency', 'Preferred frequency (e.g., weekly)', { wide: true }),
-      h('h4', {}, 'Format — all sessions are remote'),
-      h('div', { class: 'checks' }, check('format_phone', 'Telepractice — phone (audio only)'), check('format_video', 'Telepractice — video call')),
-      h('p', {}, h('strong', {}, 'What to have ready: '), 'A private, quiet space; a phone (for audio) or a device with camera and microphone (for video); a stable connection.'),
-      h('p', {}, h('strong', {}, 'Rescheduling: '), 'Contact us at least 48 hours in advance to reschedule or cancel a session.'),
-      h('p', {}, h('strong', {}, 'Between sessions: '), 'Brief questions by email are welcome. For anything urgent, see Crisis & Emergency Response below.')),
-
-    section('6. Background & History', 'Please complete before your first session.',
+    section('5. Background & History', 'Please complete before your first session.',
       area('diagnoses', 'Current diagnoses (if any)'), area('medications', 'Current medications'),
       area('providers', 'Current providers / other services (school, OT, speech, other therapy)'),
       area('past_interventions', 'Past interventions tried for this behavior'),
       area('implementers', 'Family members / caregivers involved in implementing strategies'),
       area('anything_else', 'Anything else we should know')),
 
-    section('7. Preference Assessment — What Motivates Your Child', 'List your child’s favorites in each category below, then choose the top 3 overall.',
+    section('6. Preference Assessment — What Motivates Your Child', 'List your child’s favorites in each category below, then choose the top 3 overall.',
       area('fav_toys', 'Toys & Activities', 2), area('fav_foods', 'Foods & Snacks', 2),
       area('fav_social', 'Social / Attention (praise, tickles, high-fives)', 2), area('fav_sensory', 'Sensory (music, movement, textures)', 2),
       area('fav_screen', 'Screen Time / Technology', 2), area('fav_other', 'Other', 2),
       h('h4', {}, 'Top 3 overall (ranked)'),
       text('top1', '1.', { wide: true }), text('top2', '2.', { wide: true }), text('top3', '3.', { wide: true })),
 
-    section('8. Crisis & Emergency Response', 'What to do if H.O.P. happens',
+    section('7. Crisis & Emergency Response', 'What to do if H.O.P. happens',
       numbered([
         'Ensure immediate physical safety first. If you can safely do so, remove your child or others from danger.',
         'If there is serious risk to life or safety, call 911 (or your local emergency number) right away. Do not wait to contact The BTB Method first.',
@@ -216,7 +199,7 @@ export async function renderInfoPage({ h, app }) {
       h('p', {}, h('em', {}, '“Hop in — only when there’s H.O.P.”')),
       check('crisis_ack', 'I have read the Crisis & Emergency Response sheet. *')),
 
-    section('9. Release of Information (optional)', 'Complete only if you’d like The BTB Method to communicate directly with another provider involved in your child’s care (for example, a school, pediatrician, or therapist).',
+    section('8. Release of Information (optional)', 'Complete only if you’d like The BTB Method to communicate directly with another provider involved in your child’s care (for example, a school, pediatrician, or therapist).',
       h('h4', {}, 'Authorize The BTB Method to'),
       radios('roi_direction', [['share', 'Share information with'], ['receive', 'Receive information from'], ['both', 'Both']]),
       text('roi_provider', 'Provider / organization name', { wide: true }), text('roi_contact', 'Contact info (phone / email)', { wide: true }),
@@ -224,11 +207,11 @@ export async function renderInfoPage({ h, app }) {
       text('roi_until', 'This authorization is valid until (date), or until revoked in writing', { type: 'date', wide: true }),
       signature('roi_sig', 'Parent / Caregiver / Educator signature (only if completing this section)')),
 
-    section('10. Telepractice Location & Eligibility', 'Complete the part for your state, initial each item, and sign.',
+    section('9. Telepractice Location & Eligibility', 'Complete the part for your state, initial each item, and sign.',
       locPick, njBox, nyBox, locSig),
 
     h('p', { class: 'muted' }, '* Required'),
-    h('div', {}, h('button', { type: 'submit' }, 'Submit'), ' ', saved), msg);
+    h('div', {}, submitBtn, ' ', saved), msg);
 
   syncState();
 
