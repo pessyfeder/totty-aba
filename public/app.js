@@ -279,7 +279,7 @@ function handle(err) {
 
 async function route() {
   app.className = '';
-  const m = /^#\/client\/([0-9a-f-]{36})(?:\/(profile|goals|progress))?$/i.exec(location.hash);
+  const m = /^#\/client\/([0-9a-f-]{36})(?:\/(profile|goals|progress|appointments))?$/i.exec(location.hash);
   const contactsRoute = /^#\/client\/([0-9a-f-]{36})\/contacts$/i.exec(location.hash);
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);

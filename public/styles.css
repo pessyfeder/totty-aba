@@ -231,3 +231,19 @@ a.tab.current { color: var(--accent); border-bottom-color: var(--accent); }
   .side-list { display: flex; overflow-x: auto; max-height: none; }
   a.side-item { flex: none; }
 }
+
+.client-actions { float: right; }
+button.danger { color: #b00020; border-color: #b00020; }
+.appt-counts { display: flex; gap: 8px; flex-wrap: wrap; margin: 8px 0; }
+.badge.appt-scheduled { background: var(--accent-soft); color: var(--accent); }
+.badge.appt-completed { background: #dcfce7; color: #166534; }
+.badge.appt-missed { background: #fee2e2; color: #991b1b; }
+.badge.appt-to_be_scheduled { background: #fef3c7; color: #92400e; }
+
+.log-entry { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 8px 12px; margin: 6px 0; }
+.log-entry summary { cursor: pointer; display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.log-events { margin: 8px 0 2px; padding-left: 18px; }
+.log-events time { font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.client-actions { float: right; }
+button.danger { color: #b00020; border-color: #b00020; }

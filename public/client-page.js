@@ -148,7 +148,7 @@ async function emailSection({ h, api, handle }, id, reload, { path, title, name,
     h('button', { type: 'button', class: 'link', onclick: () => { if (confirm(`Don't send the ${name}?`)) act('cancel'); } }, approved ? 'Cancel' : 'Decline'));
 }
 
-const TABS = [['profile', 'Profile'], ['goals', 'Goals'], ['progress', 'Progress']];
+const TABS = [['profile', 'Profile'], ['goals', 'Goals'], ['progress', 'Progress'], ['appointments', 'Appointments']];
 
 export async function renderClient(ctx, id, tab = 'profile') {
   const { h, api, app, logoutBtn, handle } = ctx;
@@ -222,14 +222,44 @@ export async function renderClient(ctx, id, tab = 'profile') {
         } }, 'Go'),
         h('p', { class: 'muted' }, 'No prompts are sent until Go is pressed.')]);
 
-  const scheduleSection = [
-    h('h2', {}, 'Schedule'),
-    c.appointments.length
-      ? h('table', { class: 'compact' }, h('tbody', {}, c.appointments.map((a) => h('tr', {},
-          h('td', {}, new Date(a.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })),
-          h('td', {}, a.type),
-          h('td', { class: a.status === 'cancelled' ? 'muted' : '' }, a.status === 'cancelled' ? 'Cancelled' : new Date(a.starts_at) < new Date() ? 'Past' : 'Upcoming')))))
-      : h('p', { class: 'muted' }, 'Nothing scheduled yet.'),
+  const APPT = { to_be_scheduled: 'To be scheduled', scheduled: 'Scheduled', missed: 'Missed', completed: 'Completed', cancelled: 'Cancelled' };
+  const apptWhen = (a) => (a.starts_at ? new Date(a.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No date yet');
+  const apptAct = (a, body) => api(`/appointments/${a.id}`, { method: 'PATCH', body }).then(reload, handle);
+  const localInput = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
+  const apptRow = (a) => {
+    const needsOutcome = a.status === 'scheduled' && new Date(a.starts_at) < new Date();
+    const when = h('input', { type: 'datetime-local', 'aria-label': 'Date and time', value: a.starts_at ? localInput(a.starts_at) : '' });
+    const setTime = h('button', { type: 'button', onclick: () => { if (when.value) apptAct(a, { status: 'scheduled', starts_at: new Date(when.value).toISOString() }); } }, a.status === 'to_be_scheduled' ? 'Set time' : 'Reschedule');
+    const mark = (label, status) => h('button', { type: 'button', class: 'link', onclick: () => apptAct(a, { status }) }, label);
+    return h('tr', {},
+      h('td', {}, apptWhen(a), needsOutcome ? h('div', { class: 'warn-line' }, 'Did it happen?') : ''),
+      h('td', {}, a.type === 'consultation' ? 'Consultation' : a.type === 'check-in' ? 'Check-in' : a.type),
+      h('td', {}, h('span', { class: `badge appt-${a.status}` }, APPT[a.status] ?? a.status)),
+      h('td', {}, a.status === 'cancelled' ? '' : [
+        a.status === 'completed' || a.status === 'missed' ? '' : [when, ' ', setTime, ' '],
+        a.status === 'scheduled' ? [mark('Completed', 'completed'), mark('Missed', 'missed')] : '',
+        a.status === 'completed' || a.status === 'missed' ? [mark('To be scheduled again', 'to_be_scheduled'), mark(a.status === 'missed' ? 'Mark completed' : 'Mark missed', a.status === 'missed' ? 'completed' : 'missed')] : '',
+        a.status === 'scheduled' ? mark('Back to to-be-scheduled', 'to_be_scheduled') : '']),
+      h('td', {}, a.id ? h('a', { href: `#/appointment/${a.id}` }, 'Notes') : ''));
+  };
+  const addAppt = inlineForm(h, [
+    lbl('Type', h('select', { name: 'type' }, h('option', { value: 'check-in' }, 'Check-in'), h('option', { value: 'consultation' }, 'Consultation'))),
+    lbl('Date and time (leave empty if not booked yet)', h('input', { name: 'starts_at', type: 'datetime-local' })),
+  ], 'Add appointment', async (f) => {
+    const t = f.get('starts_at');
+    await post('/appointments', { type: f.get('type'), starts_at: t ? new Date(t).toISOString() : null });
+  });
+  const groupOrder = ['to_be_scheduled', 'scheduled', 'missed', 'completed', 'cancelled'];
+  const apptTab = [
+    h('h2', { class: 'first' }, 'Appointments'),
+    h('p', { class: 'muted' }, 'Appointments booked on the calendar appear here automatically. Add one that still needs booking, and mark each as completed or missed afterwards.'),
+    h('div', { class: 'appt-counts' }, groupOrder.slice(0, 4).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
+    ...groupOrder.map((s) => {
+      const list = c.appointments.filter((a) => a.status === s);
+      return list.length ? h('section', {}, h('h3', {}, APPT[s]), h('table', { class: 'compact' }, h('tbody', {}, list.map(apptRow)))) : '';
+    }),
+    c.appointments.length ? '' : h('p', { class: 'muted' }, 'No appointments yet.'),
+    h('details', { open: c.appointments.length === 0 }, h('summary', {}, 'Add an appointment'), addAppt),
   ];
   const contactsSection = [
     h('h2', {}, 'Contact info'),
@@ -250,7 +280,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const profileTab = [
     h('p', { class: 'muted' }, `Admitted ${String(c.admission_date).slice(0, 10)} · ${c.location_name ?? ''} · ${c.timezone}`),
     intakeSection, inquiryEmail, consultEmail,
-    ...contactsSection, ...reinforcementSection, ...scheduleSection, intakeDocs,
+    ...contactsSection, ...reinforcementSection, intakeDocs,
   ];
   const goalsTab = [
     h('h2', { class: 'first' }, 'Goals'),
@@ -289,5 +319,5 @@ export async function renderClient(ctx, id, tab = 'profile') {
         h('h2', {}, `${c.first_name} ${c.last_name}`),
         h('a', { href: `#/client/${id}/edit`, class: 'button' }, 'Edit')),
       tabs,
-      h('div', { class: 'tab-body' }, ...(tab === 'goals' ? goalsTab : tab === 'progress' ? progressTab : profileTab)))));
+      h('div', { class: 'tab-body' }, ...(tab === 'goals' ? goalsTab : tab === 'progress' ? progressTab : tab === 'appointments' ? apptTab : profileTab)))));
 }

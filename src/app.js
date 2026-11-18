@@ -36,6 +36,8 @@ class HttpError extends Error {
   }
 }
 const bad = (msg) => new HttpError(400, msg);
+const MANUAL_STATUSES = ['to_be_scheduled', 'scheduled', 'missed', 'completed'];
+const apptTime = (v) => { const d = new Date(v); if (Number.isNaN(d.getTime())) throw bad('Date and time is not valid'); return d; };
 
 const validTimezone = (tz) => {
   try { new Intl.DateTimeFormat('en-US', { timeZone: tz }); return true; } catch { return false; }
@@ -253,15 +255,44 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     await audit(req, 'view', 'appointment', appt.id);
     res.json({ ...appt, goals, reinforcements });
   });
+  // Update an appointment: notes, status (to_be_scheduled / scheduled / missed / completed) and/or time.
   app.patch('/api/appointments/:id', async (req, res) => {
-    const notes = req.body?.notes;
-    if (typeof notes !== 'string' || notes.length > 20000) throw bad('notes must be text (up to 20,000 characters)');
+    const { rows: cur } = await db.query('SELECT * FROM appointment WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
+    if (!cur.length) throw new HttpError(404, 'Not found');
+    const b = req.body ?? {};
+    const next = { notes: cur[0].notes, status: cur[0].status, starts_at: cur[0].starts_at };
+    if ('notes' in b) {
+      if (typeof b.notes !== 'string' || b.notes.length > 20000) throw bad('notes must be text (up to 20,000 characters)');
+      next.notes = b.notes.trim() || null;
+    }
+    if ('status' in b) {
+      if (!MANUAL_STATUSES.includes(b.status)) throw bad(`status must be one of: ${MANUAL_STATUSES.join(', ')}`);
+      next.status = b.status;
+    }
+    if ('starts_at' in b) next.starts_at = b.starts_at ? apptTime(b.starts_at) : null;
+    if (next.status !== 'to_be_scheduled' && !next.starts_at) throw bad('A date and time is needed unless the appointment is still to be scheduled');
+    if (next.status === 'to_be_scheduled') next.starts_at = null;
     const { rows } = await db.query(
-      `UPDATE appointment SET notes = $3, updated_at = $4 WHERE id = $1 AND clinician_id = $2 RETURNING id, notes`,
-      [req.params.id, req.clinician.id, notes.trim() || null, now()]);
-    if (!rows.length) throw new HttpError(404, 'Not found');
-    await audit(req, 'update', 'appointment', rows[0].id, { fields: ['notes'] });
+      `UPDATE appointment SET notes = $3, status = $4, starts_at = $5, ends_at = CASE WHEN $5::timestamptz IS DISTINCT FROM starts_at THEN NULL ELSE ends_at END, updated_at = $6
+        WHERE id = $1 AND clinician_id = $2 RETURNING id, notes, status, starts_at`,
+      [req.params.id, req.clinician.id, next.notes, next.status, next.starts_at, now()]);
+    await audit(req, 'update', 'appointment', rows[0].id, { fields: Object.keys(b).filter((k) => ['notes', 'status', 'starts_at'].includes(k)) });
     res.json(rows[0]);
+  });
+  // Add an appointment to a client's list (e.g. one that still needs booking). The calendar sync never touches these.
+  app.post('/api/clients/:id/appointments', async (req, res) => {
+    const { rows: own } = await db.query('SELECT id FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
+    if (!own.length) throw new HttpError(404, 'Not found');
+    const b = req.body ?? {};
+    const type = ['consultation', 'check-in'].includes(b.type) ? b.type : 'check-in';
+    const startsAt = b.starts_at ? apptTime(b.starts_at) : null;
+    const status = startsAt ? 'scheduled' : 'to_be_scheduled';
+    const { rows } = await db.query(
+      `INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at, status, source)
+       VALUES ($1, $2, 'manual:' || gen_random_uuid(), $3, $4, $5, 'manual') RETURNING id, type, starts_at, ends_at, status, title, notes`,
+      [req.clinician.id, req.params.id, type, startsAt, status]);
+    await audit(req, 'create', 'appointment', rows[0].id);
+    res.status(201).json(rows[0]);
   });
 
   // ---- Clients ----
@@ -288,7 +319,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     const { rows } = await db.query('SELECT * FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
     const { rows: appointments } = await db.query(
-      `SELECT id, type, starts_at, ends_at, status, title FROM appointment WHERE client_id = $1 ORDER BY starts_at DESC`, [req.params.id]);
+      `SELECT id, type, starts_at, ends_at, status, title, notes FROM appointment WHERE client_id = $1 ORDER BY starts_at DESC NULLS FIRST`, [req.params.id]);
     const [contacts, goals, reinforcements] = await Promise.all(
       ['contact', 'goal', 'reinforcement'].map((t) => db.query(`SELECT * FROM ${t} WHERE client_id = $1 ORDER BY 1`, [req.params.id]).then((r) => r.rows)),
     );

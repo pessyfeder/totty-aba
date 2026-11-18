@@ -34,3 +34,20 @@ test('appointment page: kind (consultation / first / later check-in) and notes',
   assert.equal((await call('PATCH', `/api/appointments/${first}`, { notes: 5 })).status, 400);
   assert.equal((await call('GET', '/api/appointments/00000000-0000-0000-0000-000000000000')).status, 404);
 });
+
+test('client appointments: to be scheduled → scheduled → completed / missed', async () => {
+  const cid = world.client.id;
+  const made = await (await call('POST', `/api/clients/${cid}/appointments`, { type: 'check-in' })).json();
+  assert.equal(made.status, 'to_be_scheduled');
+  assert.equal(made.starts_at, null);
+  const patch = (body) => call('PATCH', `/api/appointments/${made.id}`, body);
+  assert.equal((await patch({ status: 'scheduled' })).status, 400); // needs a time
+  assert.equal((await patch({ status: 'scheduled', starts_at: '2027-02-02T15:00:00Z' })).status, 200);
+  assert.equal((await patch({ status: 'bogus' })).status, 400);
+  assert.equal((await (await patch({ status: 'missed' })).json()).status, 'missed');
+  assert.equal((await (await patch({ status: 'to_be_scheduled' })).json()).starts_at, null);
+  const client = await (await call('GET', `/api/clients/${cid}`)).json();
+  assert.ok(client.appointments.some((a) => a.id === made.id && a.status === 'to_be_scheduled'));
+  const scheduled = await (await call('GET', '/api/appointments')).json();
+  assert.ok(!scheduled.some((a) => a.id === made.id)); // not on the Schedule calendar until it has a time
+});
