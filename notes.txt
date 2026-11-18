@@ -14,7 +14,6 @@ press "go" or something to that affect; app takes over the rest.
 
 weekly google calendar link to schedule meetings.
 
-
 appointment scheduling: 
 manual - when client reaches out. 
 client responds, manual - upload files to app. 
@@ -28,3 +27,6 @@ show me client intake documents
 set up google calendar functions
 
 yes to voice calls
+
+watermark on documents. also lock so can't be converted to text
+

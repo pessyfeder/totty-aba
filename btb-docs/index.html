@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+
+<html dir="ltr" lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>The BTB Method™</title>
+<link href="https://thebtbmethod.com/" rel="canonical"/>
+<meta content="The BTB Method (Behavior Treating Behavior): private guidance for parents, caregivers and educators." name="description"/>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Frank+Ruhl+Libre:wght@400;500;700&amp;amp;family=Source+Sans+3:wght@400;600&amp;display=swap" rel="stylesheet"/>
+<style>
+  /* Layout: single column, wide hero, a flowing sequence for how it works, quiet cards only where content is grouped.
+     Palette from the practice's navy and red; neutrals lean cool toward the navy. */
+  :root {
+    --bg: #F4F6F9;
+    --surface: #FFFFFF;
+    --fg: #1B2433;
+    --muted: #55607A;
+    --navy: #1F3A66;
+    --red: #B3261E; --sky: #3F8AD0;
+    --line: #D5DBE6;
+    --soft: #E8EDF5;
+    --on-navy: #FFFFFF;
+    --font-display: 'Frank Ruhl Libre', 'Times New Roman', serif;
+    --font-body: 'Source Sans 3', 'Segoe UI', Arial, sans-serif;
+    --font-yi: 'David Libre', 'David', 'Times New Roman', serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0E1626; --surface: #162136; --fg: #E8ECF4; --muted: #A5B0C6; --navy: #8FB0E8; --red: #F0766E; --sky: #7DB8F0;
+      --line: #2A3752; --soft: #1C2A44; --on-navy: #0E1626; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0E1626; --surface: #162136; --fg: #E8ECF4; --muted: #A5B0C6; --navy: #8FB0E8; --red: #F0766E; --sky: #7DB8F0;
+    --line: #2A3752; --soft: #1C2A44; --on-navy: #0E1626; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 17px; line-height: 1.6; padding-inline: 20px; }
+  body.lang-yi { font-family: var(--font-yi); font-size: 19px; line-height: 1.7; }
+  body:not(.lang-yi) .yi { display: none !important; }
+  body.lang-yi .en { display: none !important; }
+  .wrap { max-width: 1000px; margin-inline: auto; }
+  h1, h2, h3 { font-family: var(--font-display); color: var(--navy); line-height: 1.15; text-wrap: balance; margin: 0; }
+  body.lang-yi h1, body.lang-yi h2, body.lang-yi h3 { font-family: var(--font-display); }
+  a { color: var(--navy); }
+  p { margin: 0; max-width: 62ch; }
+
+  /* basmala */
+  .bsd { text-align: right; direction: rtl; font-family: 'David', 'David Libre', 'Frank Ruhl Libre', 'Times New Roman', serif; font-weight: 700; font-size: 15px; line-height: 1; color: var(--navy); padding-top: 12px; }
+
+  /* header */
+  header { display: flex; align-items: center; justify-content: flex-start; gap: 18px; padding-block: 22px; border-bottom: 3px solid var(--navy); }
+  .logo { display: block; line-height: 0; flex: 0 0 auto; }
+  .logo svg { display: block; width: 84px; height: 84px; border-radius: 11px; }
+  .brand { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .brand-name { font-family: var(--font-display); font-weight: 700; font-size: clamp(28px, 6vw, 46px); line-height: 1.02; color: var(--navy); }
+  .brand-name .tm { font-size: 0.34em; font-weight: 400; vertical-align: top; position: relative; top: 0.3em; margin-inline-start: 3px; letter-spacing: 0; }
+  .brand-tag { font-weight: 600; font-size: clamp(10.5px, 2.4vw, 15px); letter-spacing: 0.2em; text-transform: uppercase; color: var(--red); line-height: 1.25; }
+  header { flex-wrap: wrap; }
+  .nav { margin-inline-start: auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px 22px; }
+  .nav a { font-weight: 600; text-decoration: none; color: var(--navy); padding: 6px 2px; border-bottom: 2px solid transparent; }
+  .nav a:hover { border-bottom-color: var(--red); }
+  .nav a.cta { background: var(--navy); color: var(--on-navy); padding: 10px 18px; border-radius: 6px; border-bottom: 0; }
+  .nav a.cta:hover { opacity: 0.9; }
+  .nav a:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+  @media (max-width: 720px) { .nav { margin-inline-start: 0; flex: 1 0 100%; gap: 6px 18px; } }
+  .lang { display: flex; gap: 4px; border: 1px solid var(--line); border-radius: 999px; padding: 3px; background: var(--surface); }
+  .lang button { font: inherit; font-size: 15px; border: 0; background: transparent; color: var(--muted); padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+  .lang button[aria-pressed="true"] { background: var(--navy); color: var(--on-navy); }
+  .lang button:focus-visible, .btn:focus-visible, summary:focus-visible { outline: 3px solid var(--red); outline-offset: 2px; }
+
+  /* hero */
+  .hero { padding-block: 56px 48px; }
+  .eyebrow { font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--red); font-weight: 600; margin-bottom: 14px; }
+  body.lang-yi .eyebrow { letter-spacing: 0; text-transform: none; font-size: 17px; font-weight: 700; }
+  .hero h1 { font-size: clamp(34px, 6vw, 58px); font-weight: 500; max-width: 18ch; margin-bottom: 20px; }
+  body.lang-yi .hero h1 { font-weight: 700; max-width: 22ch; }
+  .hero p.lead { font-size: 20px; color: var(--fg); margin-bottom: 28px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn { display: inline-block; font: inherit; font-weight: 600; text-decoration: none; padding: 13px 24px; border-radius: 6px; border: 2px solid var(--navy); cursor: pointer; }
+  .btn.primary { background: var(--navy); color: var(--on-navy); }
+  .btn.ghost { background: transparent; color: var(--navy); }
+
+  section { padding-block: 44px; border-top: 1px solid var(--line); }
+  section h2 { font-size: clamp(26px, 4vw, 36px); font-weight: 500; margin-bottom: 18px; }
+  body.lang-yi section h2 { font-weight: 700; }
+
+  /* mechanism */
+  .mech { display: flex; flex-wrap: wrap; align-items: stretch; gap: 10px; margin-block: 26px; }
+  .mech .node { flex: 1 1 200px; min-width: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px 18px; font-weight: 600; color: var(--navy); }
+  .mech .node.key { border-color: var(--red); }
+  .mech .node small { display: block; font-weight: 400; color: var(--muted); font-size: 14px; margin-top: 4px; }
+  body.lang-yi .mech .node small { font-size: 16px; }
+  .mech .arrow { align-self: center; color: var(--red); font-size: 26px; flex: 0 0 auto; }
+  body.lang-yi .mech .arrow { transform: scaleX(-1); }
+  @media (max-width: 640px) { .mech .arrow { display: none; } }
+  .callout { background: var(--soft); border-inline-start: 4px solid var(--navy); padding: 18px 22px; border-radius: 0 8px 8px 0; margin-top: 20px; max-width: 70ch; }
+  body.lang-yi .callout { border-radius: 8px 0 0 8px; }
+  .callout + .callout { margin-top: 12px; }
+
+  /* steps */
+  ol.steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 22px; counter-reset: s; }
+  ol.steps li { display: grid; grid-template-columns: 52px 1fr; gap: 18px; align-items: start; }
+  ol.steps li::before { counter-increment: s; content: counter(s); width: 44px; height: 44px; border-radius: 50%; background: var(--navy); color: var(--on-navy); display: flex; align-items: center; justify-content: center; font-family: var(--font-display); font-weight: 700; font-size: 20px; }
+  ol.steps h3 { font-size: 22px; margin-bottom: 4px; }
+
+  /* fees */
+  .fees { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-block: 22px; }
+  .fee { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 18px 20px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+  .fee .amt { font-family: var(--font-display); font-size: 34px; color: var(--sky); font-weight: 700; direction: ltr; unicode-bidi: isolate; }
+  body.lang-yi .fee .amt { text-align: right; }
+  .fee .nm { font-weight: 600; color: var(--navy); }
+  .fee .ds { color: var(--muted); font-size: 15px; }
+  body.lang-yi .fee .ds { font-size: 17px; }
+  ul.terms { margin: 0; padding-inline-start: 22px; display: grid; gap: 6px; max-width: 66ch; }
+
+  /* faq */
+  details { border-bottom: 1px solid var(--line); padding-block: 14px; max-width: 760px; }
+  summary { cursor: pointer; font-weight: 600; color: var(--navy); font-size: 18px; list-style-position: inside; }
+  details p { margin-top: 10px; }
+
+  /* contact */
+  .contact { background: var(--navy); color: var(--on-navy); border-radius: 10px; padding: 34px 28px; margin-top: 8px; }
+  .contact h2 { color: var(--on-navy); }
+  .contact p { color: var(--on-navy); }
+  .mail { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-block: 18px; }
+  .mail code { font-family: var(--font-body); font-size: 22px; font-weight: 600; background: rgba(255,255,255,0.12); padding: 8px 14px; border-radius: 6px; direction: ltr; unicode-bidi: isolate; user-select: all; overflow-wrap: anywhere; }
+  .contact .btn { border-color: var(--on-navy); }
+  .contact .btn.primary { background: var(--on-navy); color: var(--navy); }
+  .contact .btn.ghost { color: var(--on-navy); }
+  .note { font-size: 15px; opacity: 0.9; }
+
+  footer { padding-block: 30px 44px; color: var(--muted); font-size: 14px; display: grid; gap: 6px; border-top: 1px solid var(--line); margin-top: 44px; }
+  body.lang-yi footer { font-size: 16px; }
+  footer .tagline { font-family: var(--font-display); color: var(--navy); font-weight: 500; font-size: 22px; letter-spacing: 0.06em; text-align: center; direction: ltr; padding-block: 6px 10px; }
+  footer .tagline b { color: var(--red); font-size: 36px; font-weight: 700; line-height: 1; }
+  footer .en, footer .yi { text-align: center; margin-inline: auto; }
+
+  @media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+  @media (max-width: 520px) { ol.steps li { grid-template-columns: 44px 1fr; gap: 14px; } .contact { padding: 26px 20px; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+<div class="bsd" lang="he">בס״ד</div>
+<header>
+<div aria-label="The BTB Method" class="logo">
+<svg aria-label="The BTB Method" height="64" role="img" viewbox="0 0 100 100" width="64" xmlns="http://www.w3.org/2000/svg"><rect fill="#1F3A66" height="100" rx="9" width="100" x="0" y="0"></rect>
+<text fill="#E23A30" font-family="'Frank Ruhl Libre','Liberation Serif','Times New Roman',serif" font-size="37" font-weight="700" letter-spacing="0.8" text-anchor="middle" x="50.4" y="55">BTB</text>
+<text fill="#FFFFFF" font-family="'Source Sans 3',Arial,sans-serif" font-size="8.2" font-weight="700" letter-spacing="2.1" text-anchor="middle" x="50.9" y="70.5">THE METHOD</text><text x="92.5" y="20" text-anchor="end" font-family="Arial,'Liberation Sans',sans-serif" font-weight="700" font-size="14" fill="#FFFFFF">™</text></svg>
+</div>
+<div class="brand">
+<div class="brand-name">The BTB Method<sup class="tm">™</sup></div>
+<div class="brand-tag">Private Behavior Guidance</div>
+</div>
+<nav aria-label="Main" class="nav">
+<a href="#about">About</a>
+<a href="#contact">Contact</a>
+<a class="cta" href="#contact">Schedule Consultation</a>
+</nav>
+</header>
+<main>
+<!-- HERO -->
+<div class="hero">
+<div class="en">
+<div class="eyebrow">Parent, caregiver &amp; educator guidance</div>
+<h1>Real strategies for the moments that matter most.</h1>
+<p class="lead">The BTB Method (Behavior Treating Behavior) is private, one-on-one guidance that shows you exactly how to respond when your child's behavior is hard. Sessions are by call, text and video, from your own home, school or community.</p>
+<div class="actions">
+<a class="btn primary" href="#contact">Get in touch</a>
+<a class="btn ghost" href="#how">How it works</a>
+<a class="btn ghost" href="#contact">Schedule Consultation</a>
+</div>
+</div>
+
+</div>
+<!-- WHAT IT IS -->
+<section id="method">
+<div class="en">
+<h2>How The BTB Method works</h2>
+<p>At The BTB Method, you learn how to respond to your child's behavior in the moment, with consistent rewards, limits, and follow-through, and that response is what treats the behavior.</p>
+<div class="mech">
+<div class="node">Your child's behavior<small>What happens in the moment</small></div>
+<div aria-hidden="true" class="arrow">→</div>
+<div class="node key">Your planned response<small>Rewards, limits, follow-through</small></div>
+<div aria-hidden="true" class="arrow">→</div>
+<div class="node">The behavior changes<small>Over time, with consistency</small></div>
+</div>
+<div class="callout">Think of it like a doctor's treatment plan. With medication, the treatment works when it's taken exactly as prescribed. Here the treatment works through behavior, so the plan has to be applied consistently and precisely, week after week. Like a weekly visit to a therapist, regular sessions keep it on track.</div>
+<div class="callout">It takes commitment: regular sessions, and carrying out the plan between them.</div>
+</div>
+
+</section>
+<!-- HOW IT WORKS -->
+<section id="how">
+<div class="en">
+<h2>What to expect</h2>
+<ol class="steps">
+<li><div><h3>Reach out</h3><p>Send a short message with your state and the behavior that worries you most. We reply personally and explain what applies in your state.</p></div></li>
+<li><div><h3>First session</h3><p>Together we choose the one priority behavior, start a simple 7-day baseline, and find what motivates your child.</p></div></li>
+<li><div><h3>Baseline, then the plan</h3><p>You track for a week, mostly by marking a dot each time the behavior happens. Then we build a plan around your child.</p></div></li>
+<li><div><h3>Guidance begins</h3><p>You apply the plan, we adjust it each session, and you keep tracking so we can see what works.</p></div></li>
+</ol>
+</div>
+
+</section>
+<!-- ABOUT -->
+<section id="about">
+<div class="en">
+<h2>About</h2>
+<p><strong>Yisroel Feder, M.S.Ed, BCBA, LBA</strong><br/>Licensed behavior analyst with more than 25 years in special education. Yisroel works with parents, caregivers and educators, so the skills stay in your home, school and community after the session ends.</p>
+</div>
+
+</section>
+<!-- SESSIONS & FEES -->
+<section id="fees">
+<div class="en">
+<h2>Sessions and fees</h2>
+<p>Sessions are 45 minutes, by call, text and video. There are no in-person sessions.</p>
+<div class="fees">
+<div class="fee"><span class="amt">$275</span><span class="nm">First session (intake)</span></div>
+<div class="fee"><span class="amt">$175</span><span class="nm">Standard session</span></div>
+<div class="fee"><span class="amt">$325</span><span class="nm">In-vivo observation session</span><span class="ds">Live guidance by video while you carry out the strategies with your child across home, school and community.</span></div>
+</div>
+<ul class="terms">
+<li>Private pay. We do not bill insurance.</li>
+<li>Payment: credit card on file preferred; Zelle or cash also accepted.</li>
+<li>Please give at least 48 hours' notice to cancel or reschedule.</li>
+</ul>
+</div>
+
+</section>
+<!-- FAQ -->
+<section id="faq">
+<div class="en">
+<h2>Common questions</h2>
+<details><summary>Who are the sessions with?</summary><p>With you, the parent, caregiver or educator. The BTB Method is guidance for parents, caregivers and educators. You carry out the plan, with our guidance.</p></details>
+<details><summary>Are sessions in person?</summary><p>No. Sessions take place by call, text and video, so you can meet from anywhere.</p></details>
+<details><summary>Which states do you serve?</summary><p>Requirements differ by state. In New Jersey, no diagnosis is needed. In New York, a diagnosis is required. Other states vary, so tell us your state and we will let you know what applies to you.</p></details>
+<details><summary>Do you take insurance?</summary><p>No. The BTB Method is private pay.</p></details>
+<details><summary>How is The BTB Method different from the ABA my insurance covers?</summary><p>The BTB Method is ABA, set up with a different structure. You work one-on-one with a licensed behavior analyst, much as you would with a therapist or social worker, and you learn to carry out the plan yourself, in the moments that matter. Insurance-covered ABA is a fine choice for many families. If that's the route you'd rather take, we're happy to talk it through. Another benefit: with The BTB Method, no official diagnosis is needed to get started in New Jersey. Requirements vary by state, so tell us where you live and we will let you know what applies.</p></details>
+<details><summary>Why pay privately instead of using insurance?</summary><p>Private pay lets your plan, session schedule, and goals follow your child's needs rather than authorizations, billing codes, or paperwork. ABA works best when the plan is carried out consistently and correctly, and when it isn't, families often don't see the results they hoped for. Each session here is built around making that happen across home, school and community. No outcome, result, or timeline is guaranteed.</p></details>
+<details><summary>Can you guarantee results?</summary><p>No outcome, result, or timeline is guaranteed. Progress depends on many factors, including how consistently the plan is carried out across home, school and community.</p></details>
+<details><summary>Is this for emergencies?</summary><p>No. If someone is in danger, call 911.</p></details>
+</div>
+
+</section>
+<!-- CONTACT -->
+<section id="contact" style="border-top:0;padding-block:20px 0">
+<div class="contact">
+<div class="en">
+<h2>Get in touch</h2>
+<p>Write to us with your state and the behavior you're most concerned about. We reply personally.</p>
+<div class="mail">
+<code dir="ltr" id="phone-en">(718) 344-6806</code>
+<a class="btn ghost" href="tel:+17183446806"><svg aria-hidden="true" fill="currentColor" height="18" style="vertical-align:-3px;margin-inline-end:6px" viewbox="0 0 24 24" width="18"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"></path></svg>Call</a>
+<a class="btn ghost" href="sms:+17183446806"><svg aria-hidden="true" fill="currentColor" height="18" style="vertical-align:-3px;margin-inline-end:6px" viewbox="0 0 24 24" width="18"><path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2z"></path></svg>Text</a>
+<a class="btn primary" href="https://wa.me/17183446806" rel="noopener"><svg aria-hidden="true" height="18" style="vertical-align:-3px;margin-inline-end:6px" viewbox="0 0 24 24" width="18"><path d="M12 1.5a10.5 10.5 0 0 0-9 15.9L1.6 22.4l5.2-1.4A10.5 10.5 0 1 0 12 1.5z" fill="#2BA84A"></path><g fill="#fff" transform="translate(5.2 4.8) scale(.62)"><path d="M6.6 10.8c1.4 2.8 3.8 5.1 6.6 6.6l2.2-2.2c.3-.3.7-.4 1-.2 1.1.4 2.3.6 3.6.6.6 0 1 .4 1 1V20c0 .6-.4 1-1 1C10.6 21 3 13.4 3 4c0-.6.4-1 1-1h3.5c.6 0 1 .4 1 1 0 1.3.2 2.5.6 3.6.1.3 0 .7-.2 1l-2.3 2.2z"></path></g></svg>WhatsApp</a>
+</div>
+<div class="mail">
+<code id="mail-en">Office@TheBTBMethod.com</code>
+<button class="btn ghost" data-copy="mail-en" type="button">Copy address</button>
+<a class="btn primary" href="mailto:Office@TheBTBMethod.com"><svg aria-hidden="true" fill="currentColor" height="18" style="vertical-align:-3px;margin-inline-end:6px" viewbox="0 0 24 24" width="18"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"></path></svg>Open email</a>
+</div>
+<p class="note">Please don't send detailed medical information by email. We'll go over that together on a call.</p>
+</div>
+
+</div>
+</section>
+</main>
+<footer>
+<div aria-label="Behavior Treating Behavior" class="tagline"><b>B</b>ehavior <b>T</b>reating <b>B</b>ehavior</div>
+<div class="en">© 2026 The BTB Method · TheBTBMethod.com. The BTB Method does not provide emergency or crisis services. In an emergency, call 911.</div>
+
+</footer>
+</div>
+<script>
+  (function () {
+    Array.prototype.forEach.call(document.querySelectorAll('[data-copy]'), function (btn) {
+      btn.addEventListener('click', function () {
+        var el = document.getElementById(btn.getAttribute('data-copy'));
+        var done = function () { var t = btn.textContent; btn.textContent = '✓'; setTimeout(function () { btn.textContent = t; }, 1400); };
+        var sel = function () { var r = document.createRange(); r.selectNodeContents(el); var s = getSelection(); s.removeAllRanges(); s.addRange(r); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(el.textContent).then(done, sel);
+        } else { sel(); }
+      });
+    });
+  })();
+</script>
+</body>
+</html>
