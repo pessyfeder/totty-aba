@@ -331,10 +331,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
     ['Gender', c.gender],
     ['Date of birth', day10(c.dob)],
     ['Admission date', day10(c.admission_date)],
-    ['Location', c.location_name],
-    ['Coordinates', c.latitude != null && c.longitude != null ? `${c.latitude}, ${c.longitude}` : ''],
-    ['Timezone', c.timezone],
-    ['Lives in Israel', c.in_israel ? 'Yes' : 'No'],
+    ['Address', c.location_name],
     ['Candle lighting', c.candle_lighting_minutes != null ? `${c.candle_lighting_minutes} min before sunset` : ''],
     ['Notes', c.notes],
   ].filter(([, v]) => v != null && v !== '').map(([k, v]) => h('div', { class: 'acc-row' }, h('strong', {}, `${k}: `), String(v))));
