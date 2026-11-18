@@ -320,11 +320,15 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const noPhone = c.contacts.filter((p) => !p.consent_given_at).length;
   const contactsView = c.contacts.length
     ? h('div', { class: 'acc-list' }, c.contacts.map((p) => h('div', { class: 'acc-row' },
-      h('strong', {}, p.name), p.relationship ? h('span', { class: 'muted' }, ` · ${p.relationship}`) : '',
-      h('div', {}, [p.phone ?? 'No phone', p.email].filter(Boolean).join(' · ')),
-      h('div', { class: 'muted' }, p.preferred_channel === 'call' ? 'Prefers calls' : 'Prefers texts'),
-      h('div', { class: 'muted' }, p.consent_given_at ? 'Consent recorded' : 'No consent recorded'),
-      h('div', { class: 'muted' }, p.status.charAt(0).toUpperCase() + p.status.slice(1)))))
+      ...[
+        ['Name', p.name],
+        ['Relationship to client', p.relationship],
+        ['Phone', p.phone],
+        ['Email', p.email],
+        ['Preferred contact method', p.preferred_channel === 'call' ? 'Call' : 'Text'],
+        ['Consent', p.consent_given_at ? 'Recorded' : 'Not recorded'],
+        ['Status', p.status.charAt(0).toUpperCase() + p.status.slice(1)],
+      ].filter(([, v]) => v).map(([k, v]) => h('div', {}, h('strong', {}, `${k}: `), String(v))))))
     : h('p', { class: 'muted' }, 'No contacts yet.');
   const reinfBody = h('div', {},
     c.reinforcements.length ? h('ul', { class: 'chips' }, c.reinforcements.map((i) => h('li', {}, i.name))) : h('p', { class: 'muted' }, 'None recorded'),
