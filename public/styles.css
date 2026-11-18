@@ -331,12 +331,18 @@ table.rates td { padding: 8px 12px; } table.rates td:last-child { text-align: ri
 
 /* Collapsible day picker in the goal form */
 .days-field { display: grid; gap: 5px; font-size: .86rem; font-weight: 500; color: var(--muted); min-width: 0; max-width: 100%; }
-details.days-pick { border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font-size: 1rem; font-weight: 400; }
+details.days-pick { border: 1px solid var(--line); border-radius: 10px; background: var(--card); color: var(--text); font: inherit; }
 details.days-pick:hover { border-color: var(--muted); }
-details.days-pick > summary { cursor: pointer; padding: 10px 14px; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 12px; list-style: none; }
+details.days-pick > summary { cursor: pointer; padding: 10px 12px; min-height: 44px; box-sizing: border-box; display: flex; align-items: center; justify-content: space-between; gap: 8px; list-style: none; }
 details.days-pick > summary::-webkit-details-marker { display: none; }
-details.days-pick > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-top: -4px; transition: transform .15s; }
-details.days-pick[open] > summary::after { transform: rotate(-135deg); margin-top: 4px; }
+details.days-pick > summary::after { content: ""; flex: none; width: 12px; height: 8px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23222' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px 8px no-repeat; transition: transform .15s; }
+details.days-pick[open] > summary::after { transform: rotate(180deg); }
 .days-list { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 14px 12px; }
 .days-list label.day-opt { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; width: auto; margin: 0; }
 .days-list label.day-opt input { width: auto; margin: 0; }
+
+.inline-form select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23222' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 12px 8px; }
+@media (prefers-color-scheme: dark) {
+.inline-form select { appearance: none; -webkit-appearance: none; padding-right: 36px; cursor: pointer; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23ddd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; background-size: 12px 8px; }
+details.days-pick > summary::after { content: ""; flex: none; width: 12px; height: 8px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23ddd' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px 8px no-repeat; transition: transform .15s; }
+}
