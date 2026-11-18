@@ -326,7 +326,10 @@ table.rates td { padding: 8px 12px; } table.rates td:last-child { text-align: ri
 
 /* Collapsible day picker in the goal form */
 details.days-pick { border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
-details.days-pick > summary { cursor: pointer; padding: 10px 14px; min-height: 44px; display: flex; align-items: center; }
+details.days-pick > summary { cursor: pointer; padding: 10px 14px; min-height: 44px; display: flex; align-items: center; justify-content: space-between; list-style: none; }
+details.days-pick > summary::-webkit-details-marker { display: none; }
+details.days-pick > summary::after { content: ""; width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-top: -4px; transition: transform .15s; }
+details.days-pick[open] > summary::after { transform: rotate(-135deg); margin-top: 4px; }
 .days-list { display: flex; flex-wrap: wrap; gap: 6px 14px; padding: 4px 14px 12px; }
 .days-list label.day-opt { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; width: auto; margin: 0; }
 .days-list label.day-opt input { width: auto; margin: 0; }
