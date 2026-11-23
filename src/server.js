@@ -32,13 +32,13 @@ const provider = telnyxConfigured
   : consoleProvider();
 
 const messenger = createMessenger({ db, provider });
-const scheduler = createScheduler({ db, messenger });
 // Email (initial consultation email, SPEC 5.7b). Dev prints to the console; production without SMTP refuses to send.
 const smtpConfigured = env.SMTP_URL && env.EMAIL_FROM;
 const mailer = smtpConfigured
   ? await smtpMailer({ url: env.SMTP_URL, from: env.EMAIL_FROM })
   : production ? unconfiguredMailer : consoleMailer();
 if (production && !smtpConfigured) console.warn('SMTP_URL and EMAIL_FROM are not set: the consultation email cannot be sent');
+const scheduler = createScheduler({ db, messenger, mailer }); // mailer: paper-log check-in emails
 const app = createApp({
   db,
   messenger,

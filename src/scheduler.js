@@ -20,16 +20,29 @@ export function buildBody(row, { reminder = false } = {}) {
 }
 
 export const CHECKIN_FIRST_AFTER_DAYS = 7;
-// "Consistently responding": the first check-in text goes out only once the parent answered at least this share of the last 7 days' prompts.
-export const CONSISTENT_SHARE = 0.7;
 export const CHECKIN_EVERY_DAYS = 7;
 
 export function buildCheckinBody(row, link) {
+  if (!link) return `Please reach out to Yisroel Feder, BCBA, LBA, about ${row.first_name}'s check-in.`;
   return `Time to schedule a check-in for ${row.first_name} with Yisroel Feder, BCBA, LBA: ${link}. ` +
     'You can book and pay for your appointment there.';
 }
 
-export function createScheduler({ db, messenger, now = () => new Date(), staggerMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
+/** Weekly check-in email for a paper-log contact (SPEC 5.7a). Always carries the booking link; no progress details. Pure. */
+export function buildCheckinEmail({ client, contact, clinician, link }) {
+  return {
+    subject: `Time to schedule a check-in for ${client.first_name}`,
+    text: [
+      `Hi ${contact.name},`,
+      '',
+      `Time to schedule a check-in for ${client.first_name} with Yisroel Feder, BCBA, LBA: ${link}. You can book and pay for your appointment there.`,
+      '',
+      clinician.name || 'Your behavior analyst',
+    ].join('\n'),
+  };
+}
+
+export function createScheduler({ db, messenger, mailer = null, now = () => new Date(), staggerMs = 1000, sleep = (ms) => new Promise((r) => setTimeout(r, ms)) }) {
   /** Create today's and tomorrow's prompts for every active goal. Idempotent. */
   async function generatePrompts(at) {
     const { rows: goals } = await db.query(
@@ -40,7 +53,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
          JOIN client cl ON cl.id = g.client_id
          JOIN contact c ON c.id = g.contact_id
         WHERE g.status = 'active' AND cl.status = 'active' AND cl.intake_status IN ('baseline', 'active')
-          AND c.status = 'active' AND c.consent_given_at IS NOT NULL AND g.channel = 'sms'
+          AND c.status = 'active' AND c.consent_given_at IS NOT NULL AND g.channel = 'sms' AND c.logging_method <> 'paper' -- paper log: no prompts (SPEC 5.4b C)
         ORDER BY g.created_at, g.id`,
     );
     const seenPerContact = new Map();
@@ -189,14 +202,14 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     }
   }
 
-  /** Did this contact answer at least CONSISTENT_SHARE of the prompts that came due since they started (and at least one)? */
-  async function respondsConsistently({ contact_id: contactId, first_message_at: since }, at) {
+  /** Was every prompt sent to this contact in the 7 days before `at` answered (and was there at least one)? */
+  async function answeredAllLastWeek({ contact_id: contactId }, at) {
     const { rows: [r] } = await db.query(
       `SELECT count(*) FILTER (WHERE p.status = 'answered')::int AS answered, count(*)::int AS total
          FROM prompt p JOIN goal g ON g.id = p.goal_id
         WHERE g.contact_id = $1 AND p.status IN ('sent', 'answered', 'no_response', 'failed')
-          AND p.scheduled_for >= $3::timestamptz - interval '1 day' AND p.scheduled_for <= $2`, [contactId, at, since]);
-    return r.total > 0 && r.answered / r.total >= CONSISTENT_SHARE;
+          AND p.scheduled_for > $2::timestamptz - interval '7 days' AND p.scheduled_for <= $2`, [contactId, at]);
+    return r.total > 0 && r.answered === r.total;
   }
 
   /**
@@ -213,8 +226,9 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
   }
 
   /**
-   * Check-in text (SPEC 5.7a): 7 days after a contact's first message (if they replied consistently), then every 7 days after the last one,
-   * with the link to the website's scheduling portal. Same send rules as prompts: active client and contact, recorded
+   * Check-in text (SPEC 5.7a): 7 days after a contact's first message, then every 7 days after the last one. If every prompt of the
+   * last 7 days was answered it carries the booking link; otherwise it asks the parent to reach out, with no link. Skipped (and not
+   * advanced) while the client has a future appointment. Same send rules as prompts: active client and contact, recorded
    * consent, never in a Shabbos/Yom Tov window or quiet hours. A blocked one is sent once the window ends.
    */
   async function sendCheckins(at) {
@@ -224,7 +238,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
          FROM contact c
          JOIN client cl ON cl.id = c.client_id
          JOIN clinician cn ON cn.id = cl.clinician_id
-        WHERE c.status = 'active' AND c.phone IS NOT NULL AND c.consent_given_at IS NOT NULL
+        WHERE c.status = 'active' AND c.phone IS NOT NULL AND c.consent_given_at IS NOT NULL AND c.logging_method <> 'paper'
           AND cl.status = 'active' AND cl.intake_status IN ('baseline', 'active')
           AND c.first_message_at IS NOT NULL
           AND COALESCE(c.checkin_last_sent_at + make_interval(days => $2), c.first_message_at + make_interval(days => $3)) <= $1
@@ -235,22 +249,76 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
       const settings = r.settings_json;
       const link = settings.checkin_booking_url;
       if (!link) continue; // nothing to book with; sent once Totty sets the link
-      if (!r.checkin_last_sent_at && !(await respondsConsistently(r, at))) continue; // first text waits for consistent replies
       if (windowAt(at, locationFrom(r, settings))) continue;
       const q = settings.quiet_hours;
       const hhmm = DateTime.fromJSDate(at, { zone: r.timezone }).toFormat('HH:mm');
       if (q && (hhmm < q.start || hhmm >= q.end)) continue;
+      const { rows: [booked] } = await db.query(
+        `SELECT 1 AS x FROM appointment a JOIN contact c ON c.client_id = a.client_id
+          WHERE c.id = $1 AND a.status = 'scheduled' AND a.starts_at > $2 LIMIT 1`, [r.contact_id, at]);
+      if (booked) continue; // already booked: skip this cycle without advancing the clock
+      const bookable = await answeredAllLastWeek(r, at);
       const { rows: claimed } = await db.query(
         `UPDATE contact SET checkin_last_sent_at = $2 WHERE id = $1 AND checkin_last_sent_at IS NOT DISTINCT FROM $3 RETURNING id`,
         [r.contact_id, at, r.checkin_last_sent_at],
       );
       if (!claimed.length) continue;
       try {
-        await messenger.send({ client: r, settings, to: r.phone, body: buildCheckinBody(r, link) });
+        await messenger.send({ client: r, settings, to: r.phone, body: buildCheckinBody(r, bookable ? link : null) });
         if (staggerMs) await sleep(staggerMs);
       } catch (err) {
         await db.query('UPDATE contact SET checkin_last_sent_at = $2 WHERE id = $1', [r.contact_id, r.checkin_last_sent_at]);
         if (!(err instanceof ShabbosRefusal)) console.error(`check-in for contact ${r.contact_id} failed:`, err.message);
+      }
+    }
+  }
+
+  /**
+   * Paper-log contacts (SPEC 5.4b C, 5.7a) get the weekly check-in by email instead of a text. They receive no prompts, so there is
+   * no answer rate: the email always carries the booking link. First due 7 days after baseline starts (or after the contact was
+   * switched to paper, if later), then every 7 days from checkin_last_sent_at. Same rules as the text: active client and contact,
+   * recorded consent, an email address, no Shabbos/Yom Tov or quiet hours, skipped (clock not advanced) while an appointment is booked.
+   */
+  async function sendPaperCheckinEmails(at) {
+    if (!mailer) return;
+    const { rows } = await db.query(
+      `SELECT c.id AS contact_id, c.name AS contact_name, c.email, c.checkin_last_sent_at, cl.first_name,
+              cl.latitude, cl.longitude, cl.timezone, cl.in_israel, cl.candle_lighting_minutes, cn.settings_json, cn.name AS clinician_name
+         FROM contact c
+         JOIN client cl ON cl.id = c.client_id
+         JOIN clinician cn ON cn.id = cl.clinician_id
+        WHERE c.logging_method = 'paper' AND c.status = 'active' AND c.consent_given_at IS NOT NULL
+          AND c.email IS NOT NULL AND btrim(c.email) <> ''
+          AND cl.status = 'active' AND cl.intake_status IN ('baseline', 'active')
+          AND GREATEST(c.checkin_last_sent_at, c.logging_method_changed_at, cl.baseline_started_at) + make_interval(days => $2) <= $1
+        ORDER BY c.id`,
+      [at, CHECKIN_EVERY_DAYS],
+    );
+    for (const r of rows) {
+      const settings = r.settings_json;
+      const link = settings.checkin_booking_url;
+      if (!link) continue;
+      if (windowAt(at, locationFrom(r, settings))) continue;
+      const q = settings.quiet_hours;
+      const hhmm = DateTime.fromJSDate(at, { zone: r.timezone }).toFormat('HH:mm');
+      if (q && (hhmm < q.start || hhmm >= q.end)) continue;
+      const { rows: [booked] } = await db.query(
+        `SELECT 1 AS x FROM appointment a JOIN contact c ON c.client_id = a.client_id
+          WHERE c.id = $1 AND a.status = 'scheduled' AND a.starts_at > $2 LIMIT 1`, [r.contact_id, at]);
+      if (booked) continue;
+      const { rows: claimed } = await db.query(
+        `UPDATE contact SET checkin_last_sent_at = $2 WHERE id = $1 AND checkin_last_sent_at IS NOT DISTINCT FROM $3 RETURNING id`,
+        [r.contact_id, at, r.checkin_last_sent_at]);
+      if (!claimed.length) continue;
+      const to = r.email.trim();
+      const mail = buildCheckinEmail({ client: r, contact: { name: r.contact_name }, clinician: { name: r.clinician_name }, link });
+      try {
+        const { id } = await mailer.send({ to, ...mail });
+        await db.query(`INSERT INTO message_log (direction, to_from, body, provider_id, status) VALUES ('outbound', $1, $2, $3, 'sent')`,
+          [to, `${mail.subject}\n\n${mail.text}`, id ?? null]);
+      } catch (err) {
+        await db.query('UPDATE contact SET checkin_last_sent_at = $2 WHERE id = $1', [r.contact_id, r.checkin_last_sent_at]);
+        console.error(`paper check-in email for contact ${r.contact_id} failed:`, err.message);
       }
     }
   }
@@ -280,9 +348,10 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
     await sendDue(at);
     await sendFollowUps(at);
     await sendCheckins(at);
+    await sendPaperCheckinEmails(at);
     await activateAfterFirstCheckin(at);
     await markNoResponse(at);
   }
 
-  return { tick, activateAfterFirstCheckin, generatePrompts, sendDue, sendFollowUps, sendCheckins, markNoResponse };
+  return { tick, activateAfterFirstCheckin, generatePrompts, sendDue, sendFollowUps, sendCheckins, sendPaperCheckinEmails, markNoResponse };
 }

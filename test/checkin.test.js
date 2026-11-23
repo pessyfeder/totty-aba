@@ -21,7 +21,7 @@ beforeEach(async () => {
 });
 
 const contact = async () => (await db.query('SELECT * FROM contact WHERE id = $1', [world.contact.id])).rows[0];
-const checkins = () => env.sent.filter((m) => /schedule a check-in/.test(m.body));
+const checkins = () => env.sent.filter((m) => /schedule a check-in|reach out to Yisroel/.test(m.body));
 
 test('the first prompt sets first_message_at; nothing is sent before 7 days', async () => {
   assert.ok((await contact()).first_message_at);
@@ -93,12 +93,24 @@ test('a check-in is not sent in quiet hours', async () => {
   assert.equal(checkins().length, 1);
 });
 
-test('the first check-in text waits for consistent replies', async () => {
+test('any unanswered prompt in the last 7 days sends the reach-out text with no link', async () => {
   await db.query(`UPDATE prompt SET status = 'no_response'`);
   env.at('2026-11-11T23:32:00Z');
   await scheduler.sendCheckins(env.now());
+  assert.equal(checkins().length, 1);
+  assert.equal(checkins()[0].body, "Please reach out to Yisroel Feder, BCBA, LBA, about Dovid's check-in.");
+  assert.ok(!checkins()[0].body.includes(LINK));
+});
+
+test('a check-in is skipped, and the clock not advanced, while a future appointment exists', async () => {
+  await db.query(
+    `INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at, ends_at) VALUES ($1, $2, 'f1', 'check-in', '2026-11-13T15:00:00Z', '2026-11-13T16:00:00Z')`,
+    [world.clinician.id, world.client.id]);
+  env.at('2026-11-11T23:32:00Z');
+  await scheduler.sendCheckins(env.now());
   assert.equal(checkins().length, 0);
-  await db.query(`UPDATE prompt SET status = 'answered'`);
+  assert.equal((await contact()).checkin_last_sent_at, null);
+  env.at('2026-11-15T17:00:00Z'); // Sunday, the appointment has passed
   await scheduler.sendCheckins(env.now());
   assert.equal(checkins().length, 1);
 });

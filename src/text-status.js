@@ -2,7 +2,7 @@
 // text, the latest goal prompt, and a plain reason whenever texts cannot go out. Read-only; sends nothing.
 import { locationFrom, windowAt } from './shabbos.js';
 import * as consultText from './consult-text.js';
-import { CHECKIN_EVERY_DAYS, CHECKIN_FIRST_AFTER_DAYS, CONSISTENT_SHARE } from './scheduler.js';
+import { CHECKIN_EVERY_DAYS, CHECKIN_FIRST_AFTER_DAYS } from './scheduler.js';
 
 const CONSULT_LABEL = { pending_approval: 'Needs approval', approved: 'Queued', sending: 'Sending', sent: 'Sent', cancelled: 'Declined', failed: 'Failed' };
 
@@ -32,8 +32,14 @@ export async function textStatus(db, clientId, at) {
 
   // Next check-in text: one entry per contact who could get one (same rules as the scheduler).
   const started = ['baseline', 'active'].includes(client.intake_status);
-  const checkins = contacts.filter((c) => c.status === 'active' && c.phone && c.consent_given_at).map((c) => {
-    const base = { contact: c.name, last_sent_at: c.checkin_last_sent_at };
+  const checkins = contacts.filter((c) => c.status === 'active' && c.consent_given_at && (c.logging_method === 'paper' ? c.email && String(c.email).trim() : c.phone)).map((c) => {
+    const base = { contact: c.name, last_sent_at: c.checkin_last_sent_at, method: c.logging_method === 'paper' ? 'email' : 'text' };
+    if (c.logging_method === 'paper') { // paper log: weekly email, always with the link (SPEC 5.7a)
+      if (!started) return { ...base, state: 'not_started', note: 'Check-in emails start once baseline begins.' };
+      const anchor = Math.max(...[c.checkin_last_sent_at, c.logging_method_changed_at, client.baseline_started_at].filter(Boolean).map((d) => new Date(d).getTime()));
+      const note = settings.checkin_booking_url ? '' : 'Set the check-in booking link in Settings: nothing is sent without it.';
+      return { ...base, state: 'due', due_at: new Date(anchor + CHECKIN_EVERY_DAYS * 864e5), carries_link: true, note };
+    }
     if (!started) return { ...base, state: 'not_started', note: 'Check-in texts start once baseline begins.' };
     if (!c.first_message_at) return { ...base, state: 'waiting', note: `Due ${CHECKIN_FIRST_AFTER_DAYS} days after the first goal prompt is sent.` };
     const dueAt = c.checkin_last_sent_at
@@ -41,8 +47,8 @@ export async function textStatus(db, clientId, at) {
       : new Date(new Date(c.first_message_at).getTime() + CHECKIN_FIRST_AFTER_DAYS * 864e5);
     const note = [];
     if (!settings.checkin_booking_url) note.push('Set the check-in booking link in Settings: nothing is sent without it.');
-    if (!c.checkin_last_sent_at) note.push(`The first text waits until at least ${Math.round(CONSISTENT_SHARE * 100)}% of prompts have been answered.`);
-    return { ...base, state: 'due', due_at: dueAt, carries_link: true, note: note.join(' ') };
+    note.push('Carries the booking link only if every prompt in the last 7 days was answered; otherwise it asks the parent to reach out.');
+    return { ...base, state: 'due', due_at: dueAt, carries_link: null, note: note.join(' ') };
   });
 
   // Latest goal prompt (the Today and response-log sections hold the detail).

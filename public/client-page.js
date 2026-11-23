@@ -161,8 +161,8 @@ async function textStatusSection({ h, api }, id) {
       : c.status === 'approved' && c.queued_until ? `Queued until ${when(c.queued_until)} (Shabbos / Yom Tov)` : c.label]);
   }
   for (const k of s.checkins) {
-    rows.push([`Next check-in text (${k.contact})`, k.state === 'due'
-      ? `${new Date(k.due_at) <= new Date() ? 'Due now' : `Due ${when(k.due_at)}`}, carries the booking link${k.note ? `. ${k.note}` : ''}`
+    rows.push([`Next check-in ${k.method === 'email' ? 'email' : 'text'} (${k.contact})`, k.state === 'due'
+      ? `${new Date(k.due_at) <= new Date() ? 'Due now' : `Due ${when(k.due_at)}`}${k.carries_link ? ', carries the booking link' : ''}${k.note ? `. ${k.note}` : ''}`
       : k.note]);
   }
   if (s.last_prompt) rows.push(['Last goal prompt', `${s.last_prompt.title}: ${STATUS[s.last_prompt.status] ?? s.last_prompt.status}, ${when(s.last_prompt.scheduled_for)} (details under Today and the response log)`]);
@@ -337,6 +337,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
         ['Relationship to client', p.relationship],
         ['Phone', p.phone],
         ['Email', p.email],
+        ['Goal logging method', { sms: 'Text messages', email: 'Daily email', paper: 'Paper log' }[p.logging_method]],
         ['Preferred contact method', p.preferred_channel === 'call' ? 'Call' : 'Text'],
         ['Consent', p.consent_given_at ? 'Recorded' : 'Not recorded'],
         ['Status', p.status.charAt(0).toUpperCase() + p.status.slice(1)],

@@ -24,7 +24,7 @@ const withKind = ({ earlier_checkins, ...a }) => ({ ...a, kind: appointmentKind(
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CLIENT_FIELDS = ['first_name', 'last_name', 'gender', 'dob', 'admission_date', 'notes', 'location_name', 'street_address', 'city', 'state', 'zip', 'latitude', 'longitude', 'timezone', 'in_israel', 'candle_lighting_minutes'];
-const CONTACT_FIELDS = ['name', 'relationship', 'phone', 'email', 'preferred_channel', 'language', 'status', 'consent_given_at', 'consent_note'];
+const CONTACT_FIELDS = ['name', 'relationship', 'phone', 'email', 'preferred_channel', 'logging_method', 'language', 'status', 'consent_given_at', 'consent_note'];
 const GOAL_FIELDS = ['contact_id', 'title', 'description', 'question_text', 'response_type', 'channel', 'schedule_json', 'date_added', 'start_date', 'end_date', 'status', 'target_json'];
 const REINFORCEMENT_FIELDS = ['name', 'note'];
 // Links to the website's appointment scheduling portal (SPEC 5.1a, 5.7b): the app stores them and puts them in messages; the website handles booking and payment, the app never creates bookings.

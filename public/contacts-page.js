@@ -18,7 +18,7 @@ export function contactForm({ h, api }, clientId, p, onSaved) {
       const t = (k) => String(f.get(k) ?? '').trim() || null;
       const body = {
         name: t('name'), relationship: t('relationship'), phone: t('phone'), email: t('email'),
-        language: t('language') ?? 'en', preferred_channel: f.get('preferred_channel'), consent_note: t('consent_note'),
+        language: t('language') ?? 'en', preferred_channel: f.get('preferred_channel'), logging_method: f.get('logging_method'), consent_note: t('consent_note'),
         // Keep the original consent date while consent stays ticked; record now when newly ticked.
         consent_given_at: consent.checked ? (p?.consent_given_at ?? new Date().toISOString()) : null,
       };
@@ -35,6 +35,8 @@ export function contactForm({ h, api }, clientId, p, onSaved) {
       lbl('Email', h('input', { name: 'email', type: 'email', value: val('email') })),
       lbl('Preferred channel', h('select', { name: 'preferred_channel' },
         ['sms', 'call'].map((v) => h('option', { value: v, selected: (p?.preferred_channel ?? 'sms') === v }, v === 'sms' ? 'Text message' : 'Voice call')))),
+      lbl('Goal logging method', h('select', { name: 'logging_method' },
+        [['sms', 'Text messages'], ['email', 'Daily email'], ['paper', 'Paper log']].map(([v, t]) => h('option', { value: v, selected: (p?.logging_method ?? 'sms') === v }, t)))),
       lbl('Language', h('input', { name: 'language', value: val('language') || 'en' })),
       p && lbl('Status', h('select', { name: 'status' }, Object.entries(STATUS).map(([v, t]) => h('option', { value: v, selected: p.status === v }, t)))),
       h('label', {}, consent, ` Parent consented to texts/calls${p?.consent_given_at ? ` (since ${String(p.consent_given_at).slice(0, 10)})` : ''}`),
