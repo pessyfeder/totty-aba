@@ -1,7 +1,7 @@
 # BTB - Behavior Treating Behavior: Product Spec (v0.1 draft)
 
 ## 1. Overview
-A web app for Totty, a BCBA, to track client progress on behavioral goals. Parents report on each goal by one of three methods: SMS at scheduled times, a once-a-day email listing all goals, or a paper log that Totty enters into the app (see 5.4b). Their answers feed per-goal charts, and Totty can create a progress report for any client on demand. Nothing is sent during Shabbos (see 5.3).
+A web app for Totty, a BCBA, to track client progress on behavioral goals. Parents report on each goal by one of three methods: SMS at scheduled times, a once-a-day email listing all goals, or a paper log that Totty enters into the app (see 5.4b). Their answers feed per-goal charts, and Totty can create a progress report for any client on demand. Nothing is sent on days when work is forbidden, namely Shabbos and Yom Tov (see 5.3); no other days are blocked.
 
 ## 2. Users
 | Role | Description | Access |
@@ -90,7 +90,8 @@ Each goal has:
 - Use a zmanim library or API. Candle lighting is 18 minutes before sunset by default (adjustable per location, since some communities use a different custom, e.g. 40 minutes in Jerusalem).
 - **Nightfall follows the most stringent opinion (Rabbeinu Tam)**: 72 minutes after sunset. This is the default, set in Settings, and applies to all clients.
 - Any prompt scheduled in that window is queued and sent at nightfall, in order, with a small stagger to avoid flooding. Prompts that have been pushed past the following scheduled occurrence are skipped or merged (configurable; default: send latest only).
-- **Yom Tov**: the same rule applies on Jewish holidays (including the second day outside Israel, and Shabbos/Yom Tov that run back to back). The window runs from candle lighting before the holiday until nightfall at its end, and is computed from the same zmanim data and each client's location (diaspora vs. Israel observance).
+- **Yom Tov**: the same rule applies on Jewish holidays on which work is forbidden (including the second day outside Israel, and Shabbos/Yom Tov that run back to back). The window runs from candle lighting before the holiday until nightfall at its end, and is computed from the same zmanim data and each client's location (diaspora vs. Israel observance).
+- **Only days on which work is forbidden are blocked.** The blocked days are Shabbos and the Yom Tov days on which melacha is prohibited (Rosh Hashanah, Yom Kippur, the first and last days of Sukkos, Shemini Atzeres, Simchas Torah, the first and last days of Pesach, and Shavuos, with the second days outside Israel). All other days are open for sending, including Chol HaMoed, Chanukah, Purim, Tisha B'Av and other fast days, Erev Shabbos and Erev Yom Tov before candle lighting, and Motzei Shabbos/Yom Tov after nightfall. Quiet hours (5.8) still apply on every day.
 - **The rule is enforced at the send layer**, not only in scheduling. The send function refuses to dispatch during a blocked window, even if called manually. Inbound replies from parents are still recorded at any time.
 - Dated by the system clock in the recipient's timezone.
 
