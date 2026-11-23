@@ -42,62 +42,17 @@ function addHead(h, title, buttonLabel, form) {
 }
 const trimmed = (f) => Object.fromEntries([...f.entries()].map(([k, v]) => [k, String(v).trim()]).filter(([, v]) => v !== ''));
 
-/** Week/month pickers folded into the "1 week" / "1 month" range buttons: a small ▾ beside each opens a picker for a specific period.
- *  decorate(r, btn) returns the node to put in the range bar; onPick({from,to,kind}) or onPick(null) when cleared. */
-function periodPickers(h, onPick) {
-  const iso = (d) => d.toISOString().slice(0, 10);
-  const month = h('input', { type: 'month', tabindex: '-1', 'aria-hidden': 'true' });
-  const week = h('input', { type: 'week', tabindex: '-1', 'aria-hidden': 'true' });
-  const presets = {};
-  const labels = {};
-  const sync = () => {
-    if (presets.month) presets.month.textContent = month.value ? new Date(month.value + '-01T12:00').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }) : labels.month;
-    if (presets.week) presets.week.textContent = week.value ? `Week ${week.value.replace('-W', ' / ')}` : labels.week;
-  };
-  const open = (inp) => () => { try { inp.showPicker(); } catch { inp.focus(); inp.click(); } };
-  month.onchange = () => {
-    week.value = '';
-    sync();
-    if (!month.value) return onPick(null);
-    const [y, m] = month.value.split('-').map(Number);
-    onPick({ kind: 'month', from: iso(new Date(Date.UTC(y, m - 1, 1))), to: iso(new Date(Date.UTC(y, m, 0))) });
-  };
-  week.onchange = () => {
-    month.value = '';
-    sync();
-    const m = /^(\d{4})-W(\d{2})$/.exec(week.value);
-    if (!m) return onPick(null);
-    const jan4 = new Date(Date.UTC(+m[1], 0, 4));
-    const mon = new Date(jan4.getTime() + ((+m[2] - 1) * 7 - ((jan4.getUTCDay() + 6) % 7)) * 864e5);
-    onPick({ kind: 'week', from: iso(mon), to: iso(new Date(mon.getTime() + 6 * 864e5)) });
-  };
-  const clear = () => { month.value = ''; week.value = ''; sync(); };
-  const decorate = (r, btn) => {
-    const inp = r === 'week' ? week : r === 'month' ? month : null;
-    if (!inp) return btn;
-    presets[r] = btn;
-    labels[r] = btn.textContent;
-    const pick = h('button', { type: 'button', class: 'period-pick', 'aria-label': `Pick a specific ${r}` }, '▾');
-    pick.onclick = open(inp);
-    return h('span', { class: 'period' }, btn, pick, inp);
-  };
-  return { decorate, clear };
-}
-const periodQuery = (range, custom) => (custom ? `from=${custom.from}&to=${custom.to}` : `range=${range}`);
-
 function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
   const progress = mode === 'progress';
   const lbl = (text, input) => h('label', {}, text, input);
   const body = h('div', {});
   const summary = h('div', { class: 'muted' }, 'Loading…');
   let range = 'month';
-  let custom = null;
   const rangeBar = h('div', { class: 'range', role: 'group', 'aria-label': 'Chart range' });
-  const picker = periodPickers(h, (c) => { custom = c; draw().catch(handle); });
 
   async function draw() {
-    for (const b of rangeBar.querySelectorAll('button[data-r]')) b.setAttribute('aria-pressed', String(custom ? b.dataset.r === custom.kind : b.dataset.r === range));
-    const d = await api(`/goals/${g.id}/series?${periodQuery(range, custom)}`);
+    for (const b of rangeBar.children) b.setAttribute('aria-pressed', String(b.dataset.r === range));
+    const d = await api(`/goals/${g.id}/series?range=${range}`);
     const answered = d.points.filter((p) => p.answered).length;
     summary.replaceChildren(`${answered} of ${d.points.length} replies · Trend: `, h('strong', { class: `trend-${d.trend}` }, TREND[d.trend]));
     const chart = chartFor(g, d.points, d.annotations);
@@ -108,7 +63,7 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
       chart ? h('div', { class: 'legend' }, legend.map((t) => h('span', {}, t))) : '');
   }
   for (const [r, label] of RANGES) {
-    rangeBar.append(picker.decorate(r, h('button', { type: 'button', 'data-r': r, onclick: () => { range = r; custom = null; picker.clear(); draw().catch(handle); } }, label)));
+    rangeBar.append(h('button', { type: 'button', 'data-r': r, onclick: () => { range = r; draw().catch(handle); } }, label));
   }
 
   const note = inlineForm(h, [
@@ -546,10 +501,8 @@ const fmtWait = (min) => (min < 60 ? `${min} min` : min < 1440 ? `${Math.round(m
 /** Response log: when each question went out, every follow-up/re-prompt, and when (or whether) the parent answered. */
 async function responseLogSection({ h, api, handle }, clientId) {
   let range = 'month';
-  let custom = null;
   const box = h('div', {});
   const rangeBar = h('div', { class: 'range', role: 'group', 'aria-label': 'Response log range' });
-  const picker = periodPickers(h, (c) => { custom = c; draw().catch(handle); });
   const outcome = (e) => {
     if (e.replied_at) {
       const last = e.events.filter((x) => x.kind === 'reply').at(-1);
@@ -560,8 +513,8 @@ async function responseLogSection({ h, api, handle }, clientId) {
     return [h('span', { class: 'badge' }, STATUS[e.status] ?? e.status)];
   };
   async function draw() {
-    for (const b of rangeBar.querySelectorAll('button[data-r]')) b.setAttribute('aria-pressed', String(custom ? b.dataset.r === custom.kind : b.dataset.r === range));
-    const d = await api(`/clients/${clientId}/response-log?${periodQuery(range, custom)}`);
+    for (const b of rangeBar.children) b.setAttribute('aria-pressed', String(b.dataset.r === range));
+    const d = await api(`/clients/${clientId}/response-log?range=${range}`);
     const s = d.summary;
     box.replaceChildren(
       h('p', { class: 'muted' }, `${s.total} questions · ${s.answered} answered · ${s.no_response} no response · ${s.needed_followup} needed a follow-up · ${s.needed_reprompt} needed a re-prompt`),
@@ -580,7 +533,7 @@ async function responseLogSection({ h, api, handle }, clientId) {
           e.status === 'no_response' && !e.replied_at ? h('li', { class: 'muted' }, 'Day ended with no reply from the parent.') : ''))))
         : h('p', { class: 'muted' }, 'No questions sent in this range yet.'));
   }
-  for (const [r, label] of RANGES) rangeBar.append(picker.decorate(r, h('button', { type: 'button', 'data-r': r, onclick: () => { range = r; custom = null; picker.clear(); draw().catch(handle); } }, label)));
+  for (const [r, label] of RANGES) rangeBar.append(h('button', { type: 'button', 'data-r': r, onclick: () => { range = r; draw().catch(handle); } }, label));
   await draw().catch(handle);
   return [h('h2', {}, 'Parent response log'), rangeBar, box];
 }

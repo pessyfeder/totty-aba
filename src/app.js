@@ -523,13 +523,6 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
 
   // ---- Chart data and annotations (SPEC 5.5) ----
   const RANGE_DAYS = { week: 7, month: 30, '3months': 91 };
-  const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
-  /** Lower/upper date bounds for a request: an explicit from/to (specific month or week) wins over the preset range. */
-  const rangeBounds = (q) => {
-    if (ISO_DATE.test(q.from) && ISO_DATE.test(q.to)) return { since: q.from, until: q.to };
-    const days = RANGE_DAYS[q.range];
-    return { since: (days ? new Date(now().getTime() - days * 864e5) : new Date(0)).toISOString().slice(0, 10), until: '9999-12-31' };
-  };
 
   /** improving / flat / declining from the first vs second half of answered values. Missing replies are ignored. */
   const trendOf = (points, type) => {
@@ -545,14 +538,15 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   app.get('/api/goals/:id/series', async (req, res) => {
     const { rows: g } = await db.query(`SELECT * FROM goal WHERE id = $1 AND ${viaClient}`, [req.params.id, req.clinician.id]);
     if (!g.length) throw new HttpError(404, 'Not found');
-    const { since, until } = rangeBounds(req.query);
+    const days = RANGE_DAYS[req.query.range];
+    const since = days ? new Date(now().getTime() - days * 864e5) : new Date(0);
     const { rows: points } = await db.query(
       `SELECT p.id AS prompt_id, p.prompt_date::text AS date, p.status, r.id AS response_id, r.value_bool, r.value_minutes, r.source,
               (r.id IS NOT NULL) AS answered
          FROM prompt p
          LEFT JOIN LATERAL (SELECT * FROM response WHERE prompt_id = p.id AND parse_status <> 'unparsed' ORDER BY received_at DESC LIMIT 1) r ON true
-        WHERE p.goal_id = $1 AND p.prompt_date >= $2::date AND p.prompt_date <= $3::date ORDER BY p.prompt_date, p.scheduled_for`,
-      [req.params.id, since, until],
+        WHERE p.goal_id = $1 AND p.prompt_date >= $2::date ORDER BY p.prompt_date, p.scheduled_for`,
+      [req.params.id, since.toISOString().slice(0, 10)],
     );
     const { rows: annotations } = await db.query('SELECT id, date::text AS date, text FROM annotation WHERE goal_id = $1 ORDER BY date', [req.params.id]);
     res.json({ goal: g[0], points, annotations, trend: trendOf(points, g[0].response_type) });
@@ -561,14 +555,15 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   // Response log: one row per prompt with a dated timeline of what was sent and what the parent did (SPEC 5.4).
   app.get('/api/clients/:id/response-log', async (req, res) => {
     await ownedClient(req, req.params.id);
-    const { since, until } = rangeBounds(req.query);
+    const days = RANGE_DAYS[req.query.range];
+    const since = days ? new Date(now().getTime() - days * 864e5) : new Date(0);
     const { rows: prompts } = await db.query(
       `SELECT p.id, p.goal_id, g.title AS goal_title, g.response_type, ct.name AS contact_name, p.prompt_date::text AS date,
               p.scheduled_for, p.sent_at, p.status, p.followups_sent, p.last_followup_at
          FROM prompt p JOIN goal g ON g.id = p.goal_id JOIN contact ct ON ct.id = g.contact_id
-        WHERE g.client_id = $1 AND p.prompt_date >= $2::date AND p.prompt_date <= $3::date AND p.status NOT IN ('scheduled', 'deferred')
+        WHERE g.client_id = $1 AND p.prompt_date >= $2::date AND p.status NOT IN ('scheduled', 'deferred')
         ORDER BY p.scheduled_for DESC LIMIT 300`,
-      [req.params.id, since, until]);
+      [req.params.id, since.toISOString().slice(0, 10)]);
     const ids = prompts.map((p) => p.id);
     const { rows: msgs } = ids.length ? await db.query(
       `SELECT prompt_id, direction, status, body, created_at FROM message_log
