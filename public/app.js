@@ -101,68 +101,37 @@ const ICONS = {
 
 const NAV = [
   ['#/clients', 'clients', 'Clients', (hash) => hash.startsWith('#/clients') || hash.startsWith('#/client/') || hash === '#/archived'],
-  ['#/appointments', 'appointments', 'Schedule', (hash) => hash.startsWith('#/appointment')],
+  ['#/appointments', 'appointments', 'Schedule', (hash) => hash === '#/' || hash === '' || hash.startsWith('#/appointment')],
   ['#/settings', 'settings', 'Settings', (hash) => hash === '#/settings'],
 ];
 /** Sidebar navigation; hidden by CSS until logged in. */
 const sidebar = document.getElementById('sidebar');
-sidebar.append(...NAV.map(([href, key, label]) => h('a', { href, class: 'nav-link', 'data-key': key },
-  h('span', { class: 'side-icon' }, ICONS[key]()), label)));
+sidebar.append(...NAV.map(([href, key, label]) => h('a', { href, class: 'nav-link', 'data-key': key, title: label, 'aria-label': label },
+  h('span', { class: 'side-icon' }, ICONS[key]()))));
 // Show the sidebar exactly when the Log out button is visible (i.e. logged in). A MutationObserver avoids the
 // stale :has() style invalidation some browsers show when #logout's hidden attribute changes.
 const syncSidebar = () => { sidebar.hidden = logoutBtn.hidden; };
 new MutationObserver(syncSidebar).observe(logoutBtn, { attributes: true, attributeFilter: ['hidden'] });
 syncSidebar();
+/** Red flashing dot beside each icon whose page needs attention (clients flagged, emails awaiting approval). */
+function setAlert(key, on, text) {
+  const a = sidebar.querySelector(`[data-key="${key}"]`);
+  a.querySelector('.alert-dot')?.remove();
+  if (on) a.append(h('span', { class: 'alert-dot', role: 'img', 'aria-label': text, title: text }));
+}
+async function refreshAlerts() {
+  try {
+    const d = await api('/dashboard');
+    const n = (d.attention?.length ?? 0) + (d.emailsToApprove?.length ?? 0);
+    setAlert('clients', n > 0, `${n} need${n === 1 ? 's' : ''} attention`);
+  } catch { /* not logged in or locked: no flags */ }
+}
 function markActiveNav() {
   const hash = location.hash || '#/';
   for (const [, key, , test] of NAV) {
     const a = sidebar.querySelector(`[data-key="${key}"]`);
     if (test(hash)) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
   }
-}
-
-/** Dashboard home: three option tiles, each with a live preview (next appointments, clients needing attention). */
-async function renderDashboard() {
-  const d = await api('/dashboard');
-  logoutBtn.hidden = false;
-  const sh = d.shabbos;
-  const attention = d.attention ?? [];
-  const upcoming = d.appointments ?? [];
-  const PREVIEW_MAX = 3;
-  const TYPE_NAMES = { consultation: 'Consultation', 'check-in': 'Check-in', 'ongoing meeting': 'Ongoing meeting' };
-  const dayShort = (iso) => new Date(iso).toLocaleDateString('en-US', { ...NY, weekday: 'short', month: 'short', day: 'numeric' });
-  const more = (total) => total > PREVIEW_MAX && h('span', { class: 'tile-more' }, `+${total - PREVIEW_MAX} more`);
-  // Tiles are single links, so previews are plain spans (no nested links).
-  const tile = (href, key, title, { badge, bad, rows, empty, extra } = {}) => h('a', { href, class: 'option tile' },
-    h('span', { class: 'option-icon' }, ICONS[key]()),
-    h('span', { class: 'option-title' }, title,
-      badge ? h('span', { class: `badge tile-badge${bad ? ' bad-solid' : ''}` }, badge) : null),
-    rows && (rows.length
-      ? h('span', { class: 'tile-preview' }, ...rows, extra)
-      : h('span', { class: 'tile-empty' }, empty)),
-    !rows && extra);
-  app.replaceChildren(...[
-    sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
-    h('h2', { class: 'options-heading' }, 'Welcome, Yisroel'),
-    h('div', { class: 'options' },
-      tile('#/clients', 'clients', 'Clients', {
-        badge: attention.length ? `${attention.length} need${attention.length === 1 ? 's' : ''} attention` : '',
-        bad: true,
-        empty: 'Nothing needs attention',
-        rows: attention.slice(0, PREVIEW_MAX).map((c) => h('span', { class: 'tile-row attn' },
-          h('span', { class: 'tile-who' }, `${c.first_name} ${c.last_name}`),
-          h('span', { class: 'tile-what' }, c.attention.join('; ')))),
-        extra: more(attention.length) || null }),
-      tile('#/appointments', 'appointments', 'Appointments', {
-        badge: upcoming.length ? `${upcoming.length} upcoming` : '',
-        empty: 'No upcoming appointments',
-        rows: upcoming.slice(0, PREVIEW_MAX).map((a) => h('span', { class: `tile-row type-${String(a.type).replace(/\s+/g, '-')}` },
-          h('span', { class: 'tile-when' }, `${dayShort(a.starts_at)} · ${fmtTime(a.starts_at)}`),
-          h('span', { class: 'tile-who' }, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'),
-          h('span', { class: 'tile-what' }, TYPE_NAMES[a.type] ?? a.type))),
-        extra: more(upcoming.length) || null }),
-      tile('#/settings', 'settings', 'Settings')),
-  ].filter(Boolean));
 }
 
 async function renderClients() {
@@ -353,7 +322,8 @@ async function route() {
   const reportRoute = /^#\/report\/([0-9a-f-]{36})$/i.exec(location.hash);
   const edit = /^#\/client\/([0-9a-f-]{36})\/edit$/i.exec(location.hash);
   const apptRoute = /^#\/appointment\/([0-9a-f-]{36})$/i.exec(location.hash);
-  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1], m[2]) : renderDashboard()); } catch (e) { handle(e); }
+  try { await (apptRoute ? renderAppointment({ h, api, app, logoutBtn, handle }, apptRoute[1]) : location.hash === '#/archived' ? renderArchived() : location.hash === '#/clients' ? renderClients() : location.hash === '#/appointments' ? renderAppointments() : location.hash === '#/settings' ? renderSettings({ h, api, app, logoutBtn }) : edit ? renderEditClient(edit[1]) : reportRoute ? renderReport({ h, api, app, logoutBtn, handle }, reportRoute[1]) : contactsRoute ? renderContacts({ h, api, app, logoutBtn, handle }, contactsRoute[1]) : m ? renderClient(m[1], m[2]) : renderAppointments()); } catch (e) { handle(e); }
+  refreshAlerts();
 }
 
 async function boot() {
