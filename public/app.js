@@ -38,6 +38,20 @@ async function api(path, { method = 'GET', body } = {}) {
 
 const fmtDateTime = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' });
 
+const NY = { timeZone: 'America/New_York' };
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { ...NY, hour: 'numeric', minute: '2-digit' });
+const fmtDay = (iso) => new Date(iso).toLocaleDateString('en-US', { ...NY, weekday: 'long', month: 'short', day: 'numeric' });
+/** Groups appointments (already sorted) by New York calendar day -> [[label, items]]. */
+function groupByDay(list) {
+  const map = new Map();
+  for (const a of list) {
+    const label = fmtDay(a.starts_at);
+    if (!map.has(label)) map.set(label, []);
+    map.get(label).push(a);
+  }
+  return [...map];
+}
+
 let showingLocked = false;
 
 function renderLocked({ kind, reopensAt }) {
@@ -98,16 +112,25 @@ async function renderDashboard() {
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('h2', { class: 'options-heading' }, 'Dashboard'),
+    h('section', { class: 'upcoming-card', 'aria-labelledby': 'upcoming-title' },
+      h('div', { class: 'upcoming-head' },
+        h('span', { class: 'upcoming-icon' }, ICONS.appointments()),
+        h('h3', { id: 'upcoming-title' }, 'Upcoming appointments'),
+        upcoming.length > 0 && h('span', { class: 'badge' }, String(upcoming.length)),
+        h('a', { href: '#/appointments', class: 'upcoming-all' }, 'Full schedule →')),
+      upcoming.length
+        ? h('div', { class: 'upcoming-days' }, groupByDay(upcoming).map(([day, items]) => h('div', { class: 'upcoming-day' },
+          h('div', { class: 'upcoming-day-label' }, day),
+          h('ul', { class: 'upcoming-list' }, items.map((a) => h('li', {},
+            h('a', { href: `#/appointment/${a.id}`, class: 'upcoming-row' },
+              h('span', { class: 'upcoming-time' }, fmtTime(a.starts_at)),
+              h('span', { class: 'upcoming-who' }, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'),
+              h('span', { class: 'badge' }, TYPE_NAMES[a.type] ?? a.type))))))))
+        : h('p', { class: 'muted' }, 'No upcoming appointments. Add one from a client’s Appointments tab.')),
     h('div', { class: 'options' },
       option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View and manage your clients.` : 'View and manage your clients.'),
-      option('#/appointments', 'appointments', 'Schedule', 'View upcoming scheduled appointments.'),
+      option('#/appointments', 'appointments', 'Schedule', 'Calendar of all appointments.'),
       option('#/settings', 'settings', 'Settings', 'Booking links and check-in text.')),
-    h('section', { class: 'upcoming' },
-      h('h3', {}, 'Upcoming appointments'),
-      upcoming.length
-        ? h('ul', { class: 'upcoming-list' }, upcoming.map((a) => h('li', {},
-          h('a', { href: `#/appointment/${a.id}` }, `${fmtDateTime(a.starts_at)} · ${a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'} · ${TYPE_NAMES[a.type] ?? a.type}`))))
-        : h('p', { class: 'muted' }, 'No upcoming appointments. Add one from a client’s Appointments tab.')),
   ].filter(Boolean));
 }
 
