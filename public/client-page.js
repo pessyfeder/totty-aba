@@ -337,6 +337,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
         ['Relationship to client', p.relationship],
         ['Phone', p.phone],
         ['Email', p.email],
+        ['⚠ Email bounced', p.email_bounced_at ? `${new Date(p.email_bounced_at).toLocaleDateString()}: emails to this address are not being delivered. Correct the address on the Contacts page.${p.email_bounce_reason ? ` (${p.email_bounce_reason})` : ''}` : ''],
         ['Goal logging method', { sms: 'Text messages', email: 'Daily email', paper: 'Paper log' }[p.logging_method]],
         ['Preferred contact method', p.preferred_channel === 'call' ? 'Call' : 'Text'],
         ['Consent', p.consent_given_at ? 'Recorded' : 'Not recorded'],

@@ -7,6 +7,7 @@ import { createScheduler } from './scheduler.js';
 import { consoleMailer, sendApproved, smtpMailer, unconfiguredMailer } from './consult-email.js';
 import { sendApproved as sendApprovedInquiry } from './inquiry-email.js';
 import { sendApproved as sendApprovedText } from './consult-text.js';
+import { withBounceFlagging } from './bounce.js';
 
 const env = process.env;
 const production = env.NODE_ENV === 'production';
@@ -34,9 +35,9 @@ const provider = telnyxConfigured
 const messenger = createMessenger({ db, provider });
 // Email (initial consultation email, SPEC 5.7b). Dev prints to the console; production without SMTP refuses to send.
 const smtpConfigured = env.SMTP_URL && env.EMAIL_FROM;
-const mailer = smtpConfigured
+const mailer = withBounceFlagging(smtpConfigured
   ? await smtpMailer({ url: env.SMTP_URL, from: env.EMAIL_FROM })
-  : production ? unconfiguredMailer : consoleMailer();
+  : production ? unconfiguredMailer : consoleMailer(), db);
 if (production && !smtpConfigured) console.warn('SMTP_URL and EMAIL_FROM are not set: the consultation email cannot be sent');
 const scheduler = createScheduler({ db, messenger, mailer }); // mailer: paper-log check-in emails
 const app = createApp({
@@ -49,6 +50,7 @@ const app = createApp({
     publicUrl: env.PUBLIC_URL ?? '',
     reportsDir: env.REPORTS_DIR || undefined,
     reportLinkDays: Number(env.REPORT_LINK_DAYS) || 14,
+    emailWebhookSecret: env.EMAIL_WEBHOOK_SECRET || null,
     telnyx: telnyxConfigured ? { publicKey: env.TELNYX_PUBLIC_KEY } : null,
   },
 });

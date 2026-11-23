@@ -57,7 +57,9 @@ export async function renderContacts({ h, api, app, logoutBtn, handle }, clientI
     h('h2', {}, 'Contacts'),
     h('p', { class: 'muted' }, 'Pausing or ending a contact stops all prompts to that person.'),
     ...c.contacts.map((p) => h('details', { class: 'card goal-card', open: c.contacts.length === 1 },
-      h('summary', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${STATUS[p.status] ?? p.status}`), contactForm_(p))),
+      h('summary', {}, `${p.name}${p.relationship ? ` (${p.relationship})` : ''} — ${STATUS[p.status] ?? p.status}${p.email_bounced_at ? ' — ⚠ email bounced' : ''}`),
+      p.email_bounced_at ? h('p', { class: 'error' }, `Email to ${p.email} bounced on ${new Date(p.email_bounced_at).toLocaleDateString()}${p.email_bounce_reason ? ` (${p.email_bounce_reason})` : ''}. Correct the address and save to clear this.`) : '',
+      contactForm_(p))),
     h('h2', {}, 'Add a contact'),
     h('div', { class: 'card' }, contactForm_(null)));
 }

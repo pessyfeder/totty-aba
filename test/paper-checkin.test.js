@@ -42,6 +42,12 @@ test('the email always carries the booking link, first name only, and is logged'
   assert.equal(log.length, 1);
 });
 
+test('no check-in email goes to an address that bounced', async () => {
+  await db.query(`UPDATE contact SET email_bounced_at = now() WHERE id = $1`, [world.contact.id]);
+  await run('2026-11-12T00:00:00Z');
+  assert.equal(env.mails.length, 0);
+});
+
 test('then every 7 days from the last one, and not twice in a tick', async () => {
   await run('2026-11-12T00:00:00Z');
   await run('2026-11-12T00:01:00Z');

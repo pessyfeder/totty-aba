@@ -288,7 +288,7 @@ export function createScheduler({ db, messenger, mailer = null, now = () => new 
          JOIN client cl ON cl.id = c.client_id
          JOIN clinician cn ON cn.id = cl.clinician_id
         WHERE c.logging_method = 'paper' AND c.status = 'active' AND c.consent_given_at IS NOT NULL
-          AND c.email IS NOT NULL AND btrim(c.email) <> ''
+          AND c.email IS NOT NULL AND btrim(c.email) <> '' AND c.email_bounced_at IS NULL
           AND cl.status = 'active' AND cl.intake_status IN ('baseline', 'active')
           AND GREATEST(c.checkin_last_sent_at, c.logging_method_changed_at, cl.baseline_started_at) + make_interval(days => $2) <= $1
         ORDER BY c.id`,

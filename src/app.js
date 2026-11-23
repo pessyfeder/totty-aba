@@ -16,6 +16,7 @@ import { textStatus } from './text-status.js';
 import { buildCheckinBody } from './scheduler.js';
 import { appointmentKind } from './calendar.js';
 import { infoRoutes } from './info-routes.js';
+import { clearIfEmailChanged, flagBounce, parseBounceEvents, secretMatches } from './bounce.js';
 
 // Check-ins this client already had before an appointment: tells the first (baseline) check-in from later weekly ones.
 const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
@@ -102,6 +103,16 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       await handleInbound({ db, messenger, from: p.from.phone_number, body: p.text ?? '', providerId: p.id ?? null, now: now() });
     }
     res.status(200).end();
+  });
+
+  // ---- Email provider bounce webhook (SPEC 5.4b B): flags the contact; never locked. Shared secret in ?token= or x-webhook-secret. ----
+  app.post('/webhooks/email/bounce', async (req, res) => {
+    const secret = config.emailWebhookSecret;
+    if (!secret) return res.status(config.production ? 503 : 404).end();
+    if (!secretMatches(secret, req.query.token ?? req.get('x-webhook-secret'))) return res.status(403).end();
+    let flagged = 0;
+    for (const e of parseBounceEvents(req.body)) flagged += await flagBounce({ db, email: e.email, reason: e.reason, at: now(), hard: e.hard });
+    res.status(200).json({ flagged });
   });
 
   // ---- The public intake form (SPEC 5.1a): one general page, no login ----
@@ -472,7 +483,12 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   app.patch('/api/contacts/:id', async (req, res) => {
     const f = pick(req.body, CONTACT_FIELDS);
     if ('name' in f && !String(f.name ?? '').trim()) throw bad('name is required');
+    const before = 'email' in f ? (await db.query('SELECT email FROM contact WHERE id = $1', [req.params.id])).rows[0] : null;
     const row = await updateRow(req, 'contact', req.params.id, f, viaClient);
+    if (before && await clearIfEmailChanged({ db, contactId: row.id, previousEmail: before.email, nextEmail: row.email })) {
+      row.email_bounced_at = null;
+      row.email_bounce_reason = null;
+    }
     await audit(req, 'update', 'contact', row.id, { fields: Object.keys(f) });
     res.json(row);
   });
