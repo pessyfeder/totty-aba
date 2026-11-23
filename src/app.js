@@ -17,7 +17,7 @@ import { buildCheckinBody } from './scheduler.js';
 import { appointmentKind } from './calendar.js';
 import { infoRoutes } from './info-routes.js';
 
-// Check-ins this client already had before an appointment: tells the first (baseline) check-in from later bi-weekly ones.
+// Check-ins this client already had before an appointment: tells the first (baseline) check-in from later weekly ones.
 const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
   AND p.status = 'scheduled' AND p.starts_at < a.starts_at) AS earlier_checkins`;
 const withKind = ({ earlier_checkins, ...a }) => ({ ...a, kind: appointmentKind(a.type, earlier_checkins) });

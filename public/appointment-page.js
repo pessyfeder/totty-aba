@@ -1,4 +1,4 @@
-// Appointment pages (opened from the Schedule tab): Initial Consultation, First check-in (Baseline), Bi-weekly check-in.
+// Appointment pages (opened from the Schedule tab): Initial Consultation, First check-in (Baseline), Weekly check-in.
 // One renderer, three configurations. Notes are saved on the appointment record.
 import { chartFor } from './charts.js';
 
@@ -14,14 +14,14 @@ const KINDS = {
     label: 'First check-in (Baseline)',
     intro: 'Review the first 7 days of baseline data with the family.',
     agenda: ['Review the baseline data for each goal', 'Set or confirm goal targets and reinforcement levels', 'Confirm prompt schedules going forward'],
-    after: ['Set or update goal targets and prompt schedules', 'Adjust reinforcements if needed', 'The client becomes Active once this appointment has passed; the family books the next check-in (the bi-weekly text carries the booking link)'],
+    after: ['Set or update goal targets and prompt schedules', 'Adjust reinforcements if needed', 'The client becomes Active once this appointment has passed; the family books the next check-in (the weekly text carries the booking link)'],
     showGoals: true, range: 'week',
   },
   biweekly_checkin: {
-    label: 'Bi-weekly check-in',
-    intro: 'Regular progress review, every two weeks.',
+    label: 'Weekly check-in',
+    intro: 'Regular progress review.',
     agenda: ['Review progress on each goal', 'Adjust goals or reinforcements; archive mastered goals and add new ones', 'Parent training and questions', 'Consider creating a bi-weekly report'],
-    after: ['Update, archive or add goals and reinforcements', 'Create a bi-weekly report if one is due', 'Family books the next check-in (the bi-weekly text carries the booking link)'],
+    after: ['Update, archive or add goals and reinforcements', 'Create a bi-weekly report if one is due', 'Family books the next check-in (the weekly text carries the booking link)'],
     showGoals: true, range: 'month',
   },
 };

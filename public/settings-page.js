@@ -2,7 +2,7 @@
 const FIELDS = [
   ['client_info_url', 'Client information page link', ''],
   ['consult_booking_url', 'Consultation booking link', 'Link to the website scheduling portal. Emailed once intake paperwork is received.'],
-  ['checkin_booking_url', 'Ongoing meeting booking link', 'Link to the website scheduling portal (booking and payment). Sent in the bi-weekly check-in text (every 14 days).'],
+  ['checkin_booking_url', 'Ongoing meeting booking link', 'Link to the website scheduling portal (booking and payment). Sent in the weekly check-in text (every 7 days).'],
 ];
 
 export async function renderSettings({ h, api, app, logoutBtn }) {

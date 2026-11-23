@@ -1,4 +1,4 @@
-// Bi-weekly check-in text (SPEC 5.7a, AC 11).
+// Weekly check-in text (SPEC 5.7a, AC 11).
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { makeDb, makeEnv, seedWorld } from './helpers.js';
@@ -30,7 +30,7 @@ test('the first prompt sets first_message_at; nothing is sent before 7 days', as
   assert.equal(checkins().length, 0);
 });
 
-test('7 days after the first message the check-in goes out once, then every 14 days', async () => {
+test('7 days after the first message the check-in goes out once, then every 7 days', async () => {
   env.at('2026-11-11T23:32:00Z');
   await scheduler.sendCheckins(env.now());
   await scheduler.sendCheckins(env.now()); // a second pass sends nothing
@@ -39,10 +39,10 @@ test('7 days after the first message the check-in goes out once, then every 14 d
   assert.equal(checkins()[0].body,
     `Time to schedule a check-in for Dovid with Yisroel Feder, BCBA, LBA: ${LINK}. You can book and pay for your appointment there.`);
 
-  env.at('2026-11-25T22:00:00Z'); // 13 days later: not yet
+  env.at('2026-11-18T22:00:00Z'); // just under 7 days later: not yet
   await scheduler.sendCheckins(env.now());
   assert.equal(checkins().length, 1);
-  env.at('2026-11-25T23:33:00Z'); // 14 days later
+  env.at('2026-11-18T23:33:00Z'); // 7 days later
   await scheduler.sendCheckins(env.now());
   assert.equal(checkins().length, 2);
 });

@@ -1,5 +1,5 @@
--- Bi-weekly check-in text (SPEC 5.7a). first_message_at: when the contact first received an app message;
--- checkin_last_sent_at: when the last check-in text went out (the 14-day clock).
+-- Weekly check-in text (SPEC 5.7a). first_message_at: when the contact first received an app message;
+-- checkin_last_sent_at: when the last check-in text went out (the 7-day clock).
 ALTER TABLE contact ADD COLUMN first_message_at timestamptz;
 ALTER TABLE contact ADD COLUMN checkin_last_sent_at timestamptz;
 

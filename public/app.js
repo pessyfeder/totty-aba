@@ -151,7 +151,7 @@ function clientSearch(clients) {
 const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 let scheduleAnchor = null; // any date inside the month/week being viewed
 let scheduleView = 'month'; // 'month' | 'week'
-const KIND_LABEL = { initial_consultation: 'Initial Consultation', first_checkin: 'First check-in (Baseline)', biweekly_checkin: 'Bi-weekly check-in' };
+const KIND_LABEL = { initial_consultation: 'Initial Consultation', first_checkin: 'First check-in (Baseline)', biweekly_checkin: 'Weekly check-in' };
 
 /** Schedule: month or week calendar of appointments. Chips show first name and time; clicking one opens that appointment's page. */
 async function renderAppointments() {

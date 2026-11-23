@@ -22,7 +22,7 @@ export function buildBody(row, { reminder = false } = {}) {
 export const CHECKIN_FIRST_AFTER_DAYS = 7;
 // "Consistently responding": the first check-in text goes out only once the parent answered at least this share of the last 7 days' prompts.
 export const CONSISTENT_SHARE = 0.7;
-export const CHECKIN_EVERY_DAYS = 14;
+export const CHECKIN_EVERY_DAYS = 7;
 
 export function buildCheckinBody(row, link) {
   return `Time to schedule a check-in for ${row.first_name} with Yisroel Feder, BCBA, LBA: ${link}. ` +
@@ -213,7 +213,7 @@ export function createScheduler({ db, messenger, now = () => new Date(), stagger
   }
 
   /**
-   * Check-in text (SPEC 5.7a): 7 days after a contact's first message (if they replied consistently), then every 14 days after the last one,
+   * Check-in text (SPEC 5.7a): 7 days after a contact's first message (if they replied consistently), then every 7 days after the last one,
    * with the link to the website's scheduling portal. Same send rules as prompts: active client and contact, recorded
    * consent, never in a Shabbos/Yom Tov window or quiet hours. A blocked one is sent once the window ends.
    */
