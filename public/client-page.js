@@ -77,14 +77,16 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
     byText ? h('div', { class: 'time-bubbles' }, h('span', { class: 'badge' }, `Text sent at ${fmt12(g.schedule_json.time)}`)) : h('div', {}, `asks at: ${fmt12(g.schedule_json.time)}`),
     h('div', {}, `on: ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`));
   const stamp = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
-  const history = h('div', { class: 'muted' }, `Created ${stamp(g.created_at)}`,
-    ...(g.status_changes ?? []).flatMap((c) => [h('br'), `${c.from_status} → ${c.to_status} on ${stamp(c.change_made_datetime)}`]));
+  const createdText = `Created ${new Date(g.created_at).toLocaleDateString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium' })}`;
+  const createdInline = h('span', { class: 'muted', style: 'font-size:0.85rem;font-weight:normal' }, createdText);
+  const changes = (g.status_changes ?? []).map((c) => h('div', {}, `${c.from_status} → ${c.to_status} on ${stamp(c.change_made_datetime)}`));
+  const history = h('div', { class: 'muted' }, ...(progress ? [createdText] : []), ...changes);
   const card = progress
     ? h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`), meta, history, summary, rangeBar, body, g.status === 'archived' ? '' : note)
     : goalListCard();
   function goalListCard() {
     if (g.status === 'archived') {
-      return h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: 'badge' }, g.status)), meta, history,
+      return h('article', { class: 'card goal-card' }, h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: 'badge' }, g.status), ' ', createdInline), meta, history,
         h('p', { class: 'muted' }, 'Archived: no more prompts. History is kept.'));
     }
     // The pencil reveals the edit panel in place; Pause/Resume and Archive live there.
@@ -100,7 +102,7 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
     const pencil = h('button', { type: 'button', class: 'acc-act', title: 'Edit goal', 'aria-label': `Edit goal: ${g.title}`, onclick: () => { panel.hidden = !panel.hidden; } });
     pencil.innerHTML = ICON.edit;
     return h('article', { class: 'card goal-card' },
-      h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status), ' ', pencil), meta, history, panel);
+      h('h3', {}, `${g.number}. ${g.title}`, ' ', h('span', { class: `badge ${g.status === 'active' ? 'ok' : ''}` }, g.status), ' ', createdInline, ' ', pencil), meta, history, panel);
   }
   if (progress) draw().catch(handle);
   return card;
