@@ -432,9 +432,9 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const goalContactIds = new Set(liveGoals.map((g) => g.contact_id));
   const goalContacts = c.contacts.filter((p) => goalContactIds.has(p.id));
   const goalsTab = [
-    c.contacts.length ? addHead(h, 'Goals', 'Add goal', goalForm) : h('h2', { class: 'first' }, 'Goals'),
     ...(goalContacts.length ? [h('div', { class: 'goal-contacts' }, ...goalContacts.map((p) => h('div', {},
       h('strong', {}, 'Contact: '), p.name, h('br'), h('strong', {}, 'Contact method: '), METHOD_LABEL[p.logging_method] ?? 'Text messages')))] : []),
+    c.contacts.length ? addHead(h, 'Goals', 'Add goal', goalForm) : h('h2', { class: 'first' }, 'Goals'),
     ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals')) : [h('p', { class: 'muted' }, 'No goals yet.')]),
     c.contacts.length ? '' : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals'))) : '',
