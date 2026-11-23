@@ -108,7 +108,7 @@ s += [row('Child’s first name *', 'Child’s last name *'), row('Date of birth
       row('Full name', 'Relationship to child'), row('Mobile phone', 'Email'),
       Spacer(1, 4), checks('Preferred contact method (check all that apply):', ['Text', 'Email', 'Phone call']), Spacer(1, 3), check_item(TEXT)]
 
-s += sec('2. Informed Consent for Services', 'To be signed before services begin. By signing below, I understand and agree to the following:')
+s += [PageBreak()] + sec('2. Informed Consent for Services', 'To be signed before services begin. By signing below, I understand and agree to the following:')
 s += [Paragraph(f'{i}. {t}', ParagraphStyle('n', parent=base, leftIndent=14, firstLineIndent=-14, spaceAfter=3)) for i, t in enumerate(CONSENT, 1)]
 s += [Spacer(1, 3), check_item('I have read and agree to all of the statements above. *')] + sig('Parent / Caregiver / Educator signature *')
 
@@ -116,15 +116,15 @@ fee = Table([['First Session (Intake)', '$275'], ['Standard Session', '$175'],
              [Paragraph('In-Vivo Observation Session (live guidance by video call while you implement strategies with your child across home, school and community)', base), '$325']],
             colWidths=[W - 0.9 * inch, 0.9 * inch])
 fee.setStyle(TableStyle([('FONT', (0, 0), (-1, -1), 'Helvetica', 9.5), ('ALIGN', (1, 0), (1, -1), 'RIGHT'), ('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LINEBELOW', (0, 0), (-1, -1), 0.4, colors.HexColor('#bbbbbb'))]))
-s += [PageBreak()] + sec('3. Fee &amp; Cancellation Policy', 'Private pay · No insurance billing') + [fee,
+s += [KeepTogether(sec('3. Fee &amp; Cancellation Policy', 'Private pay · No insurance billing') + [fee,
       Paragraph('Payment method(s) accepted', h3), Paragraph('Credit card on file (preferred); Zelle or cash also accepted.', base), Spacer(1, 2), Paragraph('Payment due upon scheduling appointment.', base),
       Paragraph('Receipts', h3), Paragraph('Superbills/receipts are provided upon request for families seeking reimbursement or using an FSA/HSA. The BTB Method does not bill insurance directly.', base),
       Paragraph('Cancellation policy', h3), Paragraph('Please give at least 48 hours’ notice to cancel or reschedule a session. Late cancellations or no-shows may be charged the full session rate.', base),
       Paragraph('Billing questions', h3), Paragraph('Office@TheBTBMethod.com', base), Spacer(1, 3),
       Paragraph('Please do not write credit card details on this form. To put a credit card on file, use The BTB Method’s secure credit card processing portal.', small), Spacer(1, 5),
-      check_item('I have read and agree to the Fee &amp; Cancellation Policy. *')]
+      check_item('I have read and agree to the Fee &amp; Cancellation Policy. *')])]
 
-s += sec('4. Background &amp; History', 'Please complete before your first session.')
+s += [PageBreak()] + sec('4. Background &amp; History', 'Please complete before your first session.')
 for l in ['Current diagnoses (if any)', 'Current medications', 'Current providers / other services (school, OT, speech, other therapy)',
           'Past interventions tried for this behavior', 'Family members / caregivers involved in implementing strategies', 'Anything else we should know']:
     s.append(Box(l, 46))
