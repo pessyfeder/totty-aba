@@ -99,13 +99,28 @@ const ICONS = {
   settings: () => icon('M4 7h9', 'M17 7h3', 'M15 5v4', 'M4 17h3', 'M11 17h9', 'M9 15v4', 'M4 12h16'),
 };
 
-/** Dashboard home: three big options under a "Dashboard" heading. */
+const NAV = [
+  ['#/clients', 'clients', 'Clients', (hash) => hash.startsWith('#/clients') || hash.startsWith('#/client/') || hash === '#/archived'],
+  ['#/appointments', 'appointments', 'Schedule', (hash) => hash.startsWith('#/appointment')],
+  ['#/settings', 'settings', 'Settings', (hash) => hash === '#/settings'],
+];
+/** Sidebar navigation; hidden by CSS until logged in. */
+const sidebar = document.getElementById('sidebar');
+sidebar.append(...NAV.map(([href, key, label]) => h('a', { href, class: 'nav-link', 'data-key': key },
+  h('span', { class: 'side-icon' }, ICONS[key]()), label)));
+function markActiveNav() {
+  const hash = location.hash || '#/';
+  for (const [, key, , test] of NAV) {
+    const a = sidebar.querySelector(`[data-key="${key}"]`);
+    if (test(hash)) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current');
+  }
+}
+
+/** Dashboard home: Upcoming Appointments and Needs Attention. */
 async function renderDashboard() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
   const sh = d.shabbos;
-  const option = (href, key, title, text) => h('a', { href, class: 'option' },
-    h('span', { class: 'option-icon' }, ICONS[key]()), h('span', { class: 'option-title' }, title), h('span', { class: 'option-text' }, text));
   const n = d.attention.length;
   const upcoming = d.appointments ?? [];
   const TYPE_NAMES = { consultation: 'Consultation', 'check-in': 'Check-in', 'ongoing meeting': 'Ongoing meeting' };
@@ -127,10 +142,17 @@ async function renderDashboard() {
               h('span', { class: 'upcoming-who' }, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'),
               h('span', { class: 'badge' }, TYPE_NAMES[a.type] ?? a.type))))))))
         : h('p', { class: 'muted' }, 'No upcoming appointments. Add one from a client’s Appointments tab.')),
-    h('div', { class: 'options' },
-      option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View and manage your clients.` : 'View and manage your clients.'),
-      option('#/appointments', 'appointments', 'Schedule', 'Calendar of all appointments.'),
-      option('#/settings', 'settings', 'Settings', 'Booking links and check-in text.')),
+    h('section', { class: 'upcoming-card attention-card', 'aria-labelledby': 'attn-title' },
+      h('div', { class: 'upcoming-head' },
+        h('span', { class: 'upcoming-icon' }, '⚠'),
+        h('h3', { id: 'attn-title' }, 'Needs attention'),
+        n > 0 && h('span', { class: 'badge' }, String(n))),
+      n
+        ? h('ul', { class: 'upcoming-list' }, d.attention.map((c) => h('li', {},
+          h('a', { href: `#/client/${c.id}`, class: 'upcoming-row' },
+            h('span', { class: 'upcoming-who' }, `${c.first_name} ${c.last_name}`),
+            h('span', { class: 'chip-attn' }, c.attention.join('; '))))))
+        : h('p', { class: 'muted' }, 'Nothing needs attention right now.')),
   ].filter(Boolean));
 }
 
@@ -313,6 +335,7 @@ function handle(err) {
 }
 
 async function route() {
+  markActiveNav();
   const m = /^#\/client\/([0-9a-f-]{36})(?:\/(profile|goals|progress|appointments))?$/i.exec(location.hash);
   // Client pages set 'wide' themselves; resetting it here would squeeze the old page narrower
   // while the next tab loads, then widen it again (the flicker). Reset only for other pages.
