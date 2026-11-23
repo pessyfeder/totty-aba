@@ -72,7 +72,9 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
   ], 'Add note', async (f) => { await api(`/goals/${g.id}/annotations`, { method: 'POST', body: trimmed(f) }); await draw(); });
 
   const owner = contacts.find((c) => c.id === g.contact_id);
-  const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${fmt12(g.schedule_json.time)} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`);
+  const byText = owner?.logging_method === 'sms';
+  const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'}${byText ? '' : ` at ${fmt12(g.schedule_json.time)}`} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`,
+    byText ? h('div', { class: 'time-bubbles' }, h('span', { class: 'badge' }, `Text sent at ${fmt12(g.schedule_json.time)}`)) : '');
   const stamp = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
   const history = h('div', { class: 'muted' }, `Created ${stamp(g.created_at)}`,
     ...(g.status_changes ?? []).flatMap((c) => [h('br'), `${c.from_status} → ${c.to_status} on ${stamp(c.change_made_datetime)}`]));
@@ -426,8 +428,13 @@ export async function renderClient(ctx, id, tab = 'profile') {
         { action: { icon: 'add', label: 'Add reinforcement', onclick: () => { reinforcementPick.hidden = false; reinforcementPick.focus(); } } }),
       chip(h, 'consent', 'Signed consent', '', consent.node, { badge: consent.badge, cls: consent.cls })),
   ];
+  const METHOD_LABEL = { sms: 'Text messages', email: 'Daily email', paper: 'Paper log' };
+  const goalContactIds = new Set(liveGoals.map((g) => g.contact_id));
+  const goalContacts = c.contacts.filter((p) => goalContactIds.has(p.id));
   const goalsTab = [
     c.contacts.length ? addHead(h, 'Goals', 'Add goal', goalForm) : h('h2', { class: 'first' }, 'Goals'),
+    ...(goalContacts.length ? [h('div', { class: 'goal-contacts' }, ...goalContacts.map((p) => h('div', {},
+      h('strong', {}, 'Contact: '), p.name, h('br'), h('strong', {}, 'Contact method: '), METHOD_LABEL[p.logging_method] ?? 'Text messages')))] : []),
     ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals')) : [h('p', { class: 'muted' }, 'No goals yet.')]),
     c.contacts.length ? '' : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals'))) : '',
