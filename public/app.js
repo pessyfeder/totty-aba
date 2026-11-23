@@ -36,7 +36,7 @@ async function api(path, { method = 'GET', body } = {}) {
   return data;
 }
 
-const fmtDateTime = (iso) => new Date(iso).toLocaleString([], { weekday: 'long', hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' });
+const fmtDateTime = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'long', hour: 'numeric', minute: '2-digit', month: 'short', day: 'numeric' });
 
 let showingLocked = false;
 
@@ -148,7 +148,7 @@ function clientSearch(clients) {
   return h('div', {}, h('div', { class: 'client-search-bar' }, search, filter), list, empty);
 }
 
-const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 let scheduleAnchor = null; // any date inside the month/week being viewed
 let scheduleView = 'month'; // 'month' | 'week'
 const KIND_LABEL = { initial_consultation: 'Initial Consultation', first_checkin: 'First check-in (Baseline)', biweekly_checkin: 'Bi-weekly check-in' };

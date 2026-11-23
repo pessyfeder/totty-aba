@@ -29,7 +29,7 @@ const KINDS = {
 const fmtWhen = (a) => {
   const start = new Date(a.starts_at);
   const day = start.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  const t = (d) => d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  const t = (d) => d.toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
   return `${day}, ${t(start)}${a.ends_at ? ` – ${t(new Date(a.ends_at))}` : ''}`;
 };
 

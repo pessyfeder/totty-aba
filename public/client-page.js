@@ -14,7 +14,12 @@ const NEXT_STEP = {
   paperwork_received: 'Information submitted: send the initial consultation email with the document explaining what will be discussed (review and approve it below). At the consultation, set the goals and plan, then press Activate.',
   baseline: 'Baseline: prompts are going to the parents. After a week of consistent replies the parent is texted to schedule the first check-in; the client becomes Active after that appointment.',
 };
-const fmtTime = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+// "18:30" -> "6:30 pm"
+const fmt12 = (hhmm) => {
+  const [hh, mm] = String(hhmm).split(':').map(Number);
+  return `${hh % 12 || 12}:${String(mm).padStart(2, '0')} ${hh < 12 ? 'am' : 'pm'}`;
+};
+const fmtTime = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
 const today = () => new Date().toISOString().slice(0, 10);
 
 /** Small form helper: runs onSubmit with the FormData and shows any error beside the button. */
@@ -67,8 +72,8 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
   ], 'Add note', async (f) => { await api(`/goals/${g.id}/annotations`, { method: 'POST', body: trimmed(f) }); await draw(); });
 
   const owner = contacts.find((c) => c.id === g.contact_id);
-  const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${g.schedule_json.time} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`);
-  const stamp = (iso) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'} at ${fmt12(g.schedule_json.time)} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`);
+  const stamp = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
   const history = h('div', { class: 'muted' }, `Created ${stamp(g.created_at)}`,
     ...(g.status_changes ?? []).flatMap((c) => [h('br'), `${c.from_status} → ${c.to_status} on ${stamp(c.change_made_datetime)}`]));
   const card = progress
@@ -100,7 +105,7 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
 
 /** Signed consent from the online intake form (SPEC 5.1a step 3): who signed and when. */
 function consentSection({ h }, c) {
-  const when = c.consent_signed_at ? new Date(c.consent_signed_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' }) : '';
+  const when = c.consent_signed_at ? new Date(c.consent_signed_at).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' }) : '';
   return {
     badge: c.consent_signed_at ? 'Signed' : 'None',
     cls: c.consent_signed_at ? 'ok' : '',
@@ -134,7 +139,7 @@ async function emailSection({ h, api, handle }, id, reload, { path, title, name,
   const node = h('div', {},
     approved
       ? h('p', { class: 'ok-line' }, e.queued_until
-          ? `${icon} Approved and queued: it goes out after Shabbos / Yom Tov ends (${new Date(e.queued_until).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}).`
+          ? `${icon} Approved and queued: it goes out after Shabbos / Yom Tov ends (${new Date(e.queued_until).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' })}).`
           : `${icon} Approved. It goes out as soon as it can (not during Shabbos or Yom Tov).`)
       : h('p', { class: 'muted' }, hint),
     ...e.problems.map((p) => h('p', { class: 'warn-line' }, `⚠ ${p}`)),
@@ -148,7 +153,7 @@ async function emailSection({ h, api, handle }, id, reload, { path, title, name,
 /** Automatic texts at a glance: the consultation text, the next check-in text, the latest goal prompt, and why texts can't go out. */
 async function textStatusSection({ h, api }, id) {
   const s = await api(`/clients/${id}/text-status`);
-  const when = (iso) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const when = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
   const rows = [];
   if (s.consult) {
     const c = s.consult;
@@ -289,7 +294,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const editStatusBtn = h('button', { type: 'button', onclick: () => { intakeSection.hidden = !intakeSection.hidden; } }, 'Edit status');
 
   const APPT = { scheduled: 'Scheduled', missed: 'Missed', completed: 'Completed', cancelled: 'Cancelled' };
-  const apptWhen = (a) => (a.starts_at ? new Date(a.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No date yet');
+  const apptWhen = (a) => (a.starts_at ? new Date(a.starts_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No date yet');
   const apptAct = (a, body) => api(`/appointments/${a.id}`, { method: 'PATCH', body }).then(reload, handle);
   const localInput = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   const apptRow = (a) => {
@@ -464,7 +469,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
 }
 
 const EVENT_LABEL = { prompt: 'Question sent', followup: 'Follow-up sent (no reply yet)', reprompt: 'Asked to resend (reply unreadable)', unreadable: 'Parent replied, but it could not be read', reply: 'Parent replied' };
-const fmtStamp = (iso) => new Date(iso).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
+const fmtStamp = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' });
 const fmtWait = (min) => (min < 60 ? `${min} min` : min < 1440 ? `${Math.round(min / 6) / 10} hr` : `${Math.round(min / 144) / 10} days`);
 
 /** Response log: when each question went out, every follow-up/re-prompt, and when (or whether) the parent answered. */
