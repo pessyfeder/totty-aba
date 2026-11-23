@@ -27,6 +27,14 @@ function inlineForm(h, fields, submitLabel, onSubmit) {
   } }, fields, h('button', { type: 'submit' }, submitLabel), msg);
   return form;
 }
+/** Heading row with an "Add" button on the right that pops the given form up in a small dialog. */
+function addHead(h, title, buttonLabel, form) {
+  const dlg = h('dialog', { class: 'form-dialog' }, h('h3', {}, buttonLabel), form,
+    h('button', { type: 'button', class: 'link', onclick: () => dlg.close() }, 'Cancel'));
+  dlg.addEventListener('click', (e) => { if (e.target === dlg) dlg.close(); });
+  return h('div', { class: 'tab-head' }, h('h2', { class: 'first' }, title),
+    h('button', { type: 'button', onclick: () => dlg.showModal() }, buttonLabel), dlg);
+}
 const trimmed = (f) => Object.fromEntries([...f.entries()].map(([k, v]) => [k, String(v).trim()]).filter(([, v]) => v !== ''));
 
 function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
@@ -279,9 +287,8 @@ export async function renderClient(ctx, id, tab = 'profile') {
   });
   const groupOrder = ['to_be_scheduled', 'scheduled', 'missed', 'completed', 'cancelled'];
   const apptTab = [
-    h('div', { class: 'tab-head' }, h('h2', { class: 'first' }, 'Appointments')),
-    addAppt,
-    h('p', { class: 'muted' }, 'Appointments booked on the calendar appear here automatically. Add one that still needs booking, and mark each as completed or missed afterwards.'),
+    addHead(h, 'Appointments', 'Add appointment', addAppt),
+    h('p', { class: 'muted' }, 'Appointments booked on the calendar appear here automatically. Mark each as completed or missed afterwards.'),
     h('div', { class: 'appt-counts' }, groupOrder.slice(0, 4).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
     ...groupOrder.map((s) => {
       const list = c.appointments.filter((a) => a.status === s);
@@ -383,9 +390,9 @@ export async function renderClient(ctx, id, tab = 'profile') {
       chip(h, 'consent', 'Signed consent', '', consent.node, { badge: consent.badge, cls: consent.cls })),
   ];
   const goalsTab = [
-    h('h2', { class: 'first' }, 'Goals'),
+    c.contacts.length ? addHead(h, 'Goals', 'Add goal', goalForm) : h('h2', { class: 'first' }, 'Goals'),
     ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals')) : [h('p', { class: 'muted' }, 'No goals yet.')]),
-    c.contacts.length ? h('div', {}, goalForm) : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
+    c.contacts.length ? '' : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals'))) : '',
   ];
   const progressTab = [

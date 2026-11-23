@@ -15,7 +15,7 @@ function h(tag, attrs = {}, ...kids) {
     else if (v === true) node.setAttribute(k, '');
     else if (v !== false && v != null) node.setAttribute(k, v);
   }
-  for (const kid of kids.flat()) if (kid !== false) node.append(kid instanceof Node ? kid : document.createTextNode(kid ?? ''));
+  for (const kid of kids.flat(Infinity)) if (kid !== false) node.append(kid instanceof Node ? kid : document.createTextNode(kid ?? ''));
   return node;
 }
 
