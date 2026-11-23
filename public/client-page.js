@@ -274,22 +274,20 @@ export async function renderClient(ctx, id, tab = 'profile') {
       h('td', {}, a.status === 'cancelled' ? '' : [
         a.status === 'completed' || a.status === 'missed' ? '' : [when, ' ', setTime, ' '],
         a.status === 'scheduled' ? [mark('Completed', 'completed'), mark('Missed', 'missed')] : '',
-        a.status === 'completed' || a.status === 'missed' ? [mark('To be scheduled again', 'to_be_scheduled'), mark(a.status === 'missed' ? 'Mark completed' : 'Mark missed', a.status === 'missed' ? 'completed' : 'missed')] : '',
-        a.status === 'scheduled' ? mark('Back to to-be-scheduled', 'to_be_scheduled') : '']),
+        a.status === 'completed' || a.status === 'missed' ? mark(a.status === 'missed' ? 'Mark completed' : 'Mark missed', a.status === 'missed' ? 'completed' : 'missed') : '']),
       h('td', {}, a.id ? h('a', { href: `#/appointment/${a.id}` }, 'Notes') : ''));
   };
   const addAppt = inlineForm(h, [
     lbl('Type', h('select', { name: 'type' }, h('option', { value: 'check-in' }, 'Check-in'), h('option', { value: 'consultation' }, 'Consultation'))),
-    lbl('Date and time (leave empty if not booked yet)', h('input', { name: 'starts_at', type: 'datetime-local' })),
+    lbl('Date and time', h('input', { name: 'starts_at', type: 'datetime-local', required: true })),
   ], 'Add appointment', async (f) => {
-    const t = f.get('starts_at');
-    await post('/appointments', { type: f.get('type'), starts_at: t ? new Date(t).toISOString() : null });
+    await post('/appointments', { type: f.get('type'), starts_at: new Date(f.get('starts_at')).toISOString() });
   });
   const groupOrder = ['to_be_scheduled', 'scheduled', 'missed', 'completed', 'cancelled'];
   const apptTab = [
     addHead(h, 'Appointments', 'Add appointment', addAppt),
     h('p', { class: 'muted' }, 'Appointments booked on the calendar appear here automatically. Mark each as completed or missed afterwards.'),
-    h('div', { class: 'appt-counts' }, groupOrder.slice(0, 4).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
+    h('div', { class: 'appt-counts' }, groupOrder.slice(1, 4).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
     ...groupOrder.map((s) => {
       const list = c.appointments.filter((a) => a.status === s);
       return list.length ? h('section', {}, h('h3', {}, APPT[s]), h('table', { class: 'compact' }, h('tbody', {}, list.map(apptRow)))) : '';
