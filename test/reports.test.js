@@ -15,7 +15,7 @@ before(async () => {
   db = await makeDb();
   env = makeEnv(db, '2026-11-04T15:00:00Z'); // Wednesday 10am EST
   world = await seedWorld(db);
-  const app = createApp({ db, messenger: env.messenger, now: env.now, config: { sessionSecret: 'y'.repeat(40), production: false, publicUrl: 'https://app.example.test', reportsDir: dir } });
+  const app = createApp({ db, messenger: env.messenger, mailer: env.mailer, now: env.now, config: { sessionSecret: 'y'.repeat(40), production: false, publicUrl: 'https://app.example.test', reportsDir: dir } });
   server = app.listen(0);
   base = `http://127.0.0.1:${server.address().port}`;
   cookie = (await call('/api/login', { method: 'POST', body: { email: 'totty@example.test', password: PASSWORD } })).cookie;
@@ -79,7 +79,7 @@ test('a created report includes every active goal; no reply is not counted as No
   assert.equal((await call(`/api/clients/${world.client.id}/reports`, { method: 'POST', body: { ...WEEK, period_start: '2026-10-26' } })).status, 400);
 });
 
-test('draft can be edited, downloaded as PDF; sending needs consent, then freezes it and texts only a link', async () => {
+test('draft can be edited, downloaded as PDF; sending needs consent, then freezes it and emails only a link', async () => {
   const id = (await call(`/api/clients/${world.client.id}/reports`, { method: 'POST', body: WEEK })).json.id;
   const gid = (await call(`/api/reports/${id}`)).json.content.goals.find((x) => x.title === 'Uses a spoon').goal_id;
   const patch = await call(`/api/reports/${id}`, { method: 'PATCH', body: { note: 'Great week!', next_focus: 'Cup drinking', goals: { [gid]: { remark: 'Improving' } } } });
@@ -90,17 +90,22 @@ test('draft can be edited, downloaded as PDF; sending needs consent, then freeze
   assert.equal(pdf.type, 'application/pdf');
   assert.equal(pdf.buf.subarray(0, 4).toString(), '%PDF');
 
-  // No consent recorded yet
+  // No email address, then no consent recorded yet
+  assert.equal((await call(`/api/reports/${id}/send`, { method: 'POST', body: { contact_id: world.contact.id } })).status, 400);
+  await db.query(`UPDATE contact SET email = 'mrs@example.test' WHERE id = $1`, [world.contact.id]);
   assert.equal((await call(`/api/reports/${id}/send`, { method: 'POST', body: { contact_id: world.contact.id } })).status, 400);
   await db.query('UPDATE contact SET consent_given_at = now() WHERE id = $1', [world.contact.id]);
-  const before = env.sent.length;
+  const before = env.mails.length;
+  const smsBefore = env.sent.length;
   const send = await call(`/api/reports/${id}/send`, { method: 'POST', body: { contact_id: world.contact.id } });
   assert.equal(send.status, 200);
-  assert.equal(env.sent.length, before + 1);
-  const sms = env.sent.at(-1);
-  assert.equal(sms.to, '+15555550100');
-  assert.match(sms.body, /^A progress report for Dovid is ready: https:\/\/app\.example\.test\/r\/[\w-]{40,}$/);
-  assert.doesNotMatch(sms.body, /%|spoon|Cohen/i); // no progress details or last name in the text
+  assert.equal(env.mails.length, before + 1);
+  assert.equal(env.sent.length, smsBefore); // email, not text
+  const mail = env.mails.at(-1);
+  assert.equal(mail.to, 'mrs@example.test');
+  assert.match(mail.text, /A progress report for Dovid is ready: https:\/\/app\.example\.test\/r\/[\w-]{40,}\n/);
+  assert.doesNotMatch(mail.subject + mail.text, /%|spoon/i); // no progress details (the greeting uses the parent's name, the child only by first name)
+  const sms = { body: mail.text.match(/https:\/\/\S+/)[0] };
 
   // Frozen after sending
   assert.equal((await call(`/api/reports/${id}`, { method: 'PATCH', body: { note: 'x' } })).status, 409);
@@ -133,22 +138,23 @@ test('the history lists reports; another clinician cannot see them', async () =>
 test('Create and Send are refused during Shabbos, and a refused send leaves the report a draft', async () => {
   const id = (await call(`/api/clients/${world.client.id}/reports`, { method: 'POST', body: WEEK })).json.id;
   env.at('2026-11-07T15:00:00Z'); // Saturday 10am EST
-  const n = env.sent.length;
+  const n = env.mails.length;
   const create = await call(`/api/clients/${world.client.id}/reports`, { method: 'POST', body: WEEK });
   assert.equal(create.status, 423);
   const send = await call(`/api/reports/${id}/send`, { method: 'POST', body: { contact_id: world.contact.id } });
   assert.equal(send.status, 423);
-  assert.equal(env.sent.length, n);
+  assert.equal(env.mails.length, n);
   env.at('2026-11-04T15:00:00Z');
   assert.equal((await db.query('SELECT status FROM report WHERE id = $1', [id])).rows[0].status, 'draft');
 });
 
-test('the messenger itself refuses a report send inside the window and logs it', async () => {
+test('a failing email leaves the report a draft with no link', async () => {
   const id = (await call(`/api/clients/${world.client.id}/reports`, { method: 'POST', body: WEEK })).json.id;
-  env.at('2026-11-07T15:00:00Z');
-  const client = (await db.query('SELECT * FROM client WHERE id = $1', [world.client.id])).rows[0];
-  await assert.rejects(env.messenger.send({ client, settings: world.clinician.settings_json, to: '+15555550100', body: 'x', reportId: id }), /refused/);
-  env.at('2026-11-04T15:00:00Z');
-  const log = (await db.query(`SELECT status FROM message_log WHERE report_id = $1`, [id])).rows;
-  assert.deepEqual(log.map((l) => l.status), ['refused']);
+  const orig = env.mailer.send;
+  env.mailer.send = async () => { throw new Error('smtp down'); };
+  const send = await call(`/api/reports/${id}/send`, { method: 'POST', body: { contact_id: world.contact.id } });
+  env.mailer.send = orig;
+  assert.equal(send.status, 502);
+  const row = (await db.query('SELECT status, link_token_hash, pdf_path FROM report WHERE id = $1', [id])).rows[0];
+  assert.deepEqual(row, { status: 'draft', link_token_hash: null, pdf_path: null });
 });

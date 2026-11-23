@@ -670,7 +670,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   });
 
   // ---- Progress reports (SPEC 5.6); the parent's /r/:token link is outside /api, so it is not locked ----
-  reportRoutes({ app, db, messenger, config, now, HttpError, bad, audit, ownedClient, insertRow })();
+  reportRoutes({ app, db, mailer, config, now, HttpError, bad, audit, ownedClient, insertRow })();
 
   // ---- Static dashboard + errors ----
   app.use(express.static(fileURLToPath(new URL('../public', import.meta.url))));

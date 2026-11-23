@@ -22,7 +22,7 @@ CLINICIAN_PASSWORD='at least 12 chars' node scripts/create-clinician.js \
 npm start
 ```
 
-Without Telnyx variables set, outgoing SMS goes to the console. In production (`NODE_ENV=production`) `TELNYX_API_KEY`, `TELNYX_FROM_NUMBER` and `TELNYX_PUBLIC_KEY` are required, and `PUBLIC_URL` is also the base of the report links texted to parents. The Telnyx messaging webhook (`POST /webhooks/telnyx/sms`) must be pointed at `PUBLIC_URL`; requests are verified with the Ed25519 signature Telnyx sends.
+Without Telnyx variables set, outgoing SMS goes to the console. In production (`NODE_ENV=production`) `TELNYX_API_KEY`, `TELNYX_FROM_NUMBER` and `TELNYX_PUBLIC_KEY` are required, and `PUBLIC_URL` is also the base of the report links emailed to parents. The Telnyx messaging webhook (`POST /webhooks/telnyx/sms`) must be pointed at `PUBLIC_URL`; requests are verified with the Ed25519 signature Telnyx sends.
 
 ## Layout
 

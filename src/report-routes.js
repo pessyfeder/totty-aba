@@ -3,7 +3,7 @@ import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { DateTime } from 'luxon';
-import { ShabbosRefusal } from './messaging.js';
+import { locationFrom, windowAt } from './shabbos.js';
 import { buildContent, checkPeriod, lastCompletedBiweek, renderPdf } from './reports.js';
 
 const sha256 = (t) => crypto.createHash('sha256').update(t).digest('hex');
@@ -13,7 +13,7 @@ const dateOnly = (d) => (d instanceof Date ? d.toISOString().slice(0, 10) : Stri
  * Mounts the parent-facing secure link (public) and returns a function that mounts the clinician API.
  * The API part must be mounted after the login / Shabbos-lock middleware.
  */
-export function reportRoutes({ app, db, messenger, config, now, HttpError, bad, audit, ownedClient, insertRow }) {
+export function reportRoutes({ app, db, mailer, config, now, HttpError, bad, audit, ownedClient, insertRow }) {
   const reportDir = config.reportsDir ?? path.join(process.cwd(), 'data', 'reports');
   const linkDays = config.reportLinkDays ?? 14;
 
@@ -103,14 +103,26 @@ export function reportRoutes({ app, db, messenger, config, now, HttpError, bad, 
       if (r.status === 'sent') throw new HttpError(409, 'This report was already sent');
       const { rows: [c] } = await db.query('SELECT * FROM contact WHERE id = $1 AND client_id = $2', [req.body?.contact_id, r.client_id]);
       if (!c) throw bad('Choose a contact of this client');
-      if (!c.phone) throw bad('That contact has no mobile number');
+      const to = (c.email ?? '').trim();
+      if (!to) throw bad('That contact has no email address');
+      if (c.email_bounced_at) throw bad('Email to that contact bounced; correct the address first');
       if (c.status !== 'active') throw bad('That contact is not active');
-      if (!c.consent_given_at) throw bad('No consent to text is recorded for that contact');
+      if (!c.consent_given_at) throw bad('No consent to email is recorded for that contact');
       const base = config.publicUrl || (config.production ? null : 'http://localhost:3000');
       if (!base) throw new HttpError(503, 'PUBLIC_URL is not configured');
+      if (!mailer) throw new HttpError(503, 'Email is not configured');
       const { rows: [client] } = await db.query('SELECT * FROM client WHERE id = $1', [r.client_id]);
 
-      // Freeze the content, store the PDF and mint the link; undo all of it if the text cannot go out.
+      // The Shabbos / Yom Tov rule is enforced here too, so a report email is never sent in a blocked window (SPEC 5.3).
+      const window = windowAt(now(), locationFrom(client, req.clinician.settings_json));
+      if (window) {
+        await db.query(
+          `INSERT INTO message_log (direction, to_from, body, status, refusal_reason, report_id) VALUES ('outbound', $1, $2, 'refused', $3, $4)`,
+          [to, 'Progress report email', `${window.kind} until ${window.end.toISOString()}`, r.id]);
+        throw new HttpError(423, 'shabbos', { kind: window.kind, reopensAt: window.end });
+      }
+
+      // Freeze the content, store the PDF and mint the link; undo all of it if the email cannot go out.
       const pdf = await renderPdf(r.content_json, { note: r.note ?? '' });
       await fs.mkdir(reportDir, { recursive: true });
       const file = path.join(reportDir, `${r.id}.pdf`);
@@ -118,17 +130,27 @@ export function reportRoutes({ app, db, messenger, config, now, HttpError, bad, 
       const token = crypto.randomBytes(32).toString('base64url');
       const expires = new Date(now().getTime() + linkDays * 864e5);
       await db.query(`UPDATE report SET status = 'final', pdf_path = $2, link_token_hash = $3, link_expires_at = $4 WHERE id = $1`, [r.id, file, sha256(token), expires]);
+      // Only the child's first name: no progress details in the email itself.
+      const mail = {
+        subject: `A progress report for ${client.first_name} is ready`,
+        text: [
+          `Hi ${c.name},`,
+          '',
+          `A progress report for ${client.first_name} is ready: ${base}/r/${token}`,
+          '',
+          `The link expires in ${linkDays} days.`,
+          '',
+          req.clinician.name || 'Your behavior analyst',
+        ].join('\n'),
+      };
       try {
-        await messenger.send({
-          client, settings: req.clinician.settings_json, to: c.phone, reportId: r.id,
-          // Only the child's first name: no progress details in the text itself.
-          body: `A progress report for ${client.first_name} is ready: ${base}/r/${token}`,
-        });
+        const { id } = await mailer.send({ to, ...mail });
+        await db.query(`INSERT INTO message_log (direction, to_from, body, provider_id, status, report_id) VALUES ('outbound', $1, $2, $3, 'sent', $4)`,
+          [to, `${mail.subject}\n\n${mail.text}`, id ?? null, r.id]);
       } catch (err) {
         await db.query(`UPDATE report SET status = 'draft', pdf_path = NULL, link_token_hash = NULL, link_expires_at = NULL WHERE id = $1`, [r.id]);
         await fs.rm(file, { force: true });
-        if (err instanceof ShabbosRefusal) throw new HttpError(423, 'shabbos', { kind: err.window.kind, reopensAt: err.window.end });
-        throw new HttpError(502, 'The text message could not be sent; nothing was sent');
+        throw new HttpError(502, 'The email could not be sent; nothing was sent');
       }
       await db.query(`UPDATE report SET status = 'sent', sent_at = $2 WHERE id = $1`, [r.id, now()]);
       await audit(req, 'send', 'report', r.id, { contact_id: c.id });

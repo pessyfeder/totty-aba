@@ -87,8 +87,8 @@ export async function renderReport({ h, api, app, logoutBtn, handle }, id) {
   });
   const save = () => api(`/reports/${id}`, { method: 'PATCH', body: collect() });
 
-  const eligible = client.contacts.filter((p) => p.phone && p.status === 'active' && p.consent_given_at);
-  const who = h('select', { name: 'contact', 'aria-label': 'Send to' }, eligible.map((p) => h('option', { value: p.id }, `${p.name} (${p.phone})`)));
+  const eligible = client.contacts.filter((p) => p.email && !p.email_bounced_at && p.status === 'active' && p.consent_given_at);
+  const who = h('select', { name: 'contact', 'aria-label': 'Send to' }, eligible.map((p) => h('option', { value: p.id }, `${p.name} (${p.email})`)));
   const actions = !draft
     ? h('p', { class: 'muted' }, r.status === 'sent'
         ? `Sent ${fmtDate(r.sent_at)}. The link expires ${fmtDate(r.link_expires_at)}. This report can no longer be edited.` : 'Finalized.')
@@ -101,11 +101,11 @@ export async function renderReport({ h, api, app, logoutBtn, handle }, id) {
         eligible.length
           ? h('span', { class: 'inline-form' }, who, h('button', { type: 'button', onclick: async () => {
               const p = eligible.find((x) => x.id === who.value);
-              if (!confirm(`Text a link to this report to ${p.name} at ${p.phone}? It goes out right now and cannot be undone or edited afterwards.`)) return;
+              if (!confirm(`Email a link to this report to ${p.name} at ${p.email}? It goes out right now and cannot be undone or edited afterwards.`)) return;
               msg.className = 'error'; msg.textContent = '';
               try { await save(); await api(`/reports/${id}/send`, { method: 'POST', body: { contact_id: p.id } }); await reload(); } catch (ex) { msg.textContent = ex.message; }
             } }, 'Send to parent'))
-          : h('span', { class: 'muted' }, 'To send, add a contact with a mobile number and recorded consent (client page > Edit contacts).'));
+          : h('span', { class: 'muted' }, 'To send, add a contact with an email address and recorded consent (client page > Edit contacts).'));
 
   app.replaceChildren(
     h('p', {}, h('a', { href: `#/client/${r.client_id}` }, `← ${c.client.first_name} ${c.client.last_name}`)),

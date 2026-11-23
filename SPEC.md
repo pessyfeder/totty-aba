@@ -134,7 +134,7 @@ Each contact logs goal data by **one** of three methods: **text message**, **ema
 - The family brings the completed log to a check-in. Totty enters the answers into the app by hand (the manual data entry in 5.5, with `source = 'paper'`; Y/N or minutes under the same value rules, `0` valid, limit 1440). Each entry is recorded in the audit log.
 - Days not entered show as **no response**, never as No (5.5). Entries can be made for past days at any time.
 - **Weekly appointment email**: a paper contact gets the weekly check-in as an **email** (not a text) inviting them to schedule an appointment, with the booking link, every 7 days (5.7a). It requires a contact email and recorded consent that covers email; without them, Totty reaches the family himself.
-- Report links (5.6) are unchanged: they still go by text to a paper contact who has a mobile number and recorded text consent.
+- Report links (5.6) go by email, like for every contact: a paper contact needs an email address and recorded consent that covers email.
 - Goals on the paper method are still add-and-archive only (5.2). Changing a contact's method affects only prompts created afterward.
 
 ### 5.4c Call-in line with a robot secretary (proposed, not built)
@@ -161,15 +161,15 @@ For families with **no internet** (no smartphone or computer, or no comfort with
 - Reports are created on demand: Totty clicks **Create report** on a client's page and picks a period: **bi-weekly** (14 days, two Sunday-Saturday weeks), **monthly** (calendar month), or **custom** (any start and end date). The default is the most recent completed 14 days. Nothing is generated or sent automatically.
 - Contents: client name, date range, per-goal summary (responses received, % met or average minutes, change vs. prior period, small chart), Totty's optional note, and next-period focus.
 - Totty previews and edits the report, then chooses **Send** or **Download PDF**. Sending is always a manual action.
-- Delivery: the PDF is stored in the app and sent to the parent as an **SMS containing a secure link** (no email delivery). The link is unguessable and expires after a set period (default 14 days), and the text itself contains no progress details, only the child's first name. Reports can only be created or sent outside the Shabbos window; the app is locked for Totty during it (see 5.3).
+- Delivery: the PDF is stored in the app and sent to the parent as an **email containing a secure link** (no SMS delivery). The link is unguessable and expires after a set period (default 14 days), and the email itself contains no progress details, only the child's first name. Reports can only be created or sent outside the Shabbos window; the app is locked for Totty during it (see 5.3).
 - Report history is viewable per client (period, type, status, date sent).
 - **How it works in v1:**
   - Period choices snap to whole periods: bi-weekly is always 14 days, Sunday to Saturday, monthly is a whole calendar month, custom allows up to one year. Create report builds a **draft** and opens the preview.
   - The report includes **every active goal**, even with no replies, plus any paused or archived goal that was asked something in the period. "Change vs. prior period" compares with the immediately preceding period of the same length.
   - Only answered prompts count: a day with no reply is shown as a missing mark and is never counted as No (5.5).
   - In the preview Totty can edit his note, the next-period focus, and a remark under each goal. Everything else is generated from the data and cannot be edited.
-  - **Download PDF** produces the current draft without changing anything. **Send to parent** asks Totty to pick a contact (active, with a mobile number and recorded consent), confirms, then freezes the report, stores the PDF, and texts the link right away. A report that has been sent cannot be edited or sent again; to send updated figures Totty creates a new report.
-  - The text reads: "A progress report for <first name> is ready: <link>". If the text cannot go out (including a Shabbos refusal), nothing is stored as sent and the report stays a draft.
+  - **Download PDF** produces the current draft without changing anything. **Send to parent** asks Totty to pick a contact (active, with an email address that has not bounced, and recorded consent), confirms, then freezes the report, stores the PDF, and emails the link right away. A report that has been sent cannot be edited or sent again; to send updated figures Totty creates a new report.
+  - The email's subject is "A progress report for <first name> is ready" and its body greets the parent and carries "A progress report for <first name> is ready: <link>" and the expiry. If the email cannot go out (including a Shabbos refusal, which is checked at send time and logged as refused), nothing is stored as sent and the report stays a draft. A hard bounce flags the contact (5.4b B). The email is written to the message log with the report.
   - The link opens the PDF with no login, until it expires (default 14 days, `REPORT_LINK_DAYS`). Only a hash of the token is stored. After expiry it shows a short "ask Totty for a new one" message. Opening the link is read-only, so it works during Shabbos; only Totty's actions are locked.
   - PDFs use standard Latin fonts: characters outside them (for example Hebrew in Totty's note or a remark) print as "?" in the PDF in v1.
 
