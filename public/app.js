@@ -139,9 +139,7 @@ async function renderClients() {
   logoutBtn.hidden = false;
   app.replaceChildren(...[
     h('div', { class: 'stats' },
-      h('h2', {}, 'Clients'),
-      h('span', { class: 'spacer' }),
-      h('a', { href: '#/archived', class: 'chip chip-archived' }, 'View Archived')),
+      h('h2', {}, 'Clients')),
     ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ ${c.kind === 'inquiry' ? 'Profile page email' : 'Initial consultation email'} for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
     d.clients.length ? clientSearch(d.clients) : h('p', { class: 'muted' }, 'No clients yet.'),
@@ -175,7 +173,7 @@ function clientSearch(clients) {
   search.addEventListener('input', draw);
   filter.addEventListener('change', draw);
   draw();
-  return h('div', {}, h('div', { class: 'client-search-bar' }, search, filter), list, empty);
+  return h('div', {}, h('div', { class: 'client-search-bar' }, search, filter, h('a', { href: '#/archived', class: 'chip chip-archived' }, 'View Archived')), list, empty);
 }
 
 const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString('en-US', { timeZone: 'America/New_York', hour: 'numeric', minute: '2-digit' });
