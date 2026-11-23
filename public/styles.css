@@ -21,7 +21,7 @@ body { margin: 0; font: 16px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sa
 h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em; margin: 0; }
 h2 { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; margin: 28px 0 10px; }
 .shell { display: flex; align-items: flex-start; }
-.shell { align-items: stretch; }
+.shell { align-items: stretch; min-height: calc(100vh - 57px); }
 .side-nav { flex: 0 0 160px; width: 160px; align-self: stretch; background: var(--card); border-right: 1px solid var(--line); box-shadow: 2px 0 8px rgba(23,48,45,.05); display: flex; flex-direction: column; gap: 4px; padding: 16px 10px; align-content: start; }
 [hidden].side-nav { display: none; }
 .nav-link { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; color: var(--text); text-decoration: none; font-weight: 600; }
@@ -29,7 +29,7 @@ h2 { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; margin: 28px 
 .nav-link[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
 .side-icon svg { display: block; width: 24px; height: 24px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 700px) {
-  .shell { flex-direction: column; align-items: stretch; }
+  .shell { flex-direction: column; align-items: stretch; min-height: 0; }
   .side-nav { position: static; flex: none; width: auto; align-self: auto; flex-direction: row; display: flex; overflow-x: auto; padding: 8px 14px; border-right: 0; border-bottom: 1px solid var(--line); box-shadow: none; }
   .nav-link { padding: 8px 12px; }
 }
