@@ -11,6 +11,8 @@ import { reportRoutes } from './report-routes.js';
 import { ensureDraft } from './consult-email.js';
 import * as consultEmail from './consult-email.js';
 import * as inquiryEmail from './inquiry-email.js';
+import * as consultText from './consult-text.js';
+import { textStatus } from './text-status.js';
 import { buildCheckinBody } from './scheduler.js';
 import { appointmentKind } from './calendar.js';
 import { infoRoutes } from './info-routes.js';
@@ -36,7 +38,7 @@ class HttpError extends Error {
   }
 }
 const bad = (msg) => new HttpError(400, msg);
-const MANUAL_STATUSES = ['to_be_scheduled', 'scheduled', 'missed', 'completed'];
+const MANUAL_STATUSES = ['scheduled', 'missed', 'completed'];
 const apptTime = (v) => { const d = new Date(v); if (Number.isNaN(d.getTime())) throw bad('Date and time is not valid'); return d; };
 
 const validTimezone = (tz) => {
@@ -260,7 +262,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     await audit(req, 'view', 'appointment', appt.id);
     res.json({ ...appt, goals, reinforcements });
   });
-  // Update an appointment: notes, status (to_be_scheduled / scheduled / missed / completed) and/or time.
+  // Update an appointment: notes, status (scheduled / missed / completed) and/or time.
   app.patch('/api/appointments/:id', async (req, res) => {
     const { rows: cur } = await db.query('SELECT * FROM appointment WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!cur.length) throw new HttpError(404, 'Not found');
@@ -275,8 +277,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       next.status = b.status;
     }
     if ('starts_at' in b) next.starts_at = b.starts_at ? apptTime(b.starts_at) : null;
-    if (next.status !== 'to_be_scheduled' && !next.starts_at) throw bad('A date and time is needed unless the appointment is still to be scheduled');
-    if (next.status === 'to_be_scheduled') next.starts_at = null;
+    if (!next.starts_at) throw bad('A date and time is needed');
     const { rows } = await db.query(
       `UPDATE appointment SET notes = $3, status = $4, starts_at = $5, ends_at = CASE WHEN $5::timestamptz IS DISTINCT FROM starts_at THEN NULL ELSE ends_at END, updated_at = $6
         WHERE id = $1 AND clinician_id = $2 RETURNING id, notes, status, starts_at`,
@@ -284,14 +285,15 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     await audit(req, 'update', 'appointment', rows[0].id, { fields: Object.keys(b).filter((k) => ['notes', 'status', 'starts_at'].includes(k)) });
     res.json(rows[0]);
   });
-  // Add an appointment to a client's list (e.g. one that still needs booking). The calendar sync never touches these.
+  // Add an appointment (with a date and time) to a client's list. The calendar sync never touches these.
   app.post('/api/clients/:id/appointments', async (req, res) => {
     const { rows: own } = await db.query('SELECT id FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!own.length) throw new HttpError(404, 'Not found');
     const b = req.body ?? {};
     const type = ['consultation', 'check-in'].includes(b.type) ? b.type : 'check-in';
-    const startsAt = b.starts_at ? apptTime(b.starts_at) : null;
-    const status = startsAt ? 'scheduled' : 'to_be_scheduled';
+    if (!b.starts_at) throw bad('A date and time is needed');
+    const startsAt = apptTime(b.starts_at);
+    const status = 'scheduled';
     const { rows } = await db.query(
       `INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at, status, source)
        VALUES ($1, $2, 'manual:' || gen_random_uuid(), $3, $4, $5, 'manual') RETURNING id, type, starts_at, ends_at, status, title, notes`,
@@ -356,7 +358,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       await ownedClient(req, req.params.id); // 404 if not theirs
       throw bad(from ? `Client must be at "${from}" first` : 'Client not found');
     }
-    if (next === 'paperwork_received') await ensureDraft(db, rows[0].id);
+    if (next === 'paperwork_received') { await ensureDraft(db, rows[0].id); await consultText.ensureDraft(db, rows[0].id); }
     if (next === 'inquiry') await inquiryEmail.ensureDraft(db, rows[0].id);
     await audit(req, 'update', 'client', rows[0].id, { fields: ['intake_status'] });
     return rows[0];
@@ -392,6 +394,30 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     if (!(await consultEmail.cancel(db, req.params.id))) throw bad('There is no unsent consultation email to cancel');
     await audit(req, 'cancel', 'consult_email', req.params.id);
     res.json(await consultEmail.preview(db, req.params.id));
+  });
+
+  // ---- Initial consultation text: drafted with the email at "information submitted", sent only after Totty approves ----
+  app.get('/api/clients/:id/consult-text', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    res.json(await consultText.preview(db, req.params.id, now));
+  });
+  app.post('/api/clients/:id/consult-text/approve', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    try { await consultText.approve(db, req.params.id); } catch (e) { throw bad(e.message); }
+    await audit(req, 'approve', 'consult_text', req.params.id);
+    if (messenger) await consultText.sendApproved({ db, messenger, now, clientId: req.params.id });
+    res.json(await consultText.preview(db, req.params.id, now));
+  });
+  app.post('/api/clients/:id/consult-text/cancel', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    if (!(await consultText.cancel(db, req.params.id))) throw bad('There is no unsent consultation text to cancel');
+    await audit(req, 'cancel', 'consult_text', req.params.id);
+    res.json(await consultText.preview(db, req.params.id, now));
+  });
+  // Where every automatic text for this client stands, and why any cannot go out.
+  app.get('/api/clients/:id/text-status', async (req, res) => {
+    await ownedClient(req, req.params.id);
+    res.json(await textStatus(db, req.params.id, now()));
   });
 
   // ---- First reply to a new inquiry (SPEC 5.1a): drafted at "reached out", sent only after Totty approves ----

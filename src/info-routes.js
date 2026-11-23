@@ -6,6 +6,7 @@
 // Totty's approval. Typed signatures are stamped with the time of submission. Nothing is contacted automatically.
 import { fileURLToPath } from 'node:url';
 import { ensureDraft } from './consult-email.js';
+import { ensureDraft as ensureTextDraft } from './consult-text.js';
 
 const clean = (v, max = 500) => String(v ?? '').trim().slice(0, max);
 const GENDERS = ['Male', 'Female'];
@@ -32,7 +33,7 @@ export const TEXT = {
     'fav_toys', 'fav_foods', 'fav_social', 'fav_sensory', 'fav_screen', 'fav_other'),
   ...Object.fromEntries(['nj', 'ny'].flatMap((p) => [1, 2, 3, 4, 5].map((i) => [`${p}_i${i}`, 6]))), // typed initials
 };
-const BOOL = ['pref_text', 'pref_email', 'pref_call', 'p2_pref_text', 'p2_pref_email', 'p2_pref_call', 'consent_ack', 'fee_ack'];
+const BOOL = ['pref_text', 'pref_email', 'pref_call', 'p2_pref_text', 'p2_pref_email', 'p2_pref_call', 'text_consent', 'p2_text_consent', 'consent_ack', 'fee_ack'];
 const CHOICE = { gender: GENDERS, state: STATES, pay_due: ['session', 'other'], roi_direction: ['share', 'receive', 'both'] };
 const DATES = ['dob', 'ny_dx_date', 'roi_until'];
 const SIGS = ['consent_sig', 'roi_sig', 'loc_sig'];
@@ -95,20 +96,22 @@ export async function createClientFromForm(db, clinician, f, at) {
     [clinician.id, f.child_first_name, f.child_last_name, f.gender || null, f.dob || null, at, f.anything_else || null, place || null, f.street || null, f.city || null,
       f.state || null, f.zip || null, clinician.latitude, clinician.longitude, clinician.timezone, Boolean(clinician.in_israel), JSON.stringify(f), f.consent_sig]);
   try {
-    // Consent to text / email is collected at the initial consultation (Initial Consultation Form) and recorded by Totty on the contact.
+    // Text consent is the parent's own tick on the form (optional); otherwise Totty records it on the contact at the consultation.
+    const CONSENT_NOTE = 'Agreed to receive texts on the online intake form';
     await db.query(
-      `INSERT INTO contact (client_id, name, relationship, phone, email, language, preferred_channel)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      `INSERT INTO contact (client_id, name, relationship, phone, email, language, preferred_channel, consent_given_at, consent_note)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [c.id, f.parent_name, f.parent_relationship || null, normalizePhone(f.phone), f.email, LANGUAGES[(f.language ?? '').toLowerCase()] ?? 'en',
-        f.pref_call && !f.pref_text ? 'call' : 'sms']);
+        f.pref_call && !f.pref_text ? 'call' : 'sms', f.text_consent ? at : null, f.text_consent ? CONSENT_NOTE : null]);
     if (f.p2_name) {
       await db.query(
-        `INSERT INTO contact (client_id, name, relationship, phone, email, language, preferred_channel)
-         VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+        `INSERT INTO contact (client_id, name, relationship, phone, email, language, preferred_channel, consent_given_at, consent_note)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
         [c.id, f.p2_name, f.p2_relationship || null, normalizePhone(f.p2_phone), f.p2_email || null, LANGUAGES[(f.language ?? '').toLowerCase()] ?? 'en',
-          f.p2_pref_call && !f.p2_pref_text ? 'call' : 'sms']);
+          f.p2_pref_call && !f.p2_pref_text ? 'call' : 'sms', f.p2_text_consent && f.p2_phone ? at : null, f.p2_text_consent && f.p2_phone ? CONSENT_NOTE : null]);
     }
     await ensureDraft(db, c.id);
+    await ensureTextDraft(db, c.id);
   } catch (e) {
     await db.query('DELETE FROM client WHERE id = $1', [c.id]); // never leave a half-made client behind
     throw e;

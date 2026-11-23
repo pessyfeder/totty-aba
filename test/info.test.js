@@ -110,3 +110,14 @@ test('the new clients show up for Totty, and the old waiting list and per-client
   assert.equal((await staff('/intake-submissions')).status, 404);
   assert.equal((await staff('/clients', 'POST', { first_name: 'A', last_name: 'B' })).status, 404);
 });
+
+test('a ticked text-consent box records consent on that parent\'s contact, so the consult text can be approved', async () => {
+  const res = await submit({ ...full, child_first_name: 'Texty', text_consent: true, p2_name: 'Dov Levi', p2_phone: '5555550199', p2_text_consent: false });
+  assert.equal(res.status, 200);
+  const [c] = await clientNamed('Texty');
+  const { rows } = await db.query('SELECT name, consent_given_at, consent_note FROM contact WHERE client_id = $1 ORDER BY name DESC', [c.id]); // Rivka before Dov
+  assert.ok(rows[0].consent_given_at && /intake form/.test(rows[0].consent_note));
+  assert.equal(rows[1].consent_given_at, null, 'the second parent did not tick it');
+  const { rows: [t] } = await db.query('SELECT status FROM consult_text WHERE client_id = $1', [c.id]);
+  assert.equal(t.status, 'pending_approval');
+});

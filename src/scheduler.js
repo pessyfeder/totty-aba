@@ -19,10 +19,10 @@ export function buildBody(row, { reminder = false } = {}) {
   return `${reminder ? 'Reminder: ' : ''}Hi, ${row.contact_name}. ${code}${question} ${how}`;
 }
 
-const CHECKIN_FIRST_AFTER_DAYS = 7;
+export const CHECKIN_FIRST_AFTER_DAYS = 7;
 // "Consistently responding": the first check-in text goes out only once the parent answered at least this share of the last 7 days' prompts.
-const CONSISTENT_SHARE = 0.7;
-const CHECKIN_EVERY_DAYS = 14;
+export const CONSISTENT_SHARE = 0.7;
+export const CHECKIN_EVERY_DAYS = 14;
 
 export function buildCheckinBody(row, link) {
   return `Time to schedule a check-in for ${row.first_name} with Yisroel Feder, BCBA, LBA: ${link}. ` +

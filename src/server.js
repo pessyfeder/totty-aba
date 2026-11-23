@@ -6,6 +6,7 @@ import { createMessenger, consoleProvider, telnyxProvider } from './messaging.js
 import { createScheduler } from './scheduler.js';
 import { consoleMailer, sendApproved, smtpMailer, unconfiguredMailer } from './consult-email.js';
 import { sendApproved as sendApprovedInquiry } from './inquiry-email.js';
+import { sendApproved as sendApprovedText } from './consult-text.js';
 
 const env = process.env;
 const production = env.NODE_ENV === 'production';
@@ -60,6 +61,7 @@ setInterval(async () => {
     await scheduler.tick();
     await sendApproved({ db, mailer }); // approved consultation emails that waited out a Shabbos window
     await sendApprovedInquiry({ db, mailer }); // same for first-reply emails
+    await sendApprovedText({ db, messenger }); // and approved consultation texts (sent after nightfall, retried up to 3 times)
   } catch (err) {
     console.error('scheduler tick failed:', err);
   } finally {

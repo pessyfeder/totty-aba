@@ -114,29 +114,57 @@ function consentSection({ h }, c) {
 const consultEmailSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
   path: 'consult-email', title: 'Initial consultation email', name: 'consultation email', hint: 'Information submitted. Review this email to the family and approve it to send.' });
 
+/** Initial consultation text: sent alongside the email, after Totty approves the exact wording. */
+const consultTextSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
+  path: 'consult-text', title: 'Initial consultation text', name: 'consultation text', icon: '💬', hint: 'Information submitted. Review this text to the family and approve it to send.' });
+
 /** First reply to a new inquiry (SPEC 5.1a): carries the client information page link. */
 const inquiryEmailSection = (ctx, id, reload) => emailSection(ctx, id, reload, {
   path: 'inquiry-email', title: 'Profile page email', name: 'first reply email', hint: 'Reached out. Review this email to the family, with the link to the profile page for them to fill out, and approve it to send.' });
 
-async function emailSection({ h, api, handle }, id, reload, { path, title, name, hint }) {
+async function emailSection({ h, api, handle }, id, reload, { path, title, name, hint, icon = '✉' }) {
   const e = await api(`/clients/${id}/${path}`);
   const cap = name[0].toUpperCase() + name.slice(1);
   if (!e) return null;
   if (e.status === 'cancelled') return { badge: 'Declined', node: h('p', { class: 'muted' }, `${cap}: not sent (you declined it).`) };
   const act = (p) => api(`/clients/${id}/${path}/${p}`, { method: 'POST' }).then(reload, handle);
-  if (e.status === 'sent') return { badge: 'Sent', cls: 'ok', node: h('p', { class: 'ok-line' }, `✉ ${cap} sent to ${e.to} on ${String(e.sent_at).slice(0, 10)}.`) };
+  if (e.status === 'sent') return { badge: 'Sent', cls: 'ok', node: h('p', { class: 'ok-line' }, `${icon} ${cap} sent to ${e.to} on ${String(e.sent_at).slice(0, 10)}.`) };
   if (e.status === 'failed') return { badge: 'Failed', cls: 'bad', node: h('p', { class: 'warn-line' }, `⚠ The ${name} could not be sent: ${e.last_error ?? 'unknown error'}`) };
   const approved = e.status !== 'pending_approval';
   const node = h('div', {},
     approved
-      ? h('p', { class: 'ok-line' }, '✉ Approved. It goes out as soon as it can (not during Shabbos or Yom Tov).')
+      ? h('p', { class: 'ok-line' }, e.queued_until
+          ? `${icon} Approved and queued: it goes out after Shabbos / Yom Tov ends (${new Date(e.queued_until).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}).`
+          : `${icon} Approved. It goes out as soon as it can (not during Shabbos or Yom Tov).`)
       : h('p', { class: 'muted' }, hint),
     ...e.problems.map((p) => h('p', { class: 'warn-line' }, `⚠ ${p}`)),
     e.last_error ? h('p', { class: 'warn-line' }, `⚠ Last attempt failed: ${e.last_error}`) : '',
-    e.text ? h('div', { class: 'card' }, h('div', { class: 'muted' }, `To: ${e.to}`), h('strong', {}, e.subject), h('pre', { style: 'white-space: pre-wrap; font: inherit' }, e.text)) : '',
+    e.text ? h('div', { class: 'card' }, h('div', { class: 'muted' }, e.to ? `To: ${e.to}` : 'To: (no recipient yet)'), e.subject ? h('strong', {}, e.subject) : '', h('pre', { style: 'white-space: pre-wrap; font: inherit' }, e.text)) : '',
     h('button', { type: 'button', disabled: approved || e.problems.length > 0, onclick: () => act('approve') }, 'Approve and send'), ' ',
     h('button', { type: 'button', class: 'link', onclick: () => { if (confirm(`Don't send the ${name}?`)) act('cancel'); } }, approved ? 'Cancel' : 'Decline'));
   return { badge: approved ? 'Approved' : 'Needs approval', cls: approved ? 'ok' : 'bad', node };
+}
+
+/** Automatic texts at a glance: the consultation text, the next check-in text, the latest goal prompt, and why texts can't go out. */
+async function textStatusSection({ h, api }, id) {
+  const s = await api(`/clients/${id}/text-status`);
+  const when = (iso) => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const rows = [];
+  if (s.consult) {
+    const c = s.consult;
+    rows.push(['Consultation text', c.status === 'sent' ? `Sent to ${c.to} on ${String(c.sent_at).slice(0, 10)}`
+      : c.status === 'approved' && c.queued_until ? `Queued until ${when(c.queued_until)} (Shabbos / Yom Tov)` : c.label]);
+  }
+  for (const k of s.checkins) {
+    rows.push([`Next check-in text (${k.contact})`, k.state === 'due'
+      ? `${new Date(k.due_at) <= new Date() ? 'Due now' : `Due ${when(k.due_at)}`}, carries the booking link${k.note ? `. ${k.note}` : ''}`
+      : k.note]);
+  }
+  if (s.last_prompt) rows.push(['Last goal prompt', `${s.last_prompt.title}: ${STATUS[s.last_prompt.status] ?? s.last_prompt.status}, ${when(s.last_prompt.scheduled_for)} (details under Today and the response log)`]);
+  const node = h('div', {},
+    ...s.reasons.map((r) => h('p', { class: 'warn-line' }, `⚠ ${r}`)),
+    rows.length ? h('table', { class: 'compact' }, h('tbody', {}, rows.map(([k, v]) => h('tr', {}, h('td', {}, k), h('td', {}, v))))) : h('p', { class: 'muted' }, 'No automatic texts yet.'));
+  return { badge: s.reasons.length ? 'Blocked' : 'OK', cls: s.reasons.length ? 'bad' : 'ok', node };
 }
 
 const ICON = {
@@ -207,6 +235,8 @@ export async function renderClient(ctx, id, tab = 'profile') {
 
   const consent = consentSection(ctx, c);
   const consultEmail = await consultEmailSection(ctx, id, reload).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
+  const consultText = await consultTextSection(ctx, id, reload).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
+  const textStatus = await textStatusSection(ctx, id).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
   const inquiryEmail = await inquiryEmailSection(ctx, id, reload).catch((e) => ({ badge: 'Error', cls: 'bad', node: h('p', { class: 'error' }, e.message) }));
   const reports = await reportsSection(ctx, id);
   const responseLog = await responseLogSection(ctx, id);
@@ -258,14 +288,14 @@ export async function renderClient(ctx, id, tab = 'profile') {
   intakeSection.hidden = isActive;
   const editStatusBtn = h('button', { type: 'button', onclick: () => { intakeSection.hidden = !intakeSection.hidden; } }, 'Edit status');
 
-  const APPT = { to_be_scheduled: 'To be scheduled', scheduled: 'Scheduled', missed: 'Missed', completed: 'Completed', cancelled: 'Cancelled' };
+  const APPT = { scheduled: 'Scheduled', missed: 'Missed', completed: 'Completed', cancelled: 'Cancelled' };
   const apptWhen = (a) => (a.starts_at ? new Date(a.starts_at).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No date yet');
   const apptAct = (a, body) => api(`/appointments/${a.id}`, { method: 'PATCH', body }).then(reload, handle);
   const localInput = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   const apptRow = (a) => {
     const needsOutcome = a.status === 'scheduled' && new Date(a.starts_at) < new Date();
     const when = h('input', { type: 'datetime-local', 'aria-label': 'Date and time', value: a.starts_at ? localInput(a.starts_at) : '' });
-    const setTime = h('button', { type: 'button', onclick: () => { if (when.value) apptAct(a, { status: 'scheduled', starts_at: new Date(when.value).toISOString() }); } }, a.status === 'to_be_scheduled' ? 'Set time' : 'Reschedule');
+    const setTime = h('button', { type: 'button', onclick: () => { if (when.value) apptAct(a, { status: 'scheduled', starts_at: new Date(when.value).toISOString() }); } }, 'Reschedule');
     const mark = (label, status) => h('button', { type: 'button', class: 'link', onclick: () => apptAct(a, { status }) }, label);
     return h('tr', {},
       h('td', {}, apptWhen(a), needsOutcome ? h('div', { class: 'warn-line' }, 'Did it happen?') : ''),
@@ -283,11 +313,11 @@ export async function renderClient(ctx, id, tab = 'profile') {
   ], 'Add appointment', async (f) => {
     await post('/appointments', { type: f.get('type'), starts_at: new Date(f.get('starts_at')).toISOString() });
   });
-  const groupOrder = ['to_be_scheduled', 'scheduled', 'missed', 'completed', 'cancelled'];
+  const groupOrder = ['scheduled', 'missed', 'completed', 'cancelled'];
   const apptTab = [
     addHead(h, 'Appointments', 'Add appointment', addAppt),
     h('p', { class: 'muted' }, 'Appointments booked on the calendar appear here automatically. Mark each as completed or missed afterwards.'),
-    h('div', { class: 'appt-counts' }, groupOrder.slice(1, 4).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
+    h('div', { class: 'appt-counts' }, groupOrder.slice(0, 3).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
     ...groupOrder.map((s) => {
       const list = c.appointments.filter((a) => a.status === s);
       return list.length ? h('section', {}, h('h3', {}, APPT[s]), h('table', { class: 'compact' }, h('tbody', {}, list.map(apptRow)))) : '';
@@ -382,6 +412,8 @@ export async function renderClient(ctx, id, tab = 'profile') {
       chip(h, 'details', 'Client details', c.state ?? '', detailsBody, { action: { icon: 'edit', label: 'Edit client details', onclick: detailsEd.toggle } }),
       inquiryEmail ? chip(h, 'inquiry', 'Profile page email', '', inquiryEmail.node, inquiryEmail) : '',
       consultEmail ? chip(h, 'consult', 'Initial consultation email', '', consultEmail.node, consultEmail) : '',
+      consultText ? chip(h, 'consulttext', 'Initial consultation text', '', consultText.node, consultText) : '',
+      chip(h, 'texts', 'Automatic texts', '', textStatus.node, textStatus),
       chip(h, 'contacts', 'Contact info', `${c.contacts.length} ${c.contacts.length === 1 ? 'contact' : 'contacts'}${noPhone ? ` · ${noPhone} without consent` : ''}`, contactsEd.box, { action: { icon: 'edit', label: 'Edit contacts', onclick: contactsEd.toggle } }),
       chip(h, 'reinf', 'Preferred reinforcements', c.reinforcements.map((i) => i.name).join(', '), reinfBody,
         { action: { icon: 'add', label: 'Add reinforcement', onclick: () => { reinforcementPick.hidden = false; reinforcementPick.focus(); } } }),

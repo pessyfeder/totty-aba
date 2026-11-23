@@ -4,6 +4,7 @@
 const GENDERS = ['Male', 'Female'];
 const STATES = [['NJ', 'New Jersey'], ['NY', 'New York']];
 
+const TEXT_CONSENT = 'I agree to receive text messages from BTB at this mobile number (consultation and appointment links, daily goal questions). Message and data rates may apply. Reply STOP at any time to opt out.';
 const CONSENT_ITEMS = [
   'Services provided by The BTB Method are parent/caregiver/educator-focused behavioral guidance, delivered by a licensed Behavior Analyst (BCBA/LBA). Services are provided directly to me as the parent/caregiver/educator, not as direct treatment to my child.',
   'Participation is voluntary. I may pause or stop services at any time, for any reason.',
@@ -142,11 +143,13 @@ export async function renderInfoPage({ h, app }) {
         text('phone', 'Mobile phone', { type: 'tel', req: true, auto: 'tel', ph: '(555) 555-0123' }), text('email', 'Email', { type: 'email', req: true, auto: 'email' })),
       h('h4', {}, 'Preferred contact method (check all that apply)'),
       h('div', { class: 'checks' }, check('pref_text', 'Text'), check('pref_email', 'Email'), check('pref_call', 'Phone call')),
+      check('text_consent', TEXT_CONSENT),
       h('h4', {}, 'Second parent / caregiver (optional)'),
       grid(text('p2_name', 'Full name'), text('p2_relationship', 'Relationship to child'),
         text('p2_phone', 'Mobile phone', { type: 'tel', ph: '(555) 555-0123' }), text('p2_email', 'Email', { type: 'email' })),
       h('h4', {}, 'Preferred contact method (check all that apply)'),
-      h('div', { class: 'checks' }, check('p2_pref_text', 'Text'), check('p2_pref_email', 'Email'), check('p2_pref_call', 'Phone call'))),
+      h('div', { class: 'checks' }, check('p2_pref_text', 'Text'), check('p2_pref_email', 'Email'), check('p2_pref_call', 'Phone call')),
+      check('p2_text_consent', TEXT_CONSENT)),
 
     section('2. Communication Preferences', null,
       grid(text('language', 'Language', { ph: 'e.g. English' }))),
