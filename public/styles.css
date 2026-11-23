@@ -153,7 +153,7 @@ table.compact th, table.compact td { padding: 6px 10px; font-size: .88rem; }
   table.appts td:first-child { font-weight: 600; }
 }
 /* Dashboard home: three centered option tiles (icon, link title, description) */
-.options-heading { font-size: 1.6rem; margin: 28px 0 18px; color: var(--accent); }
+.options-heading { font-size: 1.2rem; margin: 10px 0 10px; color: var(--accent); }
 .options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
 a.option { display: grid; justify-items: center; align-content: start; gap: 10px; text-align: center; text-decoration: none; color: var(--text); padding: 22px 14px; background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); transition: border-color .15s, transform .1s; }
 a.option:hover { border-color: var(--accent); transform: translateY(-1px); }
@@ -277,17 +277,17 @@ button.danger { color: #b00020; border-color: #b00020; }
 .badge.appt-cancelled { background: var(--line); color: var(--muted); }
 a.appt-chip.appt-chip-held { border-left-color: #166534; background: #dcfce7; }
 .outcome-note { margin: 6px 0 0; white-space: pre-wrap; }
-.upcoming-card { background: var(--card); border: 1px solid var(--line); border-top: 4px solid var(--accent); border-radius: 20px; box-shadow: var(--shadow); padding: 20px 24px 22px; margin-bottom: 28px; }
-.upcoming-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
-.upcoming-head h3 { margin: 0; font-size: 1.3rem; color: var(--accent); }
-.upcoming-icon svg { width: 30px; height: 30px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
-.upcoming-all { margin-left: auto; font-weight: 600; text-decoration: none; }
-.upcoming-days { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); }
-.upcoming-day-label { font-size: .78rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 6px; }
-.upcoming-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
-a.upcoming-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; min-height: 48px; background: var(--bg); border: 1px solid transparent; border-left: 3px solid var(--accent); border-radius: 12px; color: var(--text); text-decoration: none; transition: border-color .15s; }
+.upcoming-card { background: var(--card); border: 1px solid var(--line); border-top: 3px solid var(--accent); border-radius: 12px; box-shadow: var(--shadow); padding: 12px 16px 14px; margin-bottom: 14px; }
+.upcoming-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.upcoming-head h3 { margin: 0; font-size: 1rem; color: var(--accent); }
+.upcoming-icon svg { width: 20px; height: 20px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; display: block; }
+.upcoming-all { margin-left: auto; font-size: .82rem; font-weight: 600; text-decoration: none; }
+.upcoming-days { display: grid; gap: 10px 14px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); }
+.upcoming-day-label { font-size: .7rem; font-weight: 650; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 3px; }
+.upcoming-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; }
+a.upcoming-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; min-height: 0; font-size: .85rem; background: var(--bg); border: 1px solid transparent; border-left: 3px solid var(--accent); border-radius: 8px; color: var(--text); text-decoration: none; transition: border-color .15s; }
 a.upcoming-row:hover { border-color: var(--accent); }
-.upcoming-time { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 4.5em; }
+.upcoming-time { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 4em; }
 .upcoming-who { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 @media (max-width: 520px) {
   .upcoming-card { padding: 16px; }
@@ -400,3 +400,6 @@ details.days-pick > summary::after { content: ""; flex: none; width: 12px; heigh
 .time-bubbles { margin-top: 6px; display: flex; gap: 6px; flex-wrap: wrap; }
 
 .compact textarea[aria-label="Outcome note"] { width: 100%; min-width: 14rem; display: block; margin: 6px 0; }
+
+.upcoming-row .badge, .upcoming-head .badge, .upcoming-row .chip-attn { font-size: .72rem; padding: 1px 7px; }
+.upcoming-card .muted { margin: 0; font-size: .85rem; }
