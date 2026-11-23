@@ -7,11 +7,11 @@ const RANGES = [['week', '1 week'], ['month', '1 month'], ['3months', '3 months'
 const TREND = { improving: 'Improving', flat: 'Flat', declining: 'Declining', not_enough_data: 'Not enough data yet' };
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const STATUS = { scheduled: 'Scheduled', deferred: 'Deferred', sending: 'Sending', sent: 'Sent', answered: 'Answered', no_response: 'No response', skipped: 'Skipped', failed: 'Failed' };
-const INTAKE = { inquiry: 'Reached out', paperwork_received: 'Information submitted', baseline: 'Baseline', active: 'Active' };
+const INTAKE = { inquiry: 'Reached out', information_submitted: 'Information submitted', baseline: 'Baseline', active: 'Active' };
 // What Yisroel should do next at each status (SPEC 5.1a).
 const NEXT_STEP = {
   inquiry: 'Reached out: send the email with the link to the profile page for the parents to fill out and submit (review and approve it below).',
-  paperwork_received: 'Information submitted: send the initial consultation email with the document explaining what will be discussed (review and approve it below). At the consultation, set the goals and plan, then press Activate.',
+  information_submitted: 'Information submitted: send the initial consultation email with the document explaining what will be discussed (review and approve it below). At the consultation, set the goals and plan, then press Activate.',
   baseline: 'Baseline: prompts are going to the parents. After a week of consistent replies the parent is texted to schedule the first check-in; the client becomes Active after that appointment.',
 };
 // "18:30" -> "6:30 pm"
@@ -288,7 +288,7 @@ export async function renderClient(ctx, id, tab = 'profile') {
   const intakeSection = h('div', { class: 'intake' },
     h('div', {}, 'Change status: ', statusSelect),
     isActive ? '' : [
-      c.intake_status === 'paperwork_received'
+      c.intake_status === 'information_submitted'
         ? h('button', { type: 'button', onclick: () => {
           if (!confirm(`Activate ${c.first_name} ${c.last_name}? Prompts will start going to the family.`)) return;
           api(`/clients/${id}/intake-status`, { method: 'POST', body: { intake_status: 'active' } }).then(reload, handle);

@@ -47,7 +47,7 @@ test('the text is plain: the child\'s first name and the link only', () => {
 test('no draft before information is submitted; reaching that status drafts one, waiting for approval, and sends nothing', async () => {
   const c = await newClient('Moshe');
   assert.equal((await textOf(c.id)).json, null);
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   const t = (await textOf(c.id)).json;
   assert.equal(t.status, 'pending_approval');
   assert.equal(t.to, '+15555550123');
@@ -60,7 +60,7 @@ test('no draft before information is submitted; reaching that status drafts one,
 
 test('approval sends once and only once; declining stops it', async () => {
   const c = await newClient('Yosef');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   const ok = await call('POST', `/api/clients/${c.id}/consult-text/approve`);
   assert.equal(ok.status, 200, JSON.stringify(ok.json));
   assert.equal(ok.json.status, 'sent');
@@ -70,11 +70,11 @@ test('approval sends once and only once; declining stops it', async () => {
   await sendApproved({ db, messenger: env.messenger, now: env.now });
   assert.equal(consultTexts().length, 1);
   await setStatus(c.id, 'baseline');
-  await setStatus(c.id, 'paperwork_received'); // re-reaching the status makes no second draft
+  await setStatus(c.id, 'information_submitted'); // re-reaching the status makes no second draft
   assert.equal((await textOf(c.id)).json.status, 'sent');
 
   const d = await newClient('Avrumi');
-  await setStatus(d.id, 'paperwork_received');
+  await setStatus(d.id, 'information_submitted');
   assert.equal((await call('POST', `/api/clients/${d.id}/consult-text/cancel`)).json.status, 'cancelled');
   assert.equal((await call('POST', `/api/clients/${d.id}/consult-text/approve`)).status, 400);
   assert.equal(consultTexts().length, 1);
@@ -82,7 +82,7 @@ test('approval sends once and only once; declining stops it', async () => {
 
 test('no recorded consent, or no number: a warning, approval refused, nothing sent', async () => {
   const c = await newClient('Dovid2', { consent: false });
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   const t = (await textOf(c.id)).json;
   assert.match(t.problems[0], /consent/i);
   const n = env.sent.length;
@@ -97,13 +97,13 @@ test('no recorded consent, or no number: a warning, approval refused, nothing se
   assert.equal((await call('POST', `/api/clients/${c.id}/consult-text/approve`)).json.status, 'sent');
 
   const d = await newClient('Nophone', { phone: '' });
-  await setStatus(d.id, 'paperwork_received');
+  await setStatus(d.id, 'information_submitted');
   assert.match((await textOf(d.id)).json.problems[0], /mobile number/);
 });
 
 test('an approved text is queued through Shabbos and sent after nightfall', async () => {
   const c = await newClient('Shmuel');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   await approve(db, c.id); // approved, not yet sent
   const n = consultTexts().length;
   env.at('2026-11-07T15:00:00Z'); // Shabbos afternoon
@@ -120,7 +120,7 @@ test('an approved text is queued through Shabbos and sent after nightfall', asyn
 
 test('a failing send retries then gives up and says why; a moved-on or archived client is not texted', async () => {
   const c = await newClient('Berel');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   await approve(db, c.id);
   const boom = { async send() { throw new Error('carrier down'); } };
   for (let i = 0; i < 3; i++) {
@@ -140,11 +140,11 @@ test('a failing send retries then gives up and says why; a moved-on or archived 
   assert.match(t.last_error, /carrier down/);
 
   const d = await newClient('Zalman');
-  await setStatus(d.id, 'paperwork_received');
+  await setStatus(d.id, 'information_submitted');
   await approve(db, d.id);
   await setStatus(d.id, 'baseline'); // consult booked by other means
   const e = await newClient('Archie');
-  await setStatus(e.id, 'paperwork_received');
+  await setStatus(e.id, 'information_submitted');
   await approve(db, e.id);
   await call('POST', `/api/clients/${e.id}/archive`, {});
   const n = env.sent.length;
@@ -168,7 +168,7 @@ test('the status summary explains why texts cannot go out, and is private to the
 
   const { rows: [other] } = await db.query(`INSERT INTO clinician (name, email, password_hash, timezone, latitude, longitude) VALUES ('X', 'x2@example.test', 'x', 'America/New_York', 40, -74) RETURNING id`);
   const { rows: [theirs] } = await db.query(
-    `INSERT INTO client (clinician_id, first_name, last_name, admission_date, latitude, longitude, timezone, intake_status) VALUES ($1, 'A', 'B', '2026-11-01', 40, -74, 'America/New_York', 'paperwork_received') RETURNING id`, [other.id]);
+    `INSERT INTO client (clinician_id, first_name, last_name, admission_date, latitude, longitude, timezone, intake_status) VALUES ($1, 'A', 'B', '2026-11-01', 40, -74, 'America/New_York', 'information_submitted') RETURNING id`, [other.id]);
   assert.equal((await call('GET', `/api/clients/${theirs.id}/text-status`)).status, 404);
   assert.equal((await call('POST', `/api/clients/${theirs.id}/consult-text/approve`)).status, 404);
 });

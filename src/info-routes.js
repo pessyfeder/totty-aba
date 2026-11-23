@@ -92,7 +92,7 @@ export async function createClientFromForm(db, clinician, f, at) {
   const { rows: [c] } = await db.query(
     `INSERT INTO client (clinician_id, first_name, last_name, gender, dob, admission_date, notes, location_name, street_address, city, state, zip,
                          latitude, longitude, timezone, in_israel, intake_status, intake_form, info_submitted_at, consent_signed_at, consent_signed_by)
-     VALUES ($1, $2, $3, $4, $5, $6::timestamptz::date, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'paperwork_received', $17::jsonb, $6, $6, $18) RETURNING id`,
+     VALUES ($1, $2, $3, $4, $5, $6::timestamptz::date, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, 'information_submitted', $17::jsonb, $6, $6, $18) RETURNING id`,
     [clinician.id, f.child_first_name, f.child_last_name, f.gender || null, f.dob || null, at, f.anything_else || null, place || null, f.street || null, f.city || null,
       f.state || null, f.zip || null, clinician.latitude, clinician.longitude, clinician.timezone, Boolean(clinician.in_israel), JSON.stringify(f), f.consent_sig]);
   try {

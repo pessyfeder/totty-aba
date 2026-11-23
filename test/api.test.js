@@ -245,7 +245,7 @@ test('Start baseline works from information submitted and is refused from any ot
   const c = await mk({ first_name: 'Go', last_name: 'Test', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   assert.equal(c.json.intake_status, 'inquiry');
   assert.equal((await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} })).status, 400);
-  await db.query(`UPDATE client SET intake_status = 'paperwork_received' WHERE id = $1`, [c.json.id]);
+  await db.query(`UPDATE client SET intake_status = 'information_submitted' WHERE id = $1`, [c.json.id]);
   const go = await call(`/api/clients/${c.json.id}/go`, { method: 'POST', cookie, body: {} });
   assert.equal(go.status, 200);
   assert.equal(go.json.intake_status, 'baseline');
@@ -258,7 +258,7 @@ test('status can be moved by hand; and an active client can be moved back', asyn
   const { cookie } = await login();
   const c = await mk({ first_name: 'In', last_name: 'Take', admission_date: '2026-10-01', timezone: 'America/New_York', latitude: 40.6, longitude: -73.9 });
   const set = (v) => call(`/api/clients/${c.json.id}/intake-status`, { method: 'POST', cookie, body: { intake_status: v } });
-  assert.equal((await set('paperwork_received')).json.intake_status, 'paperwork_received');
+  assert.equal((await set('information_submitted')).json.intake_status, 'information_submitted');
   assert.equal((await set('bogus')).status, 400);
   assert.equal((await set('baseline')).json.intake_status, 'baseline');
   const act = await set('active');

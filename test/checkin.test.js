@@ -57,7 +57,7 @@ test('nothing is sent without a link, consent, an active contact, or a started c
   await db.query(`UPDATE contact SET consent_given_at = now(), status = 'paused'`);
   await scheduler.sendCheckins(env.now());
   await db.query(`UPDATE contact SET status = 'active'`);
-  await db.query(`UPDATE client SET intake_status = 'paperwork_received'`);
+  await db.query(`UPDATE client SET intake_status = 'information_submitted'`);
   await scheduler.sendCheckins(env.now());
   assert.equal(checkins().length, 0);
 });

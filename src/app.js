@@ -379,7 +379,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
       await ownedClient(req, req.params.id); // 404 if not theirs
       throw bad(from ? `Client must be at "${from}" first` : 'Client not found');
     }
-    if (next === 'paperwork_received') { await ensureDraft(db, rows[0].id); await consultText.ensureDraft(db, rows[0].id); }
+    if (next === 'information_submitted') { await ensureDraft(db, rows[0].id); await consultText.ensureDraft(db, rows[0].id); }
     if (next === 'inquiry') await inquiryEmail.ensureDraft(db, rows[0].id);
     await audit(req, 'update', 'client', rows[0].id, { fields: ['intake_status'] });
     return rows[0];
@@ -394,11 +394,11 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
 
   app.post('/api/clients/:id/intake-status', async (req, res) => {
     const next = req.body?.intake_status;
-    if (!['inquiry', 'paperwork_received', 'baseline', 'active'].includes(next)) throw bad('Invalid intake status');
+    if (!['inquiry', 'information_submitted', 'baseline', 'active'].includes(next)) throw bad('Invalid intake status');
     res.json(await setIntakeStatus(req, next));
   });
 
-  // ---- Initial consultation email (SPEC 5.7b): drafted at paperwork_received, sent only after Totty approves ----
+  // ---- Initial consultation email (SPEC 5.7b): drafted at information_submitted, sent only after Totty approves ----
   app.get('/api/clients/:id/consult-email', async (req, res) => {
     await ownedClient(req, req.params.id);
     res.json(await consultEmail.preview(db, req.params.id));
@@ -463,7 +463,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   // Start baseline (SPEC 5.1a): at the initial consultation Yisroel sets goals and the plan, then starts baseline.
   // From then on prompts go to the family (subject to Shabbos/quiet-hours rules and consent).
   app.post('/api/clients/:id/go', async (req, res) => {
-    res.json(await setIntakeStatus(req, 'baseline', 'paperwork_received'));
+    res.json(await setIntakeStatus(req, 'baseline', 'information_submitted'));
   });
 
   // ---- Reinforcements (record only, SPEC 5.6a) ----

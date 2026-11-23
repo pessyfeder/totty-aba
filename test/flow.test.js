@@ -279,7 +279,7 @@ test('replies from unknown numbers are logged and ignored', async () => {
 
 test('intake gating: a client who is not active gets no prompts, until activated', async () => {
   await world.addGoal('Uses a spoon');
-  await db.query(`UPDATE client SET intake_status = 'paperwork_received', activated_at = NULL`);
+  await db.query(`UPDATE client SET intake_status = 'information_submitted', activated_at = NULL`);
   await scheduler.tick();
   assert.equal(env.sent.length, 0);
   assert.equal((await prompts()).length, 0);
@@ -292,7 +292,7 @@ test('intake gating: a client who is not active gets no prompts, until activated
 test('intake gating: already-queued prompts and follow-ups stop if the client leaves active', async () => {
   await world.addGoal('Uses a spoon');
   await scheduler.generatePrompts(env.now());
-  await db.query(`UPDATE client SET intake_status = 'paperwork_received'`);
+  await db.query(`UPDATE client SET intake_status = 'information_submitted'`);
   await scheduler.tick();
   assert.equal(env.sent.length, 0);
   assert.ok((await prompts()).every((p) => p.status === 'skipped' || p.status === 'scheduled'));

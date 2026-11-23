@@ -49,7 +49,7 @@ await prompt(spoon, 0, 'scheduled');
 // More clients, one per intake status (Dovid above is 'active').
 const sampleClients = [
   ['Chaya', 'Goldstein', 'inquiry', 'Mrs. Goldstein', '+15555550101', 'Brooklyn', 'NY', '11211', null, null],
-  ['Moshe', 'Friedman', 'paperwork_received', 'Mr. Friedman', '+15555550102', 'Lakewood', 'NJ', '08701', "now() - interval '3 days'", null],
+  ['Moshe', 'Friedman', 'information_submitted', 'Mr. Friedman', '+15555550102', 'Lakewood', 'NJ', '08701', "now() - interval '3 days'", null],
   ['Leah', 'Katz', 'baseline', 'Mrs. Katz', '+15555550103', 'Monsey', 'NY', '10952', "now() - interval '10 days'", "now() - interval '4 days'"],
 ];
 for (const [first, last, status, parent, phone, city, state, zip, submitted, baseline] of sampleClients) {

@@ -45,7 +45,7 @@ test('the email is plain: the child\'s first name and the link, no last name or 
 test('no draft before paperwork is received; reaching that status drafts one, waiting for approval', async () => {
   const c = await newClient('Moshe');
   assert.equal((await emailOf(c.id)).json, null);
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   const e = (await emailOf(c.id)).json;
   assert.equal(e.status, 'pending_approval');
   assert.equal(e.to, 'rivka@example.test');
@@ -54,8 +54,8 @@ test('no draft before paperwork is received; reaching that status drafts one, wa
 });
 
 test('approval is refused until a booking link is set; then it sends once and only once', async () => {
-  const c = await newClient('Yosef', { status: 'paperwork_received' });
-  await setStatus(c.id, 'paperwork_received');
+  const c = await newClient('Yosef', { status: 'information_submitted' });
+  await setStatus(c.id, 'information_submitted');
   assert.equal((await call('POST', `/api/clients/${c.id}/consult-email/approve`)).status, 400);
   assert.equal((await call('PUT', '/api/settings', { consult_booking_url: LINK })).status, 200);
 
@@ -74,13 +74,13 @@ test('approval is refused until a booking link is set; then it sends once and on
   assert.equal(env.mails.length, before + 1);
   // Re-reaching the status does not draft a second email.
   await setStatus(c.id, 'baseline');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   assert.equal((await emailOf(c.id)).json.status, 'sent');
 });
 
 test('a client with no parent email cannot be approved until one is added', async () => {
   const c = await newClient('Dovid2', { email: '' });
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   const e = (await emailOf(c.id)).json;
   assert.deepEqual(e.problems, ['Add an email address for a parent or caregiver first.']);
   assert.equal((await call('POST', `/api/clients/${c.id}/consult-email/approve`)).status, 400);
@@ -90,7 +90,7 @@ test('a client with no parent email cannot be approved until one is added', asyn
 
 test('declining stops the email', async () => {
   const c = await newClient('Avrumi');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   const n = env.mails.length;
   assert.equal((await call('POST', `/api/clients/${c.id}/consult-email/cancel`)).json.status, 'cancelled');
   assert.equal((await call('POST', `/api/clients/${c.id}/consult-email/approve`)).status, 400);
@@ -99,7 +99,7 @@ test('declining stops the email', async () => {
 
 test('an approved email waits out the family\'s Shabbos and goes out after nightfall', async () => {
   const c = await newClient('Shmuel');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   await approve(db, c.id); // approved, not yet sent
   const n = env.mails.length;
   env.at('2026-11-07T15:00:00Z'); // Shabbos afternoon
@@ -113,7 +113,7 @@ test('an approved email waits out the family\'s Shabbos and goes out after night
 
 test('a failing mailer retries, then gives up and says why; a moved-on client is not emailed', async () => {
   const c = await newClient('Berel');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   await approve(db, c.id);
   const boom = { async send() { throw new Error('smtp down'); } };
   for (let i = 0; i < 3; i++) await sendApproved({ db, mailer: boom, now: env.now });
@@ -122,7 +122,7 @@ test('a failing mailer retries, then gives up and says why; a moved-on client is
   assert.match(e.last_error, /smtp down/);
 
   const d = await newClient('Zalman');
-  await setStatus(d.id, 'paperwork_received');
+  await setStatus(d.id, 'information_submitted');
   await approve(db, d.id);
   await setStatus(d.id, 'baseline'); // consult already booked by other means
   const n = env.mails.length;
@@ -133,12 +133,12 @@ test('a failing mailer retries, then gives up and says why; a moved-on client is
 
 test('another clinician cannot see or approve the email; the dashboard lists emails awaiting approval', async () => {
   const c = await newClient('Lipa');
-  await setStatus(c.id, 'paperwork_received');
+  await setStatus(c.id, 'information_submitted');
   const dash = (await call('GET', '/api/dashboard')).json;
   assert.ok(dash.emailsToApprove.some((x) => x.id === c.id));
   const { rows: [other] } = await db.query(`INSERT INTO clinician (name, email, password_hash, timezone, latitude, longitude) VALUES ('X', 'x@example.test', 'x', 'America/New_York', 40, -74) RETURNING id`);
   const { rows: [theirs] } = await db.query(
-    `INSERT INTO client (clinician_id, first_name, last_name, admission_date, latitude, longitude, timezone, intake_status) VALUES ($1, 'A', 'B', '2026-11-01', 40, -74, 'America/New_York', 'paperwork_received') RETURNING id`, [other.id]);
+    `INSERT INTO client (clinician_id, first_name, last_name, admission_date, latitude, longitude, timezone, intake_status) VALUES ($1, 'A', 'B', '2026-11-01', 40, -74, 'America/New_York', 'information_submitted') RETURNING id`, [other.id]);
   assert.equal((await emailOf(theirs.id)).status, 404);
   assert.equal((await call('POST', `/api/clients/${theirs.id}/consult-email/approve`)).status, 404);
 });

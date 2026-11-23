@@ -32,7 +32,7 @@ export function noRecipientReason(contacts) {
 /** Creates the draft when the client is at "information submitted". Idempotent; never makes a second one. */
 export async function ensureDraft(db, clientId) {
   const { rows } = await db.query(
-    `INSERT INTO consult_text (client_id) SELECT id FROM client WHERE id = $1 AND intake_status = 'paperwork_received'
+    `INSERT INTO consult_text (client_id) SELECT id FROM client WHERE id = $1 AND intake_status = 'information_submitted'
      ON CONFLICT (client_id) DO NOTHING RETURNING client_id`, [clientId]);
   return rows.length > 0;
 }
@@ -75,7 +75,7 @@ export async function approve(db, clientId) {
   const { rows } = await db.query(
     `UPDATE consult_text SET status = 'approved', approved_at = now()
       WHERE client_id = $1 AND status = 'pending_approval'
-        AND EXISTS (SELECT 1 FROM client WHERE id = $1 AND intake_status = 'paperwork_received') RETURNING client_id`, [clientId]);
+        AND EXISTS (SELECT 1 FROM client WHERE id = $1 AND intake_status = 'information_submitted') RETURNING client_id`, [clientId]);
   if (!rows.length) throw new Error('The client is no longer at "Information submitted", so the text was not approved');
 }
 
@@ -97,7 +97,7 @@ export async function sendApproved({ db, messenger, now = () => new Date(), clie
   const sent = [];
   for (const { client_id } of rows) {
     const w = await load(db, client_id);
-    if (w.client.intake_status !== 'paperwork_received' || w.client.status !== 'active') { // moved on or archived: no longer needed
+    if (w.client.intake_status !== 'information_submitted' || w.client.status !== 'active') { // moved on or archived: no longer needed
       await db.query(`UPDATE consult_text SET status = 'cancelled' WHERE client_id = $1 AND status = 'approved'`, [client_id]);
       continue;
     }

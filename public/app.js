@@ -146,7 +146,7 @@ async function renderClients() {
   ].filter(Boolean));
 }
 
-const CLIENT_STATUS = { inquiry: 'Reached out', paperwork_received: 'Information submitted', baseline: 'Baseline', active: 'Active' };
+const CLIENT_STATUS = { inquiry: 'Reached out', information_submitted: 'Information submitted', baseline: 'Baseline', active: 'Active' };
 
 /** Search box + status filter above the client chips; filters the list in place as Totty types. */
 function clientSearch(clients) {

@@ -80,7 +80,7 @@ test('Submit creates the client, the parent contact (text/email consent is recor
   assert.deepEqual(
     { intake_status: c.intake_status, last: c.last_name, gender: c.gender, street: c.street_address, city: c.city, state: c.state, zip: c.zip, notes: c.notes, loc: c.location_name,
       signer: c.consent_signed_by, signed: Boolean(c.consent_signed_at), submitted: Boolean(c.info_submitted_at), owner: c.clinician_id, tz: c.timezone },
-    { intake_status: 'paperwork_received', last: 'Levi', gender: 'Male', street: '12 Main St', city: 'Lakewood', state: 'NJ', zip: '08701', notes: 'Likes trains', loc: 'Lakewood, NJ',
+    { intake_status: 'information_submitted', last: 'Levi', gender: 'Male', street: '12 Main St', city: 'Lakewood', state: 'NJ', zip: '08701', notes: 'Likes trains', loc: 'Lakewood, NJ',
       signer: 'Rivka Levi', signed: true, submitted: true, owner: world.clinician.id, tz: 'America/New_York' });
   assert.equal(c.dob.toISOString().slice(0, 10), '2019-03-14');
   assert.equal(c.intake_form.evil, undefined);
@@ -106,7 +106,7 @@ test('after Submit the response carries the consultation booking link set in Set
 
 test('the new clients show up for Totty, and the old waiting list and per-client link are gone', async () => {
   const list = await (await staff('/clients')).json();
-  assert.ok(list.some((x) => x.first_name === 'Moshe' && x.intake_status === 'paperwork_received'));
+  assert.ok(list.some((x) => x.first_name === 'Moshe' && x.intake_status === 'information_submitted'));
   assert.equal((await staff('/intake-submissions')).status, 404);
   assert.equal((await staff('/clients', 'POST', { first_name: 'A', last_name: 'B' })).status, 404);
 });
