@@ -6,7 +6,7 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.lib import colors
-from reportlab.platypus import (BaseDocTemplate, PageTemplate, Frame, Paragraph, Spacer, Table, TableStyle,
+from reportlab.platypus import (BaseDocTemplate, PageTemplate, Frame, Paragraph, KeepTogether, Spacer, Table, TableStyle,
                                 PageBreak, KeepTogether, Flowable)
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
@@ -130,10 +130,15 @@ s += [KeepTogether(sec('7. Release of Information (optional)', 'Complete only if
 s += [PageBreak()] + sec('8. Telepractice Location &amp; Eligibility', 'Complete the part for your state only, initial each item, and sign.')
 s += [Paragraph('If you live in New Jersey', h3),
       Paragraph('New Jersey and New York regulate behavior-analytic services differently. For New Jersey families, The BTB Method is authorized to provide services only when both the session and your child’s home environment are located in New Jersey. Please read and initial each statement.', base), Spacer(1, 4)] + initialled(NJ)
-s += [Paragraph('If you live in New York', h3),
+s += [PageBreak(), Paragraph('If you live in New York', h3),
+      row('Child’s name *', 'Date *'),
       row('Diagnosing / ordering provider *', 'License type & state'), row('Provider phone / contact', 'Date of diagnosis'), Spacer(1, 4),
       Paragraph('Under New York Education Law Article 167, The BTB Method may provide services to a family located in New York only when the child has been diagnosed with autism spectrum disorder or a related disorder, and a prescription or order for behavioral treatment has been issued by a person licensed or otherwise authorized to provide that diagnosis and order. This form verifies and documents that eligibility. Required before services begin for New York families.', base), Spacer(1, 4)] + initialled(NY)
 s += sig('Parent / Caregiver / Educator signature *')
+s += [row('Printed name *', 'Relationship to child *'), Spacer(1, 8),
+      KeepTogether([Paragraph('For Practitioner Use Only', h3),
+      row('Reviewed by (The BTB Method):', 'Date verified:'),
+      Line('Diagnosis/order copy on file (Y/N):', W / 2)])]
 s += [Spacer(1, 6), Paragraph('* Required', small)]
 
 def footer(c, d):
@@ -145,7 +150,7 @@ def footer(c, d):
     c.drawString(0.75 * inch, 0.45 * inch, 'The BTB Method · New Client Intake Form'); c.drawRightString(letter[0] - 0.75 * inch, 0.45 * inch, f'Page {d.page}')
     c.restoreState()
 
-out = ROOT / 'btb-docs' / 'BTB_New_Client_Intake_Form.pdf'
+out = ROOT / 'btb-docs' / 'To Use' / 'BTB_New_Client_Intake_Form.pdf'
 doc = BaseDocTemplate(str(out), pagesize=letter, leftMargin=0.75 * inch, rightMargin=0.75 * inch, topMargin=0.7 * inch, bottomMargin=0.8 * inch, title='New Client Intake Form - The BTB Method')
 doc.addPageTemplates([PageTemplate(frames=[Frame(doc.leftMargin, doc.bottomMargin, W, letter[1] - doc.topMargin - doc.bottomMargin, id='f')], onPage=footer)])
 doc.build(s)
