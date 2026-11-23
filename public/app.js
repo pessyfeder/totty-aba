@@ -108,6 +108,11 @@ const NAV = [
 const sidebar = document.getElementById('sidebar');
 sidebar.append(...NAV.map(([href, key, label]) => h('a', { href, class: 'nav-link', 'data-key': key },
   h('span', { class: 'side-icon' }, ICONS[key]()), label)));
+// Show the sidebar exactly when the Log out button is visible (i.e. logged in). A MutationObserver avoids the
+// stale :has() style invalidation some browsers show when #logout's hidden attribute changes.
+const syncSidebar = () => { sidebar.hidden = logoutBtn.hidden; };
+new MutationObserver(syncSidebar).observe(logoutBtn, { attributes: true, attributeFilter: ['hidden'] });
+syncSidebar();
 function markActiveNav() {
   const hash = location.hash || '#/';
   for (const [, key, , test] of NAV) {

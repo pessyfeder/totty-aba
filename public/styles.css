@@ -21,15 +21,15 @@ body { margin: 0; font: 16px/1.5 Inter, system-ui, -apple-system, "Segoe UI", sa
 h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -.01em; margin: 0; }
 h2 { font-size: 1.05rem; font-weight: 650; letter-spacing: -.01em; margin: 28px 0 10px; }
 .shell { display: flex; align-items: flex-start; }
-.side-nav { flex: 0 0 210px; position: sticky; top: 57px; display: grid; gap: 4px; padding: 16px 12px; align-content: start; }
-body:has(#logout[hidden]) .side-nav { display: none; }
+.side-nav { flex: 0 0 210px; width: 210px; position: sticky; top: 57px; display: flex; flex-direction: column; gap: 4px; padding: 16px 12px; align-content: start; }
+[hidden].side-nav { display: none; }
 .nav-link { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: 12px; color: var(--text); text-decoration: none; font-weight: 600; }
 .nav-link:hover { background: var(--accent-soft); }
 .nav-link[aria-current="page"] { background: var(--accent-soft); color: var(--accent); }
 .side-icon svg { display: block; width: 24px; height: 24px; fill: none; stroke: var(--accent); stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 700px) {
   .shell { flex-direction: column; align-items: stretch; }
-  .side-nav { position: static; flex: none; display: flex; overflow-x: auto; padding: 8px 14px 0; }
+  .side-nav { position: static; flex: none; width: auto; flex-direction: row; display: flex; overflow-x: auto; padding: 8px 14px 0; }
   .nav-link { padding: 8px 12px; }
 }
 main { flex: 1; min-width: 0; max-width: 1040px; margin: 0 auto; padding: 12px 20px 56px; }
