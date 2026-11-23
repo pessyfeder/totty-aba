@@ -442,13 +442,27 @@ export async function renderClient(ctx, id, tab = 'profile') {
     c.contacts.length ? '' : h('p', { class: 'muted' }, 'Add a contact (Profile tab) before adding a goal.'),
     archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'goals'))) : '',
   ];
+  // All progress logs live in one window: a sub-tab per goal, plus response log, reports and archived goals.
+  const logTabs = [
+    ...liveGoals.map((g) => [`goal-${g.id}`, `${g.number}. ${g.title}`, () => [goalCard(ctx, g, c.contacts, reload, 'progress')]]),
+    ['log', 'Response log', () => responseLog],
+    ['reports', 'Reports', () => [reports]],
+    ...(archivedGoals.length ? [['archived', `Archived (${archivedGoals.length})`, () => archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'progress'))]] : []),
+  ];
+  const logPanel = h('div', { class: 'log-panel', role: 'tabpanel' });
+  const logStrip = h('div', { class: 'subtabs', role: 'tablist', 'aria-label': 'Progress logs' });
+  const showLog = (key) => {
+    for (const b of logStrip.children) { b.setAttribute('aria-selected', String(b.dataset.k === key)); b.classList.toggle('current', b.dataset.k === key); }
+    logPanel.replaceChildren(...logTabs.find(([k]) => k === key)[2]());
+  };
+  for (const [k, label] of logTabs) logStrip.append(h('button', { type: 'button', role: 'tab', class: 'subtab', 'data-k': k, onclick: () => showLog(k) }, label));
+  showLog(logTabs[0][0]);
   const progressTab = [
     ...todaySection,
     h('h2', {}, 'Progress'),
-    ...(liveGoals.length ? liveGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'progress')) : [h('p', { class: 'muted' }, 'No goals to chart yet.')]),
-    ...responseLog,
-    reports,
-    archivedGoals.length ? h('details', {}, h('summary', {}, `Archived goals (${archivedGoals.length})`), ...archivedGoals.map((g) => goalCard(ctx, g, c.contacts, reload, 'progress'))) : '',
+    liveGoals.length ? '' : h('p', { class: 'muted' }, 'No goals to chart yet.'),
+    logStrip,
+    logPanel,
   ];
 
   // Sidebar: every client, the current one highlighted; searchable.

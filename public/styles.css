@@ -239,6 +239,10 @@ a.back { font-size: 2rem; line-height: 1; text-decoration: none; padding: 0 8px;
 a.tab { padding: 10px 18px; text-decoration: none; color: var(--muted); font-size: .82rem; font-weight: 650; letter-spacing: .08em; text-transform: uppercase; border-bottom: 3px solid transparent; margin-bottom: -1px; }
 a.tab:hover { color: var(--text); }
 a.tab.current { color: var(--accent); border-bottom-color: var(--accent); }
+.subtabs { display: flex; gap: 4px; flex-wrap: wrap; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.subtab { background: none; border: 0; border-bottom: 3px solid transparent; border-radius: 0; margin-bottom: -1px; padding: 8px 14px; color: var(--muted); font-weight: 600; cursor: pointer; }
+.subtab:hover { color: var(--text); }
+.subtab.current { color: var(--accent); border-bottom-color: var(--accent); }
 .tab-body h2 { color: var(--accent); }
 .tab-body h2.first { margin-top: 20px; }
 .tab-head { display: flex; justify-content: space-between; align-items: flex-end; gap: 10px; flex-wrap: wrap; }
