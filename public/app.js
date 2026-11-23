@@ -121,43 +121,47 @@ function markActiveNav() {
   }
 }
 
-/** Dashboard home: Upcoming Appointments and Needs Attention. */
+/** Dashboard home: three option tiles, each with a live preview (next appointments, clients needing attention). */
 async function renderDashboard() {
   const d = await api('/dashboard');
   logoutBtn.hidden = false;
   const sh = d.shabbos;
-  const n = d.attention.length;
+  const attention = d.attention ?? [];
   const upcoming = d.appointments ?? [];
+  const PREVIEW_MAX = 3;
   const TYPE_NAMES = { consultation: 'Consultation', 'check-in': 'Check-in', 'ongoing meeting': 'Ongoing meeting' };
+  const dayShort = (iso) => new Date(iso).toLocaleDateString('en-US', { ...NY, weekday: 'short', month: 'short', day: 'numeric' });
+  const more = (total) => total > PREVIEW_MAX && h('span', { class: 'tile-more' }, `+${total - PREVIEW_MAX} more`);
+  // Tiles are single links, so previews are plain spans (no nested links).
+  const tile = (href, key, title, { badge, bad, rows, empty, extra } = {}) => h('a', { href, class: 'option tile' },
+    h('span', { class: 'option-icon' }, ICONS[key]()),
+    h('span', { class: 'option-title' }, title,
+      badge ? h('span', { class: `badge tile-badge${bad ? ' bad-solid' : ''}` }, badge) : null),
+    rows && (rows.length
+      ? h('span', { class: 'tile-preview' }, ...rows, extra)
+      : h('span', { class: 'tile-empty' }, empty)),
+    !rows && extra);
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('h2', { class: 'options-heading' }, 'Welcome, Yisroel'),
-    h('section', { class: 'upcoming-card','aria-labelledby': 'upcoming-title' },
-      h('div', { class: 'upcoming-head' },
-        h('span', { class: 'upcoming-icon' }, ICONS.appointments()),
-        h('h3', { id: 'upcoming-title' }, 'View Your Upcoming Appointments'),
-        upcoming.length > 0 && h('span', { class: 'badge' }, String(upcoming.length)),
-        h('a', { href: '#/appointments', class: 'upcoming-all' }, 'Full schedule →')),
-      upcoming.length
-        ? h('div', { class: 'upcoming-days' }, groupByDay(upcoming).map(([day, items]) => h('div', { class: 'upcoming-day' },
-          h('div', { class: 'upcoming-day-label' }, day),
-          h('ul', { class: 'upcoming-list' }, items.map((a) => h('li', {},
-            h('a', { href: `#/appointment/${a.id}`, class: `upcoming-row type-${String(a.type).replace(/\s+/g, '-')}` },
-              h('span', { class: 'upcoming-time' }, fmtTime(a.starts_at)),
-              h('span', { class: 'upcoming-who' }, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'),
-              h('span', { class: 'badge type-badge' }, TYPE_NAMES[a.type] ?? a.type))))))))
-        : h('p', { class: 'muted' }, 'No upcoming appointments. Add one from a client’s Appointments tab.')),
-    h('section', { class: 'upcoming-card attention-card', 'aria-labelledby': 'attn-title' },
-      h('div', { class: 'upcoming-head' },
-        h('span', { class: 'upcoming-icon' }, '⚠'),
-        h('h3', { id: 'attn-title' }, 'Here’s What Needs Your Attention'),
-        n > 0 && h('span', { class: 'badge' }, String(n))),
-      n
-        ? h('ul', { class: 'upcoming-list' }, d.attention.map((c) => h('li', {},
-          h('a', { href: `#/client/${c.id}`, class: 'upcoming-row' },
-            h('span', { class: 'upcoming-who' }, `${c.first_name} ${c.last_name}`),
-            h('span', { class: 'chip-attn' }, c.attention.join('; '))))))
-        : h('p', { class: 'muted' }, 'Nothing needs attention right now.')),
+    h('div', { class: 'options' },
+      tile('#/clients', 'clients', 'Clients', {
+        badge: attention.length ? `${attention.length} need${attention.length === 1 ? 's' : ''} attention` : '',
+        bad: true,
+        empty: 'Nothing needs attention',
+        rows: attention.slice(0, PREVIEW_MAX).map((c) => h('span', { class: 'tile-row attn' },
+          h('span', { class: 'tile-who' }, `${c.first_name} ${c.last_name}`),
+          h('span', { class: 'tile-what' }, c.attention.join('; ')))),
+        extra: more(attention.length) || null }),
+      tile('#/appointments', 'appointments', 'Appointments', {
+        badge: upcoming.length ? `${upcoming.length} upcoming` : '',
+        empty: 'No upcoming appointments',
+        rows: upcoming.slice(0, PREVIEW_MAX).map((a) => h('span', { class: `tile-row type-${String(a.type).replace(/\s+/g, '-')}` },
+          h('span', { class: 'tile-when' }, `${dayShort(a.starts_at)} · ${fmtTime(a.starts_at)}`),
+          h('span', { class: 'tile-who' }, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'),
+          h('span', { class: 'tile-what' }, TYPE_NAMES[a.type] ?? a.type))),
+        extra: more(upcoming.length) || null }),
+      tile('#/settings', 'settings', 'Settings')),
   ].filter(Boolean));
 }
 

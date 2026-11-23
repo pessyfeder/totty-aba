@@ -417,3 +417,19 @@ details.days-pick > summary::after { content: ""; flex: none; width: 12px; heigh
 .upcoming-row .badge, .upcoming-head .badge, .upcoming-row .chip-attn { font-size: .72rem; padding: 1px 7px; }
 .upcoming-card .muted { margin: 0; font-size: .85rem; }
 .intake-notice { margin: 8px 0; padding: 10px 14px; border-left: 4px solid currentColor; border-radius: 6px; background: rgba(128,128,128,.12); }
+
+/* Dashboard tiles with live previews */
+a.option.tile { justify-items: stretch; text-align: left; }
+a.option.tile .option-icon { justify-self: center; }
+a.option.tile .option-title { text-align: center; display: flex; flex-wrap: wrap; justify-content: center; align-items: center; gap: 6px 10px; }
+.tile-badge { font-size: .78rem; }
+.badge.bad-solid { background: var(--bad); color: #fff; }
+@media (prefers-color-scheme: dark) { .badge.bad-solid { color: #1a1a1a; } }
+.tile-preview { display: grid; gap: 4px; }
+.tile-row { display: grid; gap: 0 8px; padding: 4px 10px; font-size: .85rem; background: var(--bg); border-left: 3px solid var(--tc, var(--bad)); border-radius: 8px; }
+.tile-row.attn { --tc: var(--bad); }
+.tile-when { font-size: .75rem; font-weight: 700; color: var(--tc, var(--accent)); font-variant-numeric: tabular-nums; }
+.tile-who { font-weight: 600; overflow-wrap: anywhere; }
+.tile-what { font-size: .75rem; color: var(--muted); overflow-wrap: anywhere; }
+.tile-more { font-size: .8rem; color: var(--muted); text-align: center; }
+.tile-empty { color: var(--muted); font-size: .85rem; text-align: center; }
