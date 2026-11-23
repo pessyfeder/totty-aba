@@ -73,8 +73,9 @@ function goalCard({ h, api, handle }, g, contacts, reload, mode = 'progress') {
 
   const owner = contacts.find((c) => c.id === g.contact_id);
   const byText = owner?.logging_method === 'sms';
-  const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'}${byText ? '' : ` at ${fmt12(g.schedule_json.time)}`} on ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`,
-    byText ? h('div', { class: 'time-bubbles' }, h('span', { class: 'badge' }, `Text sent at ${fmt12(g.schedule_json.time)}`)) : '');
+  const meta = h('div', { class: 'muted' }, `${g.response_type === 'yes_no' ? 'Yes/No' : 'Minutes'} · ${g.status} · asks ${owner?.name ?? 'contact'}`,
+    byText ? h('div', { class: 'time-bubbles' }, h('span', { class: 'badge' }, `Text sent at ${fmt12(g.schedule_json.time)}`)) : h('div', {}, `asks at: ${fmt12(g.schedule_json.time)}`),
+    h('div', {}, `on: ${g.schedule_json.days.map((d) => DAYS[d]).join(', ')}`));
   const stamp = (iso) => new Date(iso).toLocaleString('en-US', { timeZone: 'America/New_York', dateStyle: 'medium', timeStyle: 'short' });
   const history = h('div', { class: 'muted' }, `Created ${stamp(g.created_at)}`,
     ...(g.status_changes ?? []).flatMap((c) => [h('br'), `${c.from_status} → ${c.to_status} on ${stamp(c.change_made_datetime)}`]));
