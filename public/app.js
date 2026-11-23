@@ -142,10 +142,10 @@ async function renderDashboard() {
         ? h('div', { class: 'upcoming-days' }, groupByDay(upcoming).map(([day, items]) => h('div', { class: 'upcoming-day' },
           h('div', { class: 'upcoming-day-label' }, day),
           h('ul', { class: 'upcoming-list' }, items.map((a) => h('li', {},
-            h('a', { href: `#/appointment/${a.id}`, class: 'upcoming-row' },
+            h('a', { href: `#/appointment/${a.id}`, class: `upcoming-row type-${String(a.type).replace(/\s+/g, '-')}` },
               h('span', { class: 'upcoming-time' }, fmtTime(a.starts_at)),
               h('span', { class: 'upcoming-who' }, a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'),
-              h('span', { class: 'badge' }, TYPE_NAMES[a.type] ?? a.type))))))))
+              h('span', { class: 'badge type-badge' }, TYPE_NAMES[a.type] ?? a.type))))))))
         : h('p', { class: 'muted' }, 'No upcoming appointments. Add one from a client’s Appointments tab.')),
     h('section', { class: 'upcoming-card attention-card', 'aria-labelledby': 'attn-title' },
       h('div', { class: 'upcoming-head' },

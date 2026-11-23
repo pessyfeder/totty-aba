@@ -287,6 +287,19 @@ a.appt-chip.appt-chip-held { border-left-color: #166534; background: #dcfce7; }
 .upcoming-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 3px; }
 a.upcoming-row { display: flex; align-items: center; gap: 8px; padding: 4px 10px; min-height: 0; font-size: .85rem; background: var(--bg); border: 1px solid transparent; border-left: 3px solid var(--accent); border-radius: 8px; color: var(--text); text-decoration: none; transition: border-color .15s; }
 a.upcoming-row:hover { border-color: var(--accent); }
+/* Appointment type colors */
+.type-consultation { --tc: #0f766e; --tc-soft: #e0f2ef; }
+.type-check-in { --tc: #2563eb; --tc-soft: #e3ecfd; }
+.type-ongoing-meeting { --tc: #b45309; --tc-soft: #fdf0dc; }
+@media (prefers-color-scheme: dark) {
+  .type-consultation { --tc: #5eead4; --tc-soft: #15332f; }
+  .type-check-in { --tc: #7aa7ff; --tc-soft: #1a2a4a; }
+  .type-ongoing-meeting { --tc: #fbbf6a; --tc-soft: #3d2c12; }
+}
+a.upcoming-row[class*="type-"] { border-left-color: var(--tc); }
+a.upcoming-row[class*="type-"]:hover { border-color: var(--tc); }
+a.upcoming-row[class*="type-"] .upcoming-time { color: var(--tc); }
+a.upcoming-row .type-badge { background: var(--tc-soft); color: var(--tc); }
 .upcoming-time { font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; min-width: 4em; }
 .upcoming-who { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
 @media (max-width: 520px) {
@@ -403,3 +416,4 @@ details.days-pick > summary::after { content: ""; flex: none; width: 12px; heigh
 
 .upcoming-row .badge, .upcoming-head .badge, .upcoming-row .chip-attn { font-size: .72rem; padding: 1px 7px; }
 .upcoming-card .muted { margin: 0; font-size: .85rem; }
+.intake-notice { margin: 8px 0; padding: 10px 14px; border-left: 4px solid currentColor; border-radius: 6px; background: rgba(128,128,128,.12); }
