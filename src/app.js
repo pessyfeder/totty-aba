@@ -210,6 +210,9 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
   // ---- Settings: booking and intake links (SPEC 5.1a). Empty string clears a link. ----
   const checkinPreview = (settings) =>
     buildCheckinBody({ first_name: "[child's first name]" }, settings?.checkin_booking_url || '[booking link]');
+  app.get('/api/intake-form.pdf', (req, res) =>
+    res.type('application/pdf').set('Content-Disposition', 'inline; filename="BTB_New_Client_Intake_Form.pdf"')
+      .sendFile(fileURLToPath(new URL('../btb-docs/BTB_New_Client_Intake_Form.pdf', import.meta.url))));
   app.get('/api/settings', async (req, res) => {
     const { rows: waiting } = await db.query(
       `SELECT c.id, c.first_name, c.last_name FROM client c JOIN inquiry_email e ON e.client_id = c.id

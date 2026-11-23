@@ -210,6 +210,7 @@ export async function renderInfoPage({ h, app }) {
   document.title = 'New client intake form - BTB';
   app.replaceChildren(
     h('h2', {}, 'New client intake form'),
+    h('p', { class: 'intake-notice' }, h('strong', {}, 'In order to schedule a consultation, first fill out this intake form.')),
     h('p', { class: 'muted' }, 'Please fill in the sections below and press Submit at the end. We will contact you about the next step. What you type is kept on this device while you work, so you can come back to this page if you need to stop.'),
     form);
 }

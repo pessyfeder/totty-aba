@@ -137,6 +137,9 @@ s += sig('Parent / Caregiver / Educator signature *')
 s += [Spacer(1, 6), Paragraph('* Required', small)]
 
 def footer(c, d):
+    c.saveState(); c.setFillColor(colors.HexColor('#2f5d62')); c.setFillAlpha(0.08)  # diagonal watermark
+    c.setFont('Helvetica-Bold', 64); c.translate(letter[0] / 2, letter[1] / 2); c.rotate(45)
+    c.drawCentredString(0, 0, 'The BTB Method'); c.restoreState()
     c.saveState(); c.setFont('Helvetica', 8); c.setFillColor(colors.HexColor('#777777'))
     c.drawString(0.75 * inch, 0.45 * inch, 'The BTB Method · New Client Intake Form'); c.drawRightString(letter[0] - 0.75 * inch, 0.45 * inch, f'Page {d.page}')
     c.restoreState()

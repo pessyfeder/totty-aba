@@ -81,8 +81,10 @@ export async function renderSettings({ h, api, app, logoutBtn }) {
     h('button', { type: 'button', class: 'link', onclick: async () => {
       try { await navigator.clipboard.writeText(intakeUrl); copied.textContent = 'Copied'; } catch { copied.textContent = 'Select the link and copy it'; }
     } }, 'Copy'), ' ', copied);
+  const pdfLink = h('p', {}, h('strong', {}, 'Printable intake form (PDF): '),
+    h('a', { href: '/api/intake-form.pdf', target: '_blank', rel: 'noopener' }, 'Open PDF'));
   const firstReply = [
-    intakeLink,
+    intakeLink, pdfLink,
     h('h3', {}, 'New client intake email'), emailBox,
     h('label', {}, 'Send to', picker), problems, h('p', {}, sendBtn)];
 
