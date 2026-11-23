@@ -220,7 +220,7 @@ export function createScheduler({ db, messenger, mailer = null, now = () => new 
     await db.query(
       `UPDATE client SET intake_status = 'active', activated_at = COALESCE(activated_at, $1), updated_at = $1
         WHERE intake_status = 'baseline' AND status = 'active' AND EXISTS (
-          SELECT 1 FROM appointment a WHERE a.client_id = client.id AND a.type = 'check-in' AND a.status = 'scheduled'
+          SELECT 1 FROM appointment a WHERE a.client_id = client.id AND a.type = 'check-in' AND a.status IN ('scheduled', 'held')
              AND COALESCE(a.ends_at, a.starts_at + interval '1 hour') <= $1
              AND (client.baseline_started_at IS NULL OR a.starts_at >= client.baseline_started_at))`, [at]);
   }

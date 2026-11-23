@@ -298,35 +298,40 @@ export async function renderClient(ctx, id, tab = 'profile') {
   intakeSection.hidden = isActive;
   const editStatusBtn = h('button', { type: 'button', onclick: () => { intakeSection.hidden = !intakeSection.hidden; } }, 'Edit status');
 
-  const APPT = { scheduled: 'Scheduled', missed: 'Missed', completed: 'Completed', cancelled: 'Cancelled' };
-  const apptWhen = (a) => (a.starts_at ? new Date(a.starts_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }) : 'No date yet');
+  const APPT = { scheduled: 'Scheduled', held: 'Held', missed: 'Missed', cancelled: 'Cancelled' };
+  const TYPE_LABEL = { consultation: 'Consultation', 'check-in': 'Check-in', 'ongoing meeting': 'Ongoing meeting' };
+  const apptWhen = (a) => new Date(a.starts_at).toLocaleString('en-US', { timeZone: 'America/New_York', weekday: 'short', month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
   const apptAct = (a, body) => api(`/appointments/${a.id}`, { method: 'PATCH', body }).then(reload, handle);
   const localInput = (iso) => { const d = new Date(iso); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 16); };
   const apptRow = (a) => {
     const needsOutcome = a.status === 'scheduled' && new Date(a.starts_at) < new Date();
-    const when = h('input', { type: 'datetime-local', 'aria-label': 'Date and time', value: a.starts_at ? localInput(a.starts_at) : '' });
-    const setTime = h('button', { type: 'button', onclick: () => { if (when.value) apptAct(a, { status: 'scheduled', starts_at: new Date(when.value).toISOString() }); } }, 'Reschedule');
-    const mark = (label, status) => h('button', { type: 'button', class: 'link', onclick: () => apptAct(a, { status }) }, label);
+    const when = h('input', { type: 'datetime-local', 'aria-label': 'Date and time', value: localInput(a.starts_at) });
+    const setTime = h('button', { type: 'button', onclick: () => { if (when.value) apptAct(a, { starts_at: new Date(when.value).toISOString() }); } }, 'Reschedule');
+    const outcome = h('textarea', { rows: 2, maxlength: 5000, placeholder: 'Outcome note (optional): what was reviewed, what changed, next steps', 'aria-label': 'Outcome note' });
+    const markHeld = h('button', { type: 'button', onclick: () => apptAct(a, { status: 'held', outcome_note: outcome.value }) }, 'Mark held');
+    const link = (label, body) => h('button', { type: 'button', class: 'link', onclick: () => apptAct(a, body) }, label);
     return h('tr', {},
       h('td', {}, apptWhen(a), needsOutcome ? h('div', { class: 'warn-line' }, 'Did it happen?') : ''),
-      h('td', {}, a.type === 'consultation' ? 'Consultation' : a.type === 'check-in' ? 'Check-in' : a.type),
-      h('td', {}, h('span', { class: `badge appt-${a.status}` }, APPT[a.status] ?? a.status)),
-      h('td', {}, a.status === 'cancelled' ? '' : [
-        a.status === 'completed' || a.status === 'missed' ? '' : [when, ' ', setTime, ' '],
-        a.status === 'scheduled' ? [mark('Completed', 'completed'), mark('Missed', 'missed')] : '',
-        a.status === 'completed' || a.status === 'missed' ? mark(a.status === 'missed' ? 'Mark completed' : 'Mark missed', a.status === 'missed' ? 'completed' : 'missed') : '']),
-      h('td', {}, a.id ? h('a', { href: `#/appointment/${a.id}` }, 'Notes') : ''));
+      h('td', {}, TYPE_LABEL[a.type] ?? a.type, a.source === 'portal' ? h('div', { class: 'muted' }, 'via portal') : ''),
+      h('td', {}, h('span', { class: `badge appt-${a.status}` }, APPT[a.status] ?? a.status),
+        a.status === 'held' && a.outcome_note ? h('p', { class: 'outcome-note' }, a.outcome_note) : ''),
+      h('td', {}, a.status === 'scheduled' ? [when, ' ', setTime, h('div', {}, outcome, markHeld, ' ', link('Missed', { status: 'missed' }), ' ', link('Cancel', { status: 'cancelled' }))]
+        : a.status === 'held' ? link('Undo held', { status: 'scheduled' })
+        : a.status === 'missed' ? [link('Mark held', { status: 'held' }), ' ', link('Back to scheduled', { status: 'scheduled' })]
+        : link('Reschedule as scheduled', { status: 'scheduled' })),
+      h('td', {}, h('a', { href: `#/appointment/${a.id}` }, a.status === 'held' ? 'Outcome' : 'Notes')));
   };
   const addAppt = inlineForm(h, [
-    lbl('Type', h('select', { name: 'type' }, h('option', { value: 'check-in' }, 'Check-in'), h('option', { value: 'consultation' }, 'Consultation'))),
+    lbl('Type', h('select', { name: 'type' }, Object.entries(TYPE_LABEL).map(([v, t]) => h('option', { value: v }, t)))),
     lbl('Date and time', h('input', { name: 'starts_at', type: 'datetime-local', required: true })),
+    lbl('Note (optional)', h('input', { name: 'notes', maxlength: 2000 })),
   ], 'Add appointment', async (f) => {
-    await post('/appointments', { type: f.get('type'), starts_at: new Date(f.get('starts_at')).toISOString() });
+    await post('/appointments', { type: f.get('type'), starts_at: new Date(f.get('starts_at')).toISOString(), notes: f.get('notes') || undefined });
   });
-  const groupOrder = ['scheduled', 'missed', 'completed', 'cancelled'];
+  const groupOrder = ['scheduled', 'held', 'missed', 'cancelled'];
   const apptTab = [
     addHead(h, 'Appointments', 'Add appointment', addAppt),
-    h('p', { class: 'muted' }, 'Appointments booked on the calendar appear here automatically. Mark each as completed or missed afterwards.'),
+    h('p', { class: 'muted' }, 'Add each appointment here when it is booked in the scheduling portal. After the meeting, press Mark held and add an outcome note, or Missed if it did not happen.'),
     h('div', { class: 'appt-counts' }, groupOrder.slice(0, 3).map((s) => h('span', { class: `badge appt-${s}` }, `${APPT[s]}: ${c.appointments.filter((a) => a.status === s).length}`))),
     ...groupOrder.map((s) => {
       const list = c.appointments.filter((a) => a.status === s);

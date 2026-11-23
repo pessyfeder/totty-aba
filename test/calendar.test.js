@@ -35,17 +35,35 @@ test('appointment page: kind (consultation / first / later check-in) and notes',
   assert.equal((await call('GET', '/api/appointments/00000000-0000-0000-0000-000000000000')).status, 404);
 });
 
-test('client appointments: need a date; scheduled → completed / missed', async () => {
+test('client appointments: need a date; scheduled → held with outcome note / missed / cancelled', async () => {
   const cid = world.client.id;
   assert.equal((await call('POST', `/api/clients/${cid}/appointments`, { type: 'check-in' })).status, 400); // needs a time
-  const made = await (await call('POST', `/api/clients/${cid}/appointments`, { type: 'check-in', starts_at: '2027-02-01T15:00:00Z' })).json();
+  const made = await (await call('POST', `/api/clients/${cid}/appointments`, { type: 'ongoing meeting', starts_at: '2027-02-01T15:00:00Z', notes: 'Booked in portal' })).json();
   assert.equal(made.status, 'scheduled');
+  assert.equal(made.type, 'ongoing meeting');
+  assert.equal(made.source, 'manual');
   const patch = (body) => call('PATCH', `/api/appointments/${made.id}`, body);
   assert.equal((await patch({ status: 'to_be_scheduled' })).status, 400);
+  assert.equal((await patch({ status: 'completed' })).status, 400); // old status is gone
   assert.equal((await patch({ status: 'scheduled', starts_at: '2027-02-02T15:00:00Z' })).status, 200);
-  assert.equal((await patch({ status: 'bogus' })).status, 400);
-  assert.equal((await (await patch({ status: 'missed' })).json()).status, 'missed');
-  assert.equal((await (await patch({ status: 'completed' })).json()).status, 'completed');
+  assert.equal((await patch({ outcome_note: 'x'.repeat(5001) })).status, 400);
+  const held = await (await patch({ status: 'held', outcome_note: '  Reviewed baseline; added a goal  ' })).json();
+  assert.equal(held.status, 'held');
+  assert.equal(held.outcome_note, 'Reviewed baseline; added a goal');
+  assert.ok(held.held_at);
   const client = await (await call('GET', `/api/clients/${cid}`)).json();
-  assert.ok(client.appointments.some((a) => a.id === made.id && a.status === 'completed'));
+  assert.ok(client.appointments.some((a) => a.id === made.id && a.status === 'held' && a.outcome_note === 'Reviewed baseline; added a goal' && a.notes === 'Booked in portal'));
+  assert.equal((await (await patch({ status: 'scheduled' })).json()).held_at, null);
+  assert.equal((await (await patch({ status: 'missed' })).json()).status, 'missed');
+  assert.equal((await (await patch({ status: 'cancelled' })).json()).status, 'cancelled');
+});
+
+test('dashboard lists upcoming scheduled appointments only', async () => {
+  const cid = world.client.id;
+  const future = await (await call('POST', `/api/clients/${cid}/appointments`, { type: 'consultation', starts_at: '2099-01-01T15:00:00Z' })).json();
+  const cancelled = await (await call('POST', `/api/clients/${cid}/appointments`, { type: 'consultation', starts_at: '2099-01-02T15:00:00Z' })).json();
+  await call('PATCH', `/api/appointments/${cancelled.id}`, { status: 'cancelled' });
+  const d = await (await call('GET', '/api/dashboard')).json();
+  assert.ok(d.appointments.some((a) => a.id === future.id));
+  assert.ok(!d.appointments.some((a) => a.id === cancelled.id));
 });

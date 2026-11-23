@@ -20,7 +20,7 @@ import { clearIfEmailChanged, flagBounce, parseBounceEvents, secretMatches } fro
 
 // Check-ins this client already had before an appointment: tells the first (baseline) check-in from later weekly ones.
 const EARLIER_CHECKINS = `(SELECT count(*) FROM appointment p WHERE p.client_id = a.client_id AND p.type = 'check-in'
-  AND p.status = 'scheduled' AND p.starts_at < a.starts_at) AS earlier_checkins`;
+  AND p.status <> 'cancelled' AND p.starts_at < a.starts_at) AS earlier_checkins`;
 const withKind = ({ earlier_checkins, ...a }) => ({ ...a, kind: appointmentKind(a.type, earlier_checkins) });
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -39,7 +39,8 @@ class HttpError extends Error {
   }
 }
 const bad = (msg) => new HttpError(400, msg);
-const MANUAL_STATUSES = ['scheduled', 'missed', 'completed'];
+const MANUAL_STATUSES = ['scheduled', 'held', 'missed', 'cancelled'];
+const APPT_TYPES = ['consultation', 'check-in', 'ongoing meeting'];
 const apptTime = (v) => { const d = new Date(v); if (Number.isNaN(d.getTime())) throw bad('Date and time is not valid'); return d; };
 
 const validTimezone = (tz) => {
@@ -253,14 +254,14 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     const { rows } = await db.query(
       `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, c.first_name, c.last_name, ${EARLIER_CHECKINS}
          FROM appointment a LEFT JOIN client c ON c.id = a.client_id
-        WHERE a.clinician_id = $1 AND a.status = 'scheduled' AND a.starts_at >= $2 AND a.starts_at < $3
+        WHERE a.clinician_id = $1 AND a.status IN ('scheduled', 'held') AND a.starts_at >= $2 AND a.starts_at < $3
         ORDER BY a.starts_at`, [req.clinician.id, from ?? now(), to ?? new Date('9999-12-31T00:00:00Z')]);
     res.json(rows.map(withKind));
   });
   // One appointment's page: which kind it is, its client's goals and reinforcements, and the clinician's notes.
   app.get('/api/appointments/:id', async (req, res) => {
     const { rows } = await db.query(
-      `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, a.notes, c.first_name, c.last_name, ${EARLIER_CHECKINS}
+      `SELECT a.id, a.client_id, a.type, a.starts_at, a.ends_at, a.status, a.title, a.notes, a.outcome_note, a.held_at, a.source, c.first_name, c.last_name, ${EARLIER_CHECKINS}
          FROM appointment a LEFT JOIN client c ON c.id = a.client_id
         WHERE a.id = $1 AND a.clinician_id = $2`, [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
@@ -273,15 +274,19 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     await audit(req, 'view', 'appointment', appt.id);
     res.json({ ...appt, goals, reinforcements });
   });
-  // Update an appointment: notes, status (scheduled / missed / completed) and/or time.
+  // Update an appointment: notes, outcome note, status (scheduled / held / missed / cancelled) and/or time. Marking it held records held_at.
   app.patch('/api/appointments/:id', async (req, res) => {
     const { rows: cur } = await db.query('SELECT * FROM appointment WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!cur.length) throw new HttpError(404, 'Not found');
     const b = req.body ?? {};
-    const next = { notes: cur[0].notes, status: cur[0].status, starts_at: cur[0].starts_at };
+    const next = { notes: cur[0].notes, outcome_note: cur[0].outcome_note, status: cur[0].status, starts_at: cur[0].starts_at };
     if ('notes' in b) {
       if (typeof b.notes !== 'string' || b.notes.length > 20000) throw bad('notes must be text (up to 20,000 characters)');
       next.notes = b.notes.trim() || null;
+    }
+    if ('outcome_note' in b) {
+      if (b.outcome_note !== null && (typeof b.outcome_note !== 'string' || b.outcome_note.length > 5000)) throw bad('outcome_note must be text (up to 5,000 characters)');
+      next.outcome_note = b.outcome_note?.trim() || null;
     }
     if ('status' in b) {
       if (!MANUAL_STATUSES.includes(b.status)) throw bad(`status must be one of: ${MANUAL_STATUSES.join(', ')}`);
@@ -290,25 +295,27 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     if ('starts_at' in b) next.starts_at = b.starts_at ? apptTime(b.starts_at) : null;
     if (!next.starts_at) throw bad('A date and time is needed');
     const { rows } = await db.query(
-      `UPDATE appointment SET notes = $3, status = $4, starts_at = $5, ends_at = CASE WHEN $5::timestamptz IS DISTINCT FROM starts_at THEN NULL ELSE ends_at END, updated_at = $6
-        WHERE id = $1 AND clinician_id = $2 RETURNING id, notes, status, starts_at`,
-      [req.params.id, req.clinician.id, next.notes, next.status, next.starts_at, now()]);
-    await audit(req, 'update', 'appointment', rows[0].id, { fields: Object.keys(b).filter((k) => ['notes', 'status', 'starts_at'].includes(k)) });
+      `UPDATE appointment SET notes = $3, status = $4, starts_at = $5, ends_at = CASE WHEN $5::timestamptz IS DISTINCT FROM starts_at THEN NULL ELSE ends_at END, updated_at = $6,
+             outcome_note = $7, held_at = CASE WHEN $4 = 'held' THEN COALESCE(held_at, $6) ELSE NULL END
+        WHERE id = $1 AND clinician_id = $2 RETURNING id, notes, outcome_note, status, starts_at, held_at`,
+      [req.params.id, req.clinician.id, next.notes, next.status, next.starts_at, now(), next.outcome_note]);
+    await audit(req, 'update', 'appointment', rows[0].id, { fields: Object.keys(b).filter((k) => ['notes', 'outcome_note', 'status', 'starts_at'].includes(k)) });
     res.json(rows[0]);
   });
-  // Add an appointment (with a date and time) to a client's list. The calendar sync never touches these.
+  // Add an appointment (with a date and time) to a client's list. Entered by hand (source 'manual').
   app.post('/api/clients/:id/appointments', async (req, res) => {
     const { rows: own } = await db.query('SELECT id FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!own.length) throw new HttpError(404, 'Not found');
     const b = req.body ?? {};
-    const type = ['consultation', 'check-in'].includes(b.type) ? b.type : 'check-in';
+    const type = APPT_TYPES.includes(b.type) ? b.type : 'check-in';
     if (!b.starts_at) throw bad('A date and time is needed');
     const startsAt = apptTime(b.starts_at);
     const status = 'scheduled';
+    if (b.notes != null && (typeof b.notes !== 'string' || b.notes.length > 20000)) throw bad('notes must be text (up to 20,000 characters)');
     const { rows } = await db.query(
-      `INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at, status, source)
-       VALUES ($1, $2, 'manual:' || gen_random_uuid(), $3, $4, $5, 'manual') RETURNING id, type, starts_at, ends_at, status, title, notes`,
-      [req.clinician.id, req.params.id, type, startsAt, status]);
+      `INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at, status, source, notes)
+       VALUES ($1, $2, 'manual:' || gen_random_uuid(), $3, $4, $5, 'manual', $6) RETURNING id, type, starts_at, ends_at, status, title, notes, outcome_note, held_at, source`,
+      [req.clinician.id, req.params.id, type, startsAt, status, b.notes?.trim() || null]);
     await audit(req, 'create', 'appointment', rows[0].id);
     res.status(201).json(rows[0]);
   });
@@ -328,7 +335,7 @@ export function createApp({ db, messenger, mailer, config, now = () => new Date(
     const { rows } = await db.query('SELECT * FROM client WHERE id = $1 AND clinician_id = $2', [req.params.id, req.clinician.id]);
     if (!rows.length) throw new HttpError(404, 'Not found');
     const { rows: appointments } = await db.query(
-      `SELECT id, type, starts_at, ends_at, status, title, notes FROM appointment WHERE client_id = $1 ORDER BY starts_at DESC NULLS FIRST`, [req.params.id]);
+      `SELECT id, type, starts_at, ends_at, status, title, notes, outcome_note, held_at, source FROM appointment WHERE client_id = $1 ORDER BY starts_at DESC NULLS FIRST`, [req.params.id]);
     const [contacts, goals, reinforcements] = await Promise.all(
       ['contact', 'goal', 'reinforcement'].map((t) => db.query(`SELECT * FROM ${t} WHERE client_id = $1 ORDER BY 1`, [req.params.id]).then((r) => r.rows)),
     );

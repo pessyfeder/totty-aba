@@ -93,6 +93,8 @@ async function renderDashboard() {
   const option = (href, key, title, text) => h('a', { href, class: 'option' },
     h('span', { class: 'option-icon' }, ICONS[key]()), h('span', { class: 'option-title' }, title), h('span', { class: 'option-text' }, text));
   const n = d.attention.length;
+  const upcoming = d.appointments ?? [];
+  const TYPE_NAMES = { consultation: 'Consultation', 'check-in': 'Check-in', 'ongoing meeting': 'Ongoing meeting' };
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
     h('h2', { class: 'options-heading' }, 'Dashboard'),
@@ -100,6 +102,12 @@ async function renderDashboard() {
       option('#/clients', 'clients', 'Clients', n ? `${n} need${n === 1 ? 's' : ''} attention. View and manage your clients.` : 'View and manage your clients.'),
       option('#/appointments', 'appointments', 'Schedule', 'View upcoming scheduled appointments.'),
       option('#/settings', 'settings', 'Settings', 'Booking links and check-in text.')),
+    h('section', { class: 'upcoming' },
+      h('h3', {}, 'Upcoming appointments'),
+      upcoming.length
+        ? h('ul', { class: 'upcoming-list' }, upcoming.map((a) => h('li', {},
+          h('a', { href: `#/appointment/${a.id}` }, `${fmtDateTime(a.starts_at)} · ${a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client'} · ${TYPE_NAMES[a.type] ?? a.type}`))))
+        : h('p', { class: 'muted' }, 'No upcoming appointments. Add one from a client’s Appointments tab.')),
   ].filter(Boolean));
 }
 
@@ -178,9 +186,9 @@ async function renderAppointments() {
 
   const cell = (date) => h('div', { class: `cal-cell${dayKey(date) === dayKey(today) ? ' cal-today' : ''}${week ? ' cal-week-cell' : ''}` },
     h('span', { class: 'cal-day' }, week ? date.toLocaleDateString([], { month: 'short', day: 'numeric' }) : String(date.getDate())),
-    (byDay.get(dayKey(date)) ?? []).map((a) => h('a', { href: `#/appointment/${a.id}`, class: 'appt-chip', title: KIND_LABEL[a.kind],
-      'aria-label': `${KIND_LABEL[a.kind]}, ${a.client_id ? a.first_name : 'Unmatched client'} ${fmtTimeShort(a.starts_at)}: open appointment` },
-      `${a.client_id ? a.first_name : 'Unmatched'} ${fmtTimeShort(a.starts_at)}`)));
+    (byDay.get(dayKey(date)) ?? []).map((a) => h('a', { href: `#/appointment/${a.id}`, class: `appt-chip${a.status === 'held' ? ' appt-chip-held' : ''}`, title: KIND_LABEL[a.kind],
+      'aria-label': `${KIND_LABEL[a.kind]}, ${a.client_id ? a.first_name : 'Unassigned client'} ${fmtTimeShort(a.starts_at)}: open appointment` },
+      `${a.client_id ? a.first_name : 'Unassigned'} ${fmtTimeShort(a.starts_at)}`)));
 
   const cells = [];
   if (week) {

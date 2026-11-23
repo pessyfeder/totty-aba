@@ -50,7 +50,7 @@ export async function renderAppointment({ h, api, app, logoutBtn, handle }, id) 
   const a = await api(`/appointments/${id}`);
   logoutBtn.hidden = false;
   const cfg = KINDS[a.kind] ?? KINDS.biweekly_checkin;
-  const who = a.client_id ? `${a.first_name} ${a.last_name}` : 'Unmatched client';
+  const who = a.client_id ? `${a.first_name} ${a.last_name}` : 'Unassigned client';
   const liveGoals = a.goals.filter((g) => g.status !== 'archived');
 
   const saved = h('span', { class: 'muted', role: 'status' });
@@ -62,16 +62,32 @@ export async function renderAppointment({ h, api, app, logoutBtn, handle }, id) 
     catch (ex) { saved.className = 'error'; saved.textContent = ex.message; }
   } }, notes, h('div', {}, h('button', { type: 'submit' }, 'Save notes'), ' ', saved));
 
+  const outcomeSaved = h('span', { class: 'muted', role: 'status' });
+  const outcome = h('textarea', { name: 'outcome_note', rows: 4, maxlength: 5000, 'aria-label': 'Outcome note', placeholder: 'What was reviewed, what changed, next steps' }, a.outcome_note ?? '');
+  const saveOutcome = (body, okText) => async () => {
+    outcomeSaved.className = 'muted';
+    try { await api(`/appointments/${id}`, { method: 'PATCH', body: { ...body, outcome_note: outcome.value } }); outcomeSaved.textContent = okText; if (body.status) await renderAppointment({ h, api, app, logoutBtn, handle }, id); }
+    catch (ex) { outcomeSaved.className = 'error'; outcomeSaved.textContent = ex.message; }
+  };
+  const outcomeSection = h('section', {},
+    h('h3', {}, 'Outcome'),
+    h('p', { class: 'muted' }, 'A short summary of the meeting. Private: never sent by text or email, and not included in reports.'),
+    outcome,
+    h('div', {}, a.status === 'scheduled'
+      ? [h('button', { type: 'button', onclick: saveOutcome({ status: 'held' }, 'Marked held.') }, 'Mark held'), ' ']
+      : '',
+      a.status === 'held' ? [h('button', { type: 'button', onclick: saveOutcome({}, 'Saved.') }, 'Save outcome note'), ' '] : '',
+      outcomeSaved));
+
   app.replaceChildren(
     h('p', {}, h('a', { href: '#/appointments' }, '← Schedule')),
     h('h2', {}, cfg.label),
     h('p', {}, h('strong', {}, who), a.type && a.type !== 'ongoing meeting' ? ` · ${a.type}` : ''),
     h('p', { class: 'muted' }, fmtWhen(a)),
-    a.title ? h('p', { class: 'muted' }, `Calendar title: ${a.title}`) : '',
-    !a.client_id ? h('p', { class: 'warn-line' }, '⚠ No client matches this booking yet. Add the booker’s email to a contact and sync the calendar to link it.') : '',
+    h('p', {}, h('span', { class: `badge appt-${a.status}` }, a.status)),
     a.client_id ? h('p', {}, h('a', { href: `#/client/${a.client_id}`, class: 'button' }, 'Open client')) : '',
     h('p', {}, cfg.intro),
-    h('p', { class: 'muted' }, 'Draft: what is discussed and what follows are still open questions (SPEC question 15). Edit once confirmed.'),
+    h('p', { class: 'muted' }, 'Meeting purposes follow SPEC 5.7b; Totty has not yet confirmed them.'),
     h('h3', {}, 'What is discussed'),
     h('ul', {}, cfg.agenda.map((x) => h('li', {}, x))),
     h('h3', {}, 'What needs to happen after'),
@@ -83,6 +99,7 @@ export async function renderAppointment({ h, api, app, logoutBtn, handle }, id) 
     a.client_id && cfg.showGoals ? h('section', {},
       h('h3', {}, a.kind === 'first_checkin' ? 'Baseline data (first 7 days)' : 'Progress'),
       liveGoals.length ? liveGoals.map((g) => goalProgress({ h, api, handle }, g, cfg.range)) : h('p', { class: 'muted' }, 'No goals yet.')) : '',
+    a.status === 'cancelled' ? '' : outcomeSection,
     h('h3', {}, 'Notes'),
     notesForm);
 }
