@@ -106,8 +106,8 @@ const NAV = [
 ];
 /** Sidebar navigation; hidden by CSS until logged in. */
 const sidebar = document.getElementById('sidebar');
-sidebar.append(...NAV.map(([href, key, label]) => h('a', { href, class: 'nav-link', 'data-key': key, title: label, 'aria-label': label },
-  h('span', { class: 'side-icon' }, ICONS[key]()))));
+sidebar.append(...NAV.map(([href, key, label]) => h('a', { href, class: 'nav-link', 'data-key': key },
+  h('span', { class: 'side-icon' }, ICONS[key]()), label)));
 // Show the sidebar exactly when the Log out button is visible (i.e. logged in). A MutationObserver avoids the
 // stale :has() style invalidation some browsers show when #logout's hidden attribute changes.
 const syncSidebar = () => { sidebar.hidden = logoutBtn.hidden; };
@@ -140,8 +140,7 @@ async function renderClients() {
   app.replaceChildren(...[
     h('div', { class: 'stats' },
       h('h2', {}, 'Clients'),
-      h('span', { class: 'spacer' })),
-    h('div', { class: 'chip-bar' },
+      h('span', { class: 'spacer' }),
       h('a', { href: '#/archived', class: 'chip chip-archived' }, 'View Archived')),
     ...(d.emailsToApprove ?? []).map((c) => h('div', { class: 'warn-line' }, `✉ ${c.kind === 'inquiry' ? 'Profile page email' : 'Initial consultation email'} for ${c.first_name} ${c.last_name} is waiting for your approval. `,
       h('a', { href: `#/client/${c.id}` }, 'Review'))),
@@ -187,11 +186,14 @@ const KIND_LABEL = { initial_consultation: 'Initial Consultation', first_checkin
 /** Schedule: month or week calendar of appointments. Chips show first name and time; clicking one opens that appointment's page. */
 async function renderAppointments() {
   const today = new Date();
+  const dayV = scheduleView === 'day';
   const week = scheduleView === 'week';
   scheduleAnchor ??= new Date(today.getFullYear(), today.getMonth(), today.getDate());
   const a0 = scheduleAnchor;
-  const first = week ? new Date(a0.getFullYear(), a0.getMonth(), a0.getDate() - a0.getDay()) : new Date(a0.getFullYear(), a0.getMonth(), 1);
-  const next = week ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + 7) : new Date(first.getFullYear(), first.getMonth() + 1, 1);
+  const first = dayV ? new Date(a0.getFullYear(), a0.getMonth(), a0.getDate())
+    : week ? new Date(a0.getFullYear(), a0.getMonth(), a0.getDate() - a0.getDay()) : new Date(a0.getFullYear(), a0.getMonth(), 1);
+  const next = dayV ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + 1)
+    : week ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + 7) : new Date(first.getFullYear(), first.getMonth() + 1, 1);
   const list = await api(`/appointments?from=${encodeURIComponent(first.toISOString())}&to=${encodeURIComponent(next.toISOString())}`);
   logoutBtn.hidden = false;
 
@@ -202,19 +204,21 @@ async function renderAppointments() {
     byDay.set(k, [...(byDay.get(k) ?? []), a]);
   }
   const go = (delta) => {
-    scheduleAnchor = delta === 0 ? null : week ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + 7 * delta) : new Date(first.getFullYear(), first.getMonth() + delta, 1);
+    scheduleAnchor = delta === 0 ? null : dayV ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + delta) : week ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + 7 * delta) : new Date(first.getFullYear(), first.getMonth() + delta, 1);
     renderAppointments();
   };
   const setView = (v) => { scheduleView = v; renderAppointments(); };
 
   const cell = (date) => h('div', { class: `cal-cell${dayKey(date) === dayKey(today) ? ' cal-today' : ''}${week ? ' cal-week-cell' : ''}` },
-    h('span', { class: 'cal-day' }, week ? date.toLocaleDateString([], { month: 'short', day: 'numeric' }) : String(date.getDate())),
-    (byDay.get(dayKey(date)) ?? []).map((a) => h('a', { href: `#/appointment/${a.id}`, class: `appt-chip${a.status === 'held' ? ' appt-chip-held' : ''}`, title: KIND_LABEL[a.kind],
+    dayV ? null : h('span', { class: 'cal-day' }, week ? date.toLocaleDateString([], { month: 'short', day: 'numeric' }) : String(date.getDate())),
+    (byDay.get(dayKey(date)) ?? []).map((a) => h('a', { href: `#/appointment/${a.id}`, class: `appt-chip type-${String(a.type).replace(/\s+/g, '-')}${a.status === 'held' ? ' appt-chip-held' : ''}`, title: KIND_LABEL[a.kind],
       'aria-label': `${KIND_LABEL[a.kind]}, ${a.client_id ? a.first_name : 'Unassigned client'} ${fmtTimeShort(a.starts_at)}: open appointment` },
       `${a.client_id ? a.first_name : 'Unassigned'} ${fmtTimeShort(a.starts_at)}`)));
 
   const cells = [];
-  if (week) {
+  if (dayV) {
+    cells.push(cell(first));
+  } else if (week) {
     for (let i = 0; i < 7; i++) cells.push(cell(new Date(first.getFullYear(), first.getMonth(), first.getDate() + i)));
   } else {
     for (let i = 0; i < first.getDay(); i++) cells.push(h('div', { class: 'cal-cell cal-empty' }));
@@ -223,24 +227,27 @@ async function renderAppointments() {
   }
 
   const last = new Date(next.getFullYear(), next.getMonth(), next.getDate() - 1);
-  const title = week
+  const title = dayV
+    ? first.toLocaleDateString([], { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    : week
     ? `${first.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${last.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`
     : first.toLocaleDateString([], { month: 'long', year: 'numeric' });
-  const unit = week ? 'week' : 'month';
+  const unit = dayV ? 'day' : week ? 'week' : 'month';
 
   app.replaceChildren(
     h('div', { class: 'cal-head' },
       h('h2', {}, title),
       h('span', { class: 'spacer' }),
       h('div', { class: 'range' },
-        h('button', { type: 'button', 'aria-pressed': String(!week), onclick: () => setView('month') }, 'Month'),
-        h('button', { type: 'button', 'aria-pressed': String(week), onclick: () => setView('week') }, 'Week')),
+        h('button', { type: 'button', 'aria-pressed': String(!week && !dayV), onclick: () => setView('month') }, 'Month'),
+        h('button', { type: 'button', 'aria-pressed': String(week), onclick: () => setView('week') }, 'Week'),
+        h('button', { type: 'button', 'aria-pressed': String(dayV), onclick: () => setView('day') }, 'Day')),
       h('div', { class: 'range' },
         h('button', { type: 'button', onclick: () => go(-1), 'aria-label': `Previous ${unit}` }, '‹'),
         h('button', { type: 'button', onclick: () => go(0) }, 'Today'),
         h('button', { type: 'button', onclick: () => go(1), 'aria-label': `Next ${unit}` }, '›'))),
-    h('div', { class: 'cal' },
-      ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((n) => h('div', { class: 'cal-dow' }, n)),
+    h('div', { class: `cal${dayV ? ' cal-single' : ''}` },
+      dayV ? null : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((n) => h('div', { class: 'cal-dow' }, n)),
       cells),
     ...(list.length ? [] : [h('p', { class: 'muted' }, `Nothing scheduled this ${unit}.`)]));
 }
