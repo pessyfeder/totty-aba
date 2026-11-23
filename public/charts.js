@@ -42,7 +42,17 @@ function markers(svg, x, annotations, h) {
   for (const a of annotations) {
     const px = x(day(a.date));
     svg.append(s('line', { x1: px, x2: px, y1: 8, y2: h - 22, class: 'phase' }, s('title', {}, `${a.date}: ${a.text}`)));
-    svg.append(s('text', { x: px + 3, y: 16, class: 'tick' }, a.text.slice(0, 18), s('title', {}, `${a.date}: ${a.text}`)));
+    // Wrap the full note onto several lines instead of cutting it off; flip to the left of the line near the right edge.
+    const lines = [];
+    let cur = '';
+    for (const w of a.text.split(/\s+/)) {
+      if (cur && (cur + ' ' + w).length > 22) { lines.push(cur); cur = w; } else cur = cur ? cur + ' ' + w : w;
+    }
+    if (cur) lines.push(cur);
+    const flip = px > W - 130;
+    const t = s('text', { x: flip ? px - 3 : px + 3, y: 16, class: 'tick', 'text-anchor': flip ? 'end' : 'start' }, s('title', {}, `${a.date}: ${a.text}`));
+    lines.slice(0, 4).forEach((ln, i) => t.append(s('tspan', { x: flip ? px - 3 : px + 3, dy: i ? 12 : 0 }, i === 3 && lines.length > 4 ? ln + '…' : ln)));
+    svg.append(t);
   }
 }
 
