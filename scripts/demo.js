@@ -46,6 +46,21 @@ await prompt(spoon, 5, 'answered');
 await prompt(bedtime, 2, 'sent');
 await prompt(spoon, 0, 'scheduled');
 
+// More clients, one per intake status (Dovid above is 'active').
+const sampleClients = [
+  ['Chaya', 'Goldstein', 'inquiry', 'Mrs. Goldstein', '+15555550101', 'Brooklyn', 'NY', '11211', null, null],
+  ['Moshe', 'Friedman', 'paperwork_received', 'Mr. Friedman', '+15555550102', 'Lakewood', 'NJ', '08701', "now() - interval '3 days'", null],
+  ['Leah', 'Katz', 'baseline', 'Mrs. Katz', '+15555550103', 'Monsey', 'NY', '10952', "now() - interval '10 days'", "now() - interval '4 days'"],
+];
+for (const [first, last, status, parent, phone, city, state, zip, submitted, baseline] of sampleClients) {
+  const c = await w.one(
+    `INSERT INTO client (clinician_id, first_name, last_name, admission_date, timezone, intake_status, city, state, zip, info_submitted_at, baseline_started_at)
+     VALUES ($1, $2, $3, current_date, 'America/New_York', $4, $5, $6, $7, ${submitted ?? 'NULL'}, ${baseline ?? 'NULL'}) RETURNING id`,
+    [w.clinician.id, first, last, status, city, state, zip],
+  );
+  await db.query(`INSERT INTO contact (client_id, name, phone, consent_given_at) VALUES ($1, $2, $3, now())`, [c.id, parent, phone]);
+}
+
 const messenger = createMessenger({ db, provider: consoleProvider() });
 const app = createApp({ db, messenger, config: { sessionSecret: 'demo-secret-demo-secret-demo-secret-1234', production: false } });
 const port = Number(process.argv[2] ?? 3000);
