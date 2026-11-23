@@ -127,19 +127,27 @@ s += [KeepTogether(sec('7. Release of Information (optional)', 'Complete only if
       Line('Provider / organization name:'), Line('Contact info (phone / email):'), Line('Type of information to be shared:'),
       Line('This authorization is valid until (date), or until revoked in writing:')] + sig('Parent / Caregiver / Educator signature (only if completing this section)'))]
 
-s += [PageBreak()] + sec('8. Telepractice Location &amp; Eligibility', 'Complete the part for your state only, initial each item, and sign.')
-s += [Paragraph('If you live in New Jersey', h3),
+def esig():
+    return [Spacer(1, 6), Line('Parent / Caregiver / Educator Signature *:'), row('Printed Name *', 'Relationship to Child *'), Spacer(1, 6)]
+COPY = Paragraph('© 2026 The BTB Method. Confidential — for use by families enrolled with The BTB Method. Not for reproduction or distribution.', small)
+
+s += [PageBreak()] + sec('8. Telepractice Location &amp; Eligibility Form', 'Please complete ONLY the section for your state, initial each item, and sign.')
+s += [row('Child’s Name *', 'Date *'), Spacer(1, 3),
+      checks('My family is located in:', ['New Jersey (Section A)', 'New York (Section B, next page)'])]
+s += [Paragraph('SECTION A  |  New Jersey Families — Location Attestation &amp; Consent', h3),
       Paragraph('New Jersey and New York regulate behavior-analytic services differently. For New Jersey families, The BTB Method is authorized to provide services only when both the session and your child’s home environment are located in New Jersey. Please read and initial each statement.', base), Spacer(1, 4)] + initialled(NJ)
-s += [PageBreak(), Paragraph('If you live in New York', h3),
-      row('Child’s name *', 'Date *'),
-      row('Diagnosing / ordering provider *', 'License type & state'), row('Provider phone / contact', 'Date of diagnosis'), Spacer(1, 4),
+s += esig()
+s += [KeepTogether([Paragraph('For Practitioner Use Only', h3),
+      row('Reviewed By (The BTB Method):', 'Date Reviewed:'), Line('Next Re-Verification Due:', W / 2)]), Spacer(1, 6), COPY]
+s += [PageBreak(), Paragraph('SECTION B  |  New York Families — Diagnosis &amp; Treatment Order Verification', h3),
+      Paragraph('Complete only if your family is located in New York.', small), Spacer(1, 3),
+      row('Child’s Name *', 'Date *'),
+      row('Diagnosing / Ordering Provider *', 'License Type & State'), row('Provider Phone / Contact', 'Date of Diagnosis'), Spacer(1, 4),
       Paragraph('Under New York Education Law Article 167, The BTB Method may provide services to a family located in New York only when the child has been diagnosed with autism spectrum disorder or a related disorder, and a prescription or order for behavioral treatment has been issued by a person licensed or otherwise authorized to provide that diagnosis and order. This form verifies and documents that eligibility. Required before services begin for New York families.', base), Spacer(1, 4)] + initialled(NY)
-s += sig('Parent / Caregiver / Educator signature *')
-s += [row('Printed name *', 'Relationship to child *'), Spacer(1, 8),
-      KeepTogether([Paragraph('For Practitioner Use Only', h3),
-      row('Reviewed by (The BTB Method):', 'Date verified:'),
-      Line('Diagnosis/order copy on file (Y/N):', W / 2)])]
-s += [Spacer(1, 6), Paragraph('* Required', small)]
+s += esig()
+s += [KeepTogether([Paragraph('For Practitioner Use Only', h3),
+      row('Reviewed By (The BTB Method):', 'Date Verified:'), Line('Diagnosis/Order Copy on File (Y/N):', W / 2)]),
+      Spacer(1, 6), COPY, Spacer(1, 4), Paragraph('* Required', small)]
 
 def footer(c, d):
     c.saveState(); c.setFillColor(colors.HexColor('#2f5d62')); c.setFillAlpha(0.08)  # diagonal watermark
