@@ -22,7 +22,7 @@ CONSENT, NJ, NY, TEXT = js_list('CONSENT_ITEMS'), js_list('NJ_ITEMS'), js_list('
 ACC = colors.HexColor('#2f5d62')
 W = letter[0] - 1.5 * inch
 
-base = ParagraphStyle('b', fontName='Helvetica', fontSize=9.5, leading=12.5)
+base = ParagraphStyle('b', fontName='Helvetica', fontSize=9.5, leading=14.5)
 small = ParagraphStyle('s', parent=base, fontSize=8.5, leading=11, textColor=colors.HexColor('#444444'))
 h1 = ParagraphStyle('h1', parent=base, fontName='Helvetica-Bold', fontSize=20, leading=24, textColor=ACC)
 h2 = ParagraphStyle('h2', parent=base, fontName='Helvetica-Bold', fontSize=12.5, leading=16, textColor=colors.white, backColor=ACC, borderPadding=(3, 5, 3, 5), spaceBefore=12, spaceAfter=8)
@@ -30,14 +30,14 @@ h3 = ParagraphStyle('h3', parent=base, fontName='Helvetica-Bold', fontSize=10, s
 
 class Line(Flowable):
     """A fill-in field: label followed by a ruled line."""
-    def __init__(self, label, width=W, height=20):
+    def __init__(self, label, width=W, height=28):
         super().__init__(); self.label, self.w, self.h = label, width, height
     def wrap(self, *_): return self.w, self.h
     def draw(self):
         c = self.canv; c.setFont('Helvetica', 8.5); c.setFillColor(colors.HexColor('#333333'))
-        c.drawString(0, 5, self.label)
+        c.drawString(0, 7, self.label)
         x = c.stringWidth(self.label, 'Helvetica', 8.5) + 4
-        c.setStrokeColor(colors.HexColor('#666666')); c.setLineWidth(0.5); c.line(x, 3, self.w, 3)
+        c.setStrokeColor(colors.HexColor('#666666')); c.setLineWidth(0.5); c.line(x, 5, self.w, 5)
 
 class Box(Flowable):
     """An empty writing box with a caption above."""
@@ -63,14 +63,14 @@ def checks(label, options):
 
 def check_item(text):
     t = Table([[Paragraph('[&nbsp;&nbsp;]', base), Paragraph(text, base)]], colWidths=[0.38 * inch, W - 0.38 * inch])
-    t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0), ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 2)]))
+    t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0), ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]))
     return t
 
 def initialled(items):
     out = []
     for i, text in enumerate(items, 1):
         t = Table([[Paragraph('_______', base), Paragraph(f'{i}. {text}', base)]], colWidths=[0.65 * inch, W - 0.65 * inch])
-        t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0), ('TOPPADDING', (0, 0), (-1, -1), 2), ('BOTTOMPADDING', (0, 0), (-1, -1), 3)]))
+        t.setStyle(TableStyle([('VALIGN', (0, 0), (-1, -1), 'TOP'), ('LEFTPADDING', (0, 0), (-1, -1), 0), ('TOPPADDING', (0, 0), (-1, -1), 3), ('BOTTOMPADDING', (0, 0), (-1, -1), 5)]))
         out.append(t)
     return out
 
@@ -127,11 +127,11 @@ s += [KeepTogether(sec('3. Fee &amp; Cancellation Policy', 'Private pay · No in
 s += [PageBreak()] + sec('4. Background &amp; History', 'Please complete before your first session.')
 for l in ['Current diagnoses (if any)', 'Current medications', 'Current providers / other services (school, OT, speech, other therapy)',
           'Past interventions tried for this behavior', 'Family members / caregivers involved in implementing strategies', 'Anything else we should know']:
-    s.append(Box(l, 46))
+    s.append(Box(l, 78))
 
 s += [PageBreak()] + sec('5. Preference Assessment — What Motivates Your Child', 'List your child’s favorites in each category below, then choose the top 3 overall.')
 for l in ['Toys & Activities', 'Foods & Snacks', 'Social / Attention (praise, tickles, high-fives)', 'Sensory (music, movement, textures)', 'Screen Time / Technology', 'Other']:
-    s.append(Box(l, 38))
+    s.append(Box(l, 60))
 s += [Paragraph('Top 3 overall (ranked)', h3), Line('1.'), Line('2.'), Line('3.')]
 
 s += [KeepTogether(sec('6. Release of Information (optional)', 'Complete only if you’d like The BTB Method to communicate directly with another provider involved in your child’s care (for example, a school, pediatrician, or therapist).') + [
