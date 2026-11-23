@@ -342,6 +342,24 @@ export function createScheduler({ db, messenger, mailer = null, now = () => new 
     );
   }
 
+  /**
+   * Once the local day of a scheduled appointment has passed without Totty marking it held, it becomes missed (SPEC 5.7b).
+   * "Local" is the client's timezone. Runs after activateAfterFirstCheckin so a check-in that ended still activates the client.
+   * Totty can change it back (Mark held / Back to scheduled). Each change is audit-logged as a system action.
+   */
+  async function markMissedAppointments(at) {
+    const { rows } = await db.query(
+      `UPDATE appointment a SET status = 'missed', updated_at = $1
+         FROM client cl
+        WHERE cl.id = a.client_id AND a.status = 'scheduled'
+          AND ($1::timestamptz AT TIME ZONE cl.timezone)::date > (a.starts_at AT TIME ZONE cl.timezone)::date
+        RETURNING a.id, a.clinician_id`, [at]);
+    for (const r of rows) {
+      await db.query(`INSERT INTO audit_log (clinician_id, action, entity, entity_id, detail) VALUES ($1, 'update', 'appointment', $2, $3)`,
+        [r.clinician_id, r.id, { fields: ['status'], status: 'missed', via: 'scheduler' }]);
+    }
+  }
+
   async function tick() {
     const at = now();
     await generatePrompts(at);
@@ -350,8 +368,9 @@ export function createScheduler({ db, messenger, mailer = null, now = () => new 
     await sendCheckins(at);
     await sendPaperCheckinEmails(at);
     await activateAfterFirstCheckin(at);
+    await markMissedAppointments(at);
     await markNoResponse(at);
   }
 
-  return { tick, activateAfterFirstCheckin, generatePrompts, sendDue, sendFollowUps, sendCheckins, sendPaperCheckinEmails, markNoResponse };
+  return { tick, activateAfterFirstCheckin, markMissedAppointments, generatePrompts, sendDue, sendFollowUps, sendCheckins, sendPaperCheckinEmails, markNoResponse };
 }

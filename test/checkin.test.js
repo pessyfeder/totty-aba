@@ -129,3 +129,24 @@ test('a baseline client gets the first check-in text and becomes active after th
   await scheduler.activateAfterFirstCheckin(new Date('2026-11-13T16:01:00Z'));
   assert.equal(await status(), 'active');
 });
+
+test('a scheduled appointment becomes missed once its local day has passed without being marked held (SPEC 5.7b)', async () => {
+  const add = async (id, startsAt, status = 'scheduled') => (await db.query(
+    `INSERT INTO appointment (clinician_id, client_id, external_id, type, starts_at, status) VALUES ($1, $2, $3, 'check-in', $4, $5) RETURNING id`,
+    [world.clinician.id, world.client.id, id, startsAt, status])).rows[0].id;
+  const statusOf = async (id) => (await db.query('SELECT status FROM appointment WHERE id = $1', [id])).rows[0].status;
+  const today = await add('m1', '2026-11-13T15:00:00Z'); // Fri 10am EST
+  const held = await add('m2', '2026-11-13T16:00:00Z', 'held');
+  const cancelled = await add('m3', '2026-11-13T17:00:00Z', 'cancelled');
+  const future = await add('m4', '2026-11-16T15:00:00Z');
+  await scheduler.markMissedAppointments(new Date('2026-11-14T04:59:00Z')); // 11:59pm Friday EST: day not over
+  assert.equal(await statusOf(today), 'scheduled');
+  await scheduler.markMissedAppointments(new Date('2026-11-14T05:01:00Z')); // just after local midnight
+  assert.equal(await statusOf(today), 'missed');
+  assert.equal(await statusOf(held), 'held');
+  assert.equal(await statusOf(cancelled), 'cancelled');
+  assert.equal(await statusOf(future), 'scheduled');
+  const { rows } = await db.query(`SELECT detail FROM audit_log WHERE entity = 'appointment' AND entity_id = $1`, [today]);
+  assert.equal(rows.length, 1);
+  assert.equal(rows[0].detail.via, 'scheduler');
+});
