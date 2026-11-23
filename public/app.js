@@ -149,50 +149,69 @@ function clientSearch(clients) {
 }
 
 const fmtTimeShort = (iso) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
-let scheduleMonth = null; // first day of the month being viewed
+let scheduleAnchor = null; // any date inside the month/week being viewed
+let scheduleView = 'month'; // 'month' | 'week'
 const KIND_LABEL = { initial_consultation: 'Initial Consultation', first_checkin: 'First check-in (Baseline)', biweekly_checkin: 'Bi-weekly check-in' };
 
-/** Schedule: month calendar of appointments. Chips show first name and time; clicking one opens that appointment's page. */
+/** Schedule: month or week calendar of appointments. Chips show first name and time; clicking one opens that appointment's page. */
 async function renderAppointments() {
   const today = new Date();
-  scheduleMonth ??= new Date(today.getFullYear(), today.getMonth(), 1);
-  const first = scheduleMonth;
-  const next = new Date(first.getFullYear(), first.getMonth() + 1, 1);
+  const week = scheduleView === 'week';
+  scheduleAnchor ??= new Date(today.getFullYear(), today.getMonth(), today.getDate());
+  const a0 = scheduleAnchor;
+  const first = week ? new Date(a0.getFullYear(), a0.getMonth(), a0.getDate() - a0.getDay()) : new Date(a0.getFullYear(), a0.getMonth(), 1);
+  const next = week ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + 7) : new Date(first.getFullYear(), first.getMonth() + 1, 1);
   const list = await api(`/appointments?from=${encodeURIComponent(first.toISOString())}&to=${encodeURIComponent(next.toISOString())}`);
   logoutBtn.hidden = false;
 
+  const dayKey = (d) => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
   const byDay = new Map();
-  for (const a of list) {
-    const k = new Date(a.starts_at).getDate();
+  for (const a of [...list].sort((x, y) => new Date(x.starts_at) - new Date(y.starts_at))) {
+    const k = dayKey(new Date(a.starts_at));
     byDay.set(k, [...(byDay.get(k) ?? []), a]);
   }
-  const go = (delta) => { scheduleMonth = delta === 0 ? null : new Date(first.getFullYear(), first.getMonth() + delta, 1); renderAppointments(); };
+  const go = (delta) => {
+    scheduleAnchor = delta === 0 ? null : week ? new Date(first.getFullYear(), first.getMonth(), first.getDate() + 7 * delta) : new Date(first.getFullYear(), first.getMonth() + delta, 1);
+    renderAppointments();
+  };
+  const setView = (v) => { scheduleView = v; renderAppointments(); };
 
-  const lead = first.getDay();
-  const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+  const cell = (date) => h('div', { class: `cal-cell${dayKey(date) === dayKey(today) ? ' cal-today' : ''}${week ? ' cal-week-cell' : ''}` },
+    h('span', { class: 'cal-day' }, week ? date.toLocaleDateString([], { month: 'short', day: 'numeric' }) : String(date.getDate())),
+    (byDay.get(dayKey(date)) ?? []).map((a) => h('a', { href: `#/appointment/${a.id}`, class: 'appt-chip', title: KIND_LABEL[a.kind],
+      'aria-label': `${KIND_LABEL[a.kind]}, ${a.client_id ? a.first_name : 'Unmatched client'} ${fmtTimeShort(a.starts_at)}: open appointment` },
+      `${a.client_id ? a.first_name : 'Unmatched'} ${fmtTimeShort(a.starts_at)}`)));
+
   const cells = [];
-  for (let i = 0; i < lead; i++) cells.push(h('div', { class: 'cal-cell cal-empty' }));
-  for (let d = 1; d <= days; d++) {
-    const isToday = d === today.getDate() && first.getMonth() === today.getMonth() && first.getFullYear() === today.getFullYear();
-    cells.push(h('div', { class: `cal-cell${isToday ? ' cal-today' : ''}` },
-      h('span', { class: 'cal-day' }, String(d)),
-      (byDay.get(d) ?? []).map((a) => h('a', { href: `#/appointment/${a.id}`, class: 'appt-chip', title: KIND_LABEL[a.kind],
-        'aria-label': `${KIND_LABEL[a.kind]}, ${a.client_id ? a.first_name : 'Unmatched client'} ${fmtTimeShort(a.starts_at)}: open appointment` },
-        `${a.client_id ? a.first_name : 'Unmatched'} ${fmtTimeShort(a.starts_at)}`))));
+  if (week) {
+    for (let i = 0; i < 7; i++) cells.push(cell(new Date(first.getFullYear(), first.getMonth(), first.getDate() + i)));
+  } else {
+    for (let i = 0; i < first.getDay(); i++) cells.push(h('div', { class: 'cal-cell cal-empty' }));
+    const days = new Date(first.getFullYear(), first.getMonth() + 1, 0).getDate();
+    for (let d = 1; d <= days; d++) cells.push(cell(new Date(first.getFullYear(), first.getMonth(), d)));
   }
+
+  const last = new Date(next.getFullYear(), next.getMonth(), next.getDate() - 1);
+  const title = week
+    ? `${first.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${last.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`
+    : first.toLocaleDateString([], { month: 'long', year: 'numeric' });
+  const unit = week ? 'week' : 'month';
 
   app.replaceChildren(
     h('div', { class: 'cal-head' },
-      h('h2', {}, first.toLocaleDateString([], { month: 'long', year: 'numeric' })),
+      h('h2', {}, title),
       h('span', { class: 'spacer' }),
       h('div', { class: 'range' },
-        h('button', { type: 'button', onclick: () => go(-1), 'aria-label': 'Previous month' }, '‹'),
+        h('button', { type: 'button', 'aria-pressed': String(!week), onclick: () => setView('month') }, 'Month'),
+        h('button', { type: 'button', 'aria-pressed': String(week), onclick: () => setView('week') }, 'Week')),
+      h('div', { class: 'range' },
+        h('button', { type: 'button', onclick: () => go(-1), 'aria-label': `Previous ${unit}` }, '‹'),
         h('button', { type: 'button', onclick: () => go(0) }, 'Today'),
-        h('button', { type: 'button', onclick: () => go(1), 'aria-label': 'Next month' }, '›'))),
+        h('button', { type: 'button', onclick: () => go(1), 'aria-label': `Next ${unit}` }, '›'))),
     h('div', { class: 'cal' },
       ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((n) => h('div', { class: 'cal-dow' }, n)),
       cells),
-    ...(list.length ? [] : [h('p', { class: 'muted' }, 'Nothing scheduled this month.')]));
+    ...(list.length ? [] : [h('p', { class: 'muted' }, `Nothing scheduled this ${unit}.`)]));
 }
 
 const renderClient = (id, tab) => renderClientPage({ h, api, app, logoutBtn, handle }, id, tab);
