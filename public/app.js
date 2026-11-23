@@ -131,11 +131,11 @@ async function renderDashboard() {
   const TYPE_NAMES = { consultation: 'Consultation', 'check-in': 'Check-in', 'ongoing meeting': 'Ongoing meeting' };
   app.replaceChildren(...[
     sh && sh.active && h('div', { class: 'banner' }, `Shabbos window in effect until ${fmtDateTime(sh.end)}.`),
-    h('h2', { class: 'options-heading' }, 'Dashboard'),
-    h('section', { class: 'upcoming-card', 'aria-labelledby': 'upcoming-title' },
+    h('h2', { class: 'options-heading' }, 'Welcome, Yisroel'),
+    h('section', { class: 'upcoming-card','aria-labelledby': 'upcoming-title' },
       h('div', { class: 'upcoming-head' },
         h('span', { class: 'upcoming-icon' }, ICONS.appointments()),
-        h('h3', { id: 'upcoming-title' }, 'Upcoming appointments'),
+        h('h3', { id: 'upcoming-title' }, 'View Your Upcoming Appointments'),
         upcoming.length > 0 && h('span', { class: 'badge' }, String(upcoming.length)),
         h('a', { href: '#/appointments', class: 'upcoming-all' }, 'Full schedule →')),
       upcoming.length
@@ -150,7 +150,7 @@ async function renderDashboard() {
     h('section', { class: 'upcoming-card attention-card', 'aria-labelledby': 'attn-title' },
       h('div', { class: 'upcoming-head' },
         h('span', { class: 'upcoming-icon' }, '⚠'),
-        h('h3', { id: 'attn-title' }, 'Needs attention'),
+        h('h3', { id: 'attn-title' }, 'Here’s What Needs Your Attention'),
         n > 0 && h('span', { class: 'badge' }, String(n))),
       n
         ? h('ul', { class: 'upcoming-list' }, d.attention.map((c) => h('li', {},
